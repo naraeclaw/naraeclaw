@@ -26,6 +26,9 @@ zeroclaw-tool-call-parser = { path = "crates/zeroclaw-tool-call-parser", version
 zeroclaw-macros = { path = "crates/zeroclaw-macros", version = "0.6.9" }
 aardvark-sys = { path = "crates/aardvark-sys", version = "0.1.0" }
 
+# Memory zeroization for secrets on drop
+zeroize = { version = "1", features = ["derive"] }
+
 [package]
 name = "naraeclawlabs"
 version.workspace = true

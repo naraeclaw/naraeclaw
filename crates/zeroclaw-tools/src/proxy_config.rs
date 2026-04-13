@@ -140,7 +140,7 @@ impl ProxyConfigTool {
     }
 
     fn handle_get(&self) -> anyhow::Result<ToolResult> {
-        let file_proxy = self.load_config_without_env()?.proxy;
+        let file_proxy = self.load_config_without_env()?.proxy.clone();
         let runtime_proxy = runtime_proxy_config();
         Ok(ToolResult {
             success: true,
@@ -309,7 +309,7 @@ impl ProxyConfigTool {
 
     fn handle_apply_env(&self) -> anyhow::Result<ToolResult> {
         let cfg = self.load_config_without_env()?;
-        let proxy = cfg.proxy;
+        let proxy = cfg.proxy.clone();
         proxy.validate()?;
 
         if !proxy.enabled {

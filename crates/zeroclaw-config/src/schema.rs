@@ -9806,11 +9806,11 @@ impl Config {
             );
             Ok(config)
         } else {
-            let mut config = Config {
-                config_path: config_path.clone(),
-                workspace_dir,
-                ..Config::default()
-            };
+            // Note: struct-update syntax (`..Config::default()`) is disallowed
+            // for types that implement Drop (Rust E0509). Use field assignment instead.
+            let mut config = Config::default();
+            config.config_path = config_path.clone();
+            config.workspace_dir = workspace_dir;
             config.save().await?;
 
             // Restrict permissions on newly created config file (may contain API keys)
@@ -11342,11 +11342,9 @@ mod tests {
         let config_path = temp.path().join("config.toml");
         let workspace_dir = temp.path().join("workspace");
 
-        let config = Config {
-            config_path: config_path.clone(),
-            workspace_dir,
-            ..Default::default()
-        };
+        let mut config = Config::default();
+        config.config_path = config_path.clone();
+        config.workspace_dir = workspace_dir;
 
         config.save().await.expect("save config");
 
@@ -11760,7 +11758,7 @@ auto_save = true
         assert_eq!(parsed.heartbeat.to.as_deref(), Some("123456"));
         assert!(parsed.channels_config.telegram.is_some());
         assert_eq!(
-            parsed.channels_config.telegram.unwrap().bot_token,
+            parsed.channels_config.telegram.as_ref().unwrap().bot_token,
             "123:ABC"
         );
     }
@@ -12296,12 +12294,10 @@ default_temperature = 0.7
         ));
         fs::create_dir_all(&dir).await.unwrap();
 
-        let mut config = Config {
-            workspace_dir: dir.join("workspace"),
-            config_path: dir.join("config.toml"),
-            api_key: Some("root-credential".into()),
-            ..Default::default()
-        };
+        let mut config = Config::default();
+        config.workspace_dir = dir.join("workspace");
+        config.config_path = dir.join("config.toml");
+        config.api_key = Some("root-credential".into());
         config.composio.api_key = Some("composio-credential".into());
         config.browser.computer_use.api_key = Some("browser-credential".into());
         config.web_search.brave_api_key = Some("brave-credential".into());
@@ -12426,12 +12422,10 @@ default_temperature = 0.7
         fs::create_dir_all(&dir).await.unwrap();
 
         let config_path = dir.join("config.toml");
-        let mut config = Config {
-            workspace_dir: dir.join("workspace"),
-            config_path: config_path.clone(),
-            default_model: Some("model-a".into()),
-            ..Default::default()
-        };
+        let mut config = Config::default();
+        config.workspace_dir = dir.join("workspace");
+        config.config_path = config_path.clone();
+        config.default_model = Some("model-a".into());
         config.save().await.unwrap();
         assert!(config_path.exists());
 
@@ -13662,10 +13656,8 @@ requires_openai_auth = true
     #[test]
     async fn env_override_provider_fallback_does_not_replace_non_default_provider() {
         let _env_guard = env_override_lock().await;
-        let mut config = Config {
-            default_provider: Some("custom:https://proxy.example.com/v1".to_string()),
-            ..Config::default()
-        };
+        let mut config = Config::default();
+        config.default_provider = Some("custom:https://proxy.example.com/v1".to_string());
 
         // SAFETY: test-only, single-threaded test runner.
         unsafe { std::env::remove_var("ZEROCLAW_PROVIDER") };
@@ -13684,10 +13676,8 @@ requires_openai_auth = true
     #[test]
     async fn env_override_zero_claw_provider_overrides_non_default_provider() {
         let _env_guard = env_override_lock().await;
-        let mut config = Config {
-            default_provider: Some("custom:https://proxy.example.com/v1".to_string()),
-            ..Config::default()
-        };
+        let mut config = Config::default();
+        config.default_provider = Some("custom:https://proxy.example.com/v1".to_string());
 
         // SAFETY: test-only, single-threaded test runner.
         unsafe { std::env::set_var("ZEROCLAW_PROVIDER", "openrouter") };
@@ -13705,10 +13695,8 @@ requires_openai_auth = true
     #[test]
     async fn env_override_glm_api_key_for_regional_aliases() {
         let _env_guard = env_override_lock().await;
-        let mut config = Config {
-            default_provider: Some("glm-cn".to_string()),
-            ..Config::default()
-        };
+        let mut config = Config::default();
+        config.default_provider = Some("glm-cn".to_string());
 
         // SAFETY: test-only, single-threaded test runner.
         unsafe { std::env::set_var("GLM_API_KEY", "glm-regional-key") };
@@ -13722,10 +13710,8 @@ requires_openai_auth = true
     #[test]
     async fn env_override_zai_api_key_for_regional_aliases() {
         let _env_guard = env_override_lock().await;
-        let mut config = Config {
-            default_provider: Some("zai-cn".to_string()),
-            ..Config::default()
-        };
+        let mut config = Config::default();
+        config.default_provider = Some("zai-cn".to_string());
 
         // SAFETY: test-only, single-threaded test runner.
         unsafe { std::env::set_var("ZAI_API_KEY", "zai-regional-key") };
@@ -13753,25 +13739,20 @@ requires_openai_auth = true
     #[test]
     async fn model_provider_profile_maps_to_custom_endpoint() {
         let _env_guard = env_override_lock().await;
-        let mut config = Config {
-            default_provider: Some("sub2api".to_string()),
-            model_providers: HashMap::from([(
-                "sub2api".to_string(),
-                ModelProviderConfig {
-                    name: Some("sub2api".to_string()),
-                    base_url: Some("https://api.tonsof.blue/v1".to_string()),
-                    wire_api: None,
-                    requires_openai_auth: false,
-                    azure_openai_resource: None,
-                    azure_openai_deployment: None,
-                    azure_openai_api_version: None,
-                    api_path: None,
-                    max_tokens: None,
-                    ..Default::default()
-                },
-            )]),
-            ..Config::default()
-        };
+        let mut profile = ModelProviderConfig::default();
+        profile.name = Some("sub2api".to_string());
+        profile.base_url = Some("https://api.tonsof.blue/v1".to_string());
+        profile.wire_api = None;
+        profile.requires_openai_auth = false;
+        profile.azure_openai_resource = None;
+        profile.azure_openai_deployment = None;
+        profile.azure_openai_api_version = None;
+        profile.api_path = None;
+        profile.max_tokens = None;
+
+        let mut config = Config::default();
+        config.default_provider = Some("sub2api".to_string());
+        config.model_providers = HashMap::from([("sub2api".to_string(), profile)]);
 
         config.apply_env_overrides();
         assert_eq!(
@@ -13787,26 +13768,21 @@ requires_openai_auth = true
     #[test]
     async fn model_provider_profile_responses_uses_openai_codex_and_openai_key() {
         let _env_guard = env_override_lock().await;
-        let mut config = Config {
-            default_provider: Some("sub2api".to_string()),
-            model_providers: HashMap::from([(
-                "sub2api".to_string(),
-                ModelProviderConfig {
-                    name: Some("sub2api".to_string()),
-                    base_url: Some("https://api.tonsof.blue".to_string()),
-                    wire_api: Some("responses".to_string()),
-                    requires_openai_auth: true,
-                    azure_openai_resource: None,
-                    azure_openai_deployment: None,
-                    azure_openai_api_version: None,
-                    api_path: None,
-                    max_tokens: None,
-                    ..Default::default()
-                },
-            )]),
-            api_key: None,
-            ..Config::default()
-        };
+        let mut profile = ModelProviderConfig::default();
+        profile.name = Some("sub2api".to_string());
+        profile.base_url = Some("https://api.tonsof.blue".to_string());
+        profile.wire_api = Some("responses".to_string());
+        profile.requires_openai_auth = true;
+        profile.azure_openai_resource = None;
+        profile.azure_openai_deployment = None;
+        profile.azure_openai_api_version = None;
+        profile.api_path = None;
+        profile.max_tokens = None;
+
+        let mut config = Config::default();
+        config.default_provider = Some("sub2api".to_string());
+        config.model_providers = HashMap::from([("sub2api".to_string(), profile)]);
+        config.api_key = None;
 
         // SAFETY: test-only, single-threaded test runner.
         unsafe { std::env::set_var("OPENAI_API_KEY", "sk-test-codex-key") };
@@ -13833,12 +13809,10 @@ requires_openai_auth = true
         // SAFETY: test-only, single-threaded test runner.
         unsafe { std::env::set_var("ZEROCLAW_WORKSPACE", &workspace_dir) };
 
-        let config = Config {
-            workspace_dir,
-            config_path: PathBuf::from("config.toml"),
-            default_temperature: 0.5,
-            ..Default::default()
-        };
+        let mut config = Config::default();
+        config.workspace_dir = workspace_dir;
+        config.config_path = PathBuf::from("config.toml");
+        config.default_temperature = 0.5;
         config.save().await.unwrap();
 
         assert!(resolved_config_path.exists());
@@ -13863,13 +13837,11 @@ requires_openai_auth = true
     #[test]
     async fn validate_ollama_cloud_model_requires_remote_api_url() {
         let _env_guard = env_override_lock().await;
-        let config = Config {
-            default_provider: Some("ollama".to_string()),
-            default_model: Some("glm-5:cloud".to_string()),
-            api_url: None,
-            api_key: Some("ollama-key".to_string()),
-            ..Config::default()
-        };
+        let mut config = Config::default();
+        config.default_provider = Some("ollama".to_string());
+        config.default_model = Some("glm-5:cloud".to_string());
+        config.api_url = None;
+        config.api_key = Some("ollama-key".to_string());
 
         let error = config.validate().expect_err("expected validation to fail");
         assert!(error.to_string().contains(
@@ -13880,13 +13852,11 @@ requires_openai_auth = true
     #[test]
     async fn validate_ollama_cloud_model_accepts_remote_endpoint_and_env_key() {
         let _env_guard = env_override_lock().await;
-        let config = Config {
-            default_provider: Some("ollama".to_string()),
-            default_model: Some("glm-5:cloud".to_string()),
-            api_url: Some("https://ollama.com/api".to_string()),
-            api_key: None,
-            ..Config::default()
-        };
+        let mut config = Config::default();
+        config.default_provider = Some("ollama".to_string());
+        config.default_model = Some("glm-5:cloud".to_string());
+        config.api_url = Some("https://ollama.com/api".to_string());
+        config.api_key = None;
 
         // SAFETY: test-only, single-threaded test runner.
         unsafe { std::env::set_var("OLLAMA_API_KEY", "ollama-env-key") };
@@ -13900,25 +13870,20 @@ requires_openai_auth = true
     #[test]
     async fn validate_rejects_unknown_model_provider_wire_api() {
         let _env_guard = env_override_lock().await;
-        let config = Config {
-            default_provider: Some("sub2api".to_string()),
-            model_providers: HashMap::from([(
-                "sub2api".to_string(),
-                ModelProviderConfig {
-                    name: Some("sub2api".to_string()),
-                    base_url: Some("https://api.tonsof.blue/v1".to_string()),
-                    wire_api: Some("ws".to_string()),
-                    requires_openai_auth: false,
-                    azure_openai_resource: None,
-                    azure_openai_deployment: None,
-                    azure_openai_api_version: None,
-                    api_path: None,
-                    max_tokens: None,
-                    ..Default::default()
-                },
-            )]),
-            ..Config::default()
-        };
+        let mut profile = ModelProviderConfig::default();
+        profile.name = Some("sub2api".to_string());
+        profile.base_url = Some("https://api.tonsof.blue/v1".to_string());
+        profile.wire_api = Some("ws".to_string());
+        profile.requires_openai_auth = false;
+        profile.azure_openai_resource = None;
+        profile.azure_openai_deployment = None;
+        profile.azure_openai_api_version = None;
+        profile.api_path = None;
+        profile.max_tokens = None;
+
+        let mut config = Config::default();
+        config.default_provider = Some("sub2api".to_string());
+        config.model_providers = HashMap::from([("sub2api".to_string(), profile)]);
 
         let error = config.validate().expect_err("expected validation failure");
         assert!(
@@ -14195,11 +14160,9 @@ default_model = "legacy-model"
         // SAFETY: test-only, single-threaded test runner.
         unsafe { std::env::remove_var("ZEROCLAW_WORKSPACE") };
 
-        let mut config = Config {
-            config_path: config_path.clone(),
-            workspace_dir: config_dir.join("workspace"),
-            ..Default::default()
-        };
+        let mut config = Config::default();
+        config.config_path = config_path.clone();
+        config.workspace_dir = config_dir.join("workspace");
         config.secrets.encrypt = true;
         config.channels_config.feishu = Some(FeishuConfig {
             enabled: true,
@@ -15280,10 +15243,8 @@ group_policy = "disabled"
         let config_path = tmp.path().join("config.toml");
 
         // Create a config and save it
-        let config = Config {
-            config_path: config_path.clone(),
-            ..Default::default()
-        };
+        let mut config = Config::default();
+        config.config_path = config_path.clone();
         config.save().await.unwrap();
 
         let meta = fs::metadata(&config_path).await.unwrap();
@@ -15300,10 +15261,8 @@ group_policy = "disabled"
         let tmp = tempfile::TempDir::new().unwrap();
         let config_path = tmp.path().join("config.toml");
 
-        let mut config = Config {
-            config_path: config_path.clone(),
-            ..Default::default()
-        };
+        let mut config = Config::default();
+        config.config_path = config_path.clone();
         config.save().await.unwrap();
 
         // Simulate the regression state observed in issue #1345.
@@ -15479,11 +15438,9 @@ require_otp_to_resume = true
 
         let plaintext_token = "123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11";
 
-        let mut config = Config {
-            workspace_dir: dir.join("workspace"),
-            config_path: dir.join("config.toml"),
-            ..Default::default()
-        };
+        let mut config = Config::default();
+        config.workspace_dir = dir.join("workspace");
+        config.config_path = dir.join("config.toml");
         config.channels_config.telegram = Some(TelegramConfig {
             enabled: true,
             bot_token: plaintext_token.into(),
@@ -15563,30 +15520,27 @@ require_otp_to_resume = true
     // ── MCP config validation ─────────────────────────────────────────────
 
     fn stdio_server(name: &str, command: &str) -> McpServerConfig {
-        McpServerConfig {
-            name: name.to_string(),
-            transport: McpTransport::Stdio,
-            command: command.to_string(),
-            ..Default::default()
-        }
+        let mut config = McpServerConfig::default();
+        config.name = name.to_string();
+        config.transport = McpTransport::Stdio;
+        config.command = command.to_string();
+        config
     }
 
     fn http_server(name: &str, url: &str) -> McpServerConfig {
-        McpServerConfig {
-            name: name.to_string(),
-            transport: McpTransport::Http,
-            url: Some(url.to_string()),
-            ..Default::default()
-        }
+        let mut config = McpServerConfig::default();
+        config.name = name.to_string();
+        config.transport = McpTransport::Http;
+        config.url = Some(url.to_string());
+        config
     }
 
     fn sse_server(name: &str, url: &str) -> McpServerConfig {
-        McpServerConfig {
-            name: name.to_string(),
-            transport: McpTransport::Sse,
-            url: Some(url.to_string()),
-            ..Default::default()
-        }
+        let mut config = McpServerConfig::default();
+        config.name = name.to_string();
+        config.transport = McpTransport::Sse;
+        config.url = Some(url.to_string());
+        config
     }
 
     #[test]
@@ -15597,41 +15551,33 @@ require_otp_to_resume = true
 
     #[test]
     async fn validate_mcp_config_valid_stdio_ok() {
-        let cfg = McpConfig {
-            enabled: true,
-            servers: vec![stdio_server("fs", "/usr/bin/mcp-fs")],
-            ..Default::default()
-        };
+        let mut cfg = McpConfig::default();
+        cfg.enabled = true;
+        cfg.servers = vec![stdio_server("fs", "/usr/bin/mcp-fs")];
         assert!(validate_mcp_config(&cfg).is_ok());
     }
 
     #[test]
     async fn validate_mcp_config_valid_http_ok() {
-        let cfg = McpConfig {
-            enabled: true,
-            servers: vec![http_server("svc", "http://localhost:8080/mcp")],
-            ..Default::default()
-        };
+        let mut cfg = McpConfig::default();
+        cfg.enabled = true;
+        cfg.servers = vec![http_server("svc", "http://localhost:8080/mcp")];
         assert!(validate_mcp_config(&cfg).is_ok());
     }
 
     #[test]
     async fn validate_mcp_config_valid_sse_ok() {
-        let cfg = McpConfig {
-            enabled: true,
-            servers: vec![sse_server("svc", "https://example.com/events")],
-            ..Default::default()
-        };
+        let mut cfg = McpConfig::default();
+        cfg.enabled = true;
+        cfg.servers = vec![sse_server("svc", "https://example.com/events")];
         assert!(validate_mcp_config(&cfg).is_ok());
     }
 
     #[test]
     async fn validate_mcp_config_rejects_empty_name() {
-        let cfg = McpConfig {
-            enabled: true,
-            servers: vec![stdio_server("", "/usr/bin/tool")],
-            ..Default::default()
-        };
+        let mut cfg = McpConfig::default();
+        cfg.enabled = true;
+        cfg.servers = vec![stdio_server("", "/usr/bin/tool")];
         let err = validate_mcp_config(&cfg).expect_err("empty name should fail");
         assert!(
             err.to_string().contains("name must not be empty"),
@@ -15641,11 +15587,9 @@ require_otp_to_resume = true
 
     #[test]
     async fn validate_mcp_config_rejects_whitespace_name() {
-        let cfg = McpConfig {
-            enabled: true,
-            servers: vec![stdio_server("   ", "/usr/bin/tool")],
-            ..Default::default()
-        };
+        let mut cfg = McpConfig::default();
+        cfg.enabled = true;
+        cfg.servers = vec![stdio_server("   ", "/usr/bin/tool")];
         let err = validate_mcp_config(&cfg).expect_err("whitespace name should fail");
         assert!(
             err.to_string().contains("name must not be empty"),
@@ -15655,14 +15599,12 @@ require_otp_to_resume = true
 
     #[test]
     async fn validate_mcp_config_rejects_duplicate_names() {
-        let cfg = McpConfig {
-            enabled: true,
-            servers: vec![
-                stdio_server("fs", "/usr/bin/mcp-a"),
-                stdio_server("fs", "/usr/bin/mcp-b"),
-            ],
-            ..Default::default()
-        };
+        let mut cfg = McpConfig::default();
+        cfg.enabled = true;
+        cfg.servers = vec![
+            stdio_server("fs", "/usr/bin/mcp-a"),
+            stdio_server("fs", "/usr/bin/mcp-b"),
+        ];
         let err = validate_mcp_config(&cfg).expect_err("duplicate name should fail");
         assert!(err.to_string().contains("duplicate name"), "got: {err}");
     }
@@ -15671,11 +15613,9 @@ require_otp_to_resume = true
     async fn validate_mcp_config_rejects_zero_timeout() {
         let mut server = stdio_server("fs", "/usr/bin/mcp-fs");
         server.tool_timeout_secs = Some(0);
-        let cfg = McpConfig {
-            enabled: true,
-            servers: vec![server],
-            ..Default::default()
-        };
+        let mut cfg = McpConfig::default();
+        cfg.enabled = true;
+        cfg.servers = vec![server];
         let err = validate_mcp_config(&cfg).expect_err("zero timeout should fail");
         assert!(err.to_string().contains("greater than 0"), "got: {err}");
     }
@@ -15684,11 +15624,9 @@ require_otp_to_resume = true
     async fn validate_mcp_config_rejects_timeout_exceeding_max() {
         let mut server = stdio_server("fs", "/usr/bin/mcp-fs");
         server.tool_timeout_secs = Some(MCP_MAX_TOOL_TIMEOUT_SECS + 1);
-        let cfg = McpConfig {
-            enabled: true,
-            servers: vec![server],
-            ..Default::default()
-        };
+        let mut cfg = McpConfig::default();
+        cfg.enabled = true;
+        cfg.servers = vec![server];
         let err = validate_mcp_config(&cfg).expect_err("oversized timeout should fail");
         assert!(err.to_string().contains("exceeds max"), "got: {err}");
     }
@@ -15697,21 +15635,17 @@ require_otp_to_resume = true
     async fn validate_mcp_config_allows_max_timeout_exactly() {
         let mut server = stdio_server("fs", "/usr/bin/mcp-fs");
         server.tool_timeout_secs = Some(MCP_MAX_TOOL_TIMEOUT_SECS);
-        let cfg = McpConfig {
-            enabled: true,
-            servers: vec![server],
-            ..Default::default()
-        };
+        let mut cfg = McpConfig::default();
+        cfg.enabled = true;
+        cfg.servers = vec![server];
         assert!(validate_mcp_config(&cfg).is_ok());
     }
 
     #[test]
     async fn validate_mcp_config_rejects_stdio_with_empty_command() {
-        let cfg = McpConfig {
-            enabled: true,
-            servers: vec![stdio_server("fs", "")],
-            ..Default::default()
-        };
+        let mut cfg = McpConfig::default();
+        cfg.enabled = true;
+        cfg.servers = vec![stdio_server("fs", "")];
         let err = validate_mcp_config(&cfg).expect_err("empty command should fail");
         assert!(
             err.to_string().contains("requires non-empty command"),
@@ -15721,54 +15655,44 @@ require_otp_to_resume = true
 
     #[test]
     async fn validate_mcp_config_rejects_http_without_url() {
-        let cfg = McpConfig {
-            enabled: true,
-            servers: vec![McpServerConfig {
-                name: "svc".to_string(),
-                transport: McpTransport::Http,
-                url: None,
-                ..Default::default()
-            }],
-            ..Default::default()
-        };
+        let mut server = McpServerConfig::default();
+        server.name = "svc".to_string();
+        server.transport = McpTransport::Http;
+        server.url = None;
+        let mut cfg = McpConfig::default();
+        cfg.enabled = true;
+        cfg.servers = vec![server];
         let err = validate_mcp_config(&cfg).expect_err("http without url should fail");
         assert!(err.to_string().contains("requires url"), "got: {err}");
     }
 
     #[test]
     async fn validate_mcp_config_rejects_sse_without_url() {
-        let cfg = McpConfig {
-            enabled: true,
-            servers: vec![McpServerConfig {
-                name: "svc".to_string(),
-                transport: McpTransport::Sse,
-                url: None,
-                ..Default::default()
-            }],
-            ..Default::default()
-        };
+        let mut server = McpServerConfig::default();
+        server.name = "svc".to_string();
+        server.transport = McpTransport::Sse;
+        server.url = None;
+        let mut cfg = McpConfig::default();
+        cfg.enabled = true;
+        cfg.servers = vec![server];
         let err = validate_mcp_config(&cfg).expect_err("sse without url should fail");
         assert!(err.to_string().contains("requires url"), "got: {err}");
     }
 
     #[test]
     async fn validate_mcp_config_rejects_non_http_scheme() {
-        let cfg = McpConfig {
-            enabled: true,
-            servers: vec![http_server("svc", "ftp://example.com/mcp")],
-            ..Default::default()
-        };
+        let mut cfg = McpConfig::default();
+        cfg.enabled = true;
+        cfg.servers = vec![http_server("svc", "ftp://example.com/mcp")];
         let err = validate_mcp_config(&cfg).expect_err("non-http scheme should fail");
         assert!(err.to_string().contains("http/https"), "got: {err}");
     }
 
     #[test]
     async fn validate_mcp_config_rejects_invalid_url() {
-        let cfg = McpConfig {
-            enabled: true,
-            servers: vec![http_server("svc", "not a url at all !!!")],
-            ..Default::default()
-        };
+        let mut cfg = McpConfig::default();
+        cfg.enabled = true;
+        cfg.servers = vec![http_server("svc", "not a url at all !!!")];
         let err = validate_mcp_config(&cfg).expect_err("invalid url should fail");
         assert!(err.to_string().contains("valid URL"), "got: {err}");
     }
@@ -15874,11 +15798,9 @@ require_otp_to_resume = true
 
         let plaintext_secret = "nevis-test-client-secret-value";
 
-        let mut config = Config {
-            workspace_dir: dir.join("workspace"),
-            config_path: dir.join("config.toml"),
-            ..Default::default()
-        };
+        let mut config = Config::default();
+        config.workspace_dir = dir.join("workspace");
+        config.config_path = dir.join("config.toml");
         config.security.nevis.client_secret = Some(plaintext_secret.into());
 
         // Save (triggers encryption)
@@ -15932,94 +15854,80 @@ require_otp_to_resume = true
 
     #[test]
     async fn nevis_config_validate_rejects_empty_instance_url() {
-        let cfg = NevisConfig {
-            enabled: true,
-            instance_url: String::new(),
-            client_id: "test-client".into(),
-            ..NevisConfig::default()
-        };
+        let mut cfg = NevisConfig::default();
+        cfg.enabled = true;
+        cfg.instance_url = String::new();
+        cfg.client_id = "test-client".into();
         let err = cfg.validate().unwrap_err();
         assert!(err.contains("instance_url"));
     }
 
     #[test]
     async fn nevis_config_validate_rejects_empty_client_id() {
-        let cfg = NevisConfig {
-            enabled: true,
-            instance_url: "https://nevis.example.com".into(),
-            client_id: String::new(),
-            ..NevisConfig::default()
-        };
+        let mut cfg = NevisConfig::default();
+        cfg.enabled = true;
+        cfg.instance_url = "https://nevis.example.com".into();
+        cfg.client_id = String::new();
         let err = cfg.validate().unwrap_err();
         assert!(err.contains("client_id"));
     }
 
     #[test]
     async fn nevis_config_validate_rejects_empty_realm() {
-        let cfg = NevisConfig {
-            enabled: true,
-            instance_url: "https://nevis.example.com".into(),
-            client_id: "test-client".into(),
-            realm: String::new(),
-            ..NevisConfig::default()
-        };
+        let mut cfg = NevisConfig::default();
+        cfg.enabled = true;
+        cfg.instance_url = "https://nevis.example.com".into();
+        cfg.client_id = "test-client".into();
+        cfg.realm = String::new();
         let err = cfg.validate().unwrap_err();
         assert!(err.contains("realm"));
     }
 
     #[test]
     async fn nevis_config_validate_rejects_local_without_jwks() {
-        let cfg = NevisConfig {
-            enabled: true,
-            instance_url: "https://nevis.example.com".into(),
-            client_id: "test-client".into(),
-            token_validation: "local".into(),
-            jwks_url: None,
-            ..NevisConfig::default()
-        };
+        let mut cfg = NevisConfig::default();
+        cfg.enabled = true;
+        cfg.instance_url = "https://nevis.example.com".into();
+        cfg.client_id = "test-client".into();
+        cfg.token_validation = "local".into();
+        cfg.jwks_url = None;
         let err = cfg.validate().unwrap_err();
         assert!(err.contains("jwks_url"));
     }
 
     #[test]
     async fn nevis_config_validate_rejects_zero_session_timeout() {
-        let cfg = NevisConfig {
-            enabled: true,
-            instance_url: "https://nevis.example.com".into(),
-            client_id: "test-client".into(),
-            token_validation: "remote".into(),
-            session_timeout_secs: 0,
-            ..NevisConfig::default()
-        };
+        let mut cfg = NevisConfig::default();
+        cfg.enabled = true;
+        cfg.instance_url = "https://nevis.example.com".into();
+        cfg.client_id = "test-client".into();
+        cfg.token_validation = "remote".into();
+        cfg.session_timeout_secs = 0;
         let err = cfg.validate().unwrap_err();
         assert!(err.contains("session_timeout_secs"));
     }
 
     #[test]
     async fn nevis_config_validate_accepts_valid_enabled_config() {
-        let cfg = NevisConfig {
-            enabled: true,
-            instance_url: "https://nevis.example.com".into(),
-            realm: "master".into(),
-            client_id: "test-client".into(),
-            token_validation: "remote".into(),
-            session_timeout_secs: 3600,
-            ..NevisConfig::default()
-        };
+        let mut cfg = NevisConfig::default();
+        cfg.enabled = true;
+        cfg.instance_url = "https://nevis.example.com".into();
+        cfg.realm = "master".into();
+        cfg.client_id = "test-client".into();
+        cfg.token_validation = "remote".into();
+        cfg.session_timeout_secs = 3600;
         assert!(cfg.validate().is_ok());
     }
 
     #[test]
     async fn nevis_config_validate_rejects_invalid_token_validation() {
-        let cfg = NevisConfig {
-            enabled: true,
-            instance_url: "https://nevis.example.com".into(),
-            realm: "master".into(),
-            client_id: "test-client".into(),
-            token_validation: "invalid_mode".into(),
-            session_timeout_secs: 3600,
-            ..NevisConfig::default()
-        };
+        let mut cfg = NevisConfig::default();
+        cfg.enabled = true;
+        cfg.instance_url = "https://nevis.example.com".into();
+        cfg.realm = "master".into();
+        cfg.client_id = "test-client".into();
+        cfg.token_validation = "invalid_mode".into();
+        cfg.session_timeout_secs = 3600;
         let err = cfg.validate().unwrap_err();
         assert!(
             err.contains("invalid value 'invalid_mode'"),
@@ -16029,10 +15937,8 @@ require_otp_to_resume = true
 
     #[test]
     async fn nevis_config_debug_redacts_client_secret() {
-        let cfg = NevisConfig {
-            client_secret: Some("super-secret".into()),
-            ..NevisConfig::default()
-        };
+        let mut cfg = NevisConfig::default();
+        cfg.client_secret = Some("super-secret".into());
         let debug_output = format!("{:?}", cfg);
         assert!(
             !debug_output.contains("super-secret"),
@@ -16510,10 +16416,8 @@ auto_approve = ["file_read", "file_write", "file_edit", "memory_recall", "memory
 
     #[test]
     async fn config_tree_traversal_discovers_nested_secrets() {
-        let mut config = Config {
-            api_key: Some("test-key".into()),
-            ..Default::default()
-        };
+        let mut config = Config::default();
+        config.api_key = Some("test-key".into());
         config.channels_config.matrix = Some(MatrixConfig {
             enabled: true,
             homeserver: "https://m.org".into(),
@@ -16922,13 +16826,11 @@ auto_approve = ["file_read", "file_write", "file_edit", "memory_recall", "memory
         let store = crate::secrets::SecretStore::new(dir.path(), true);
 
         let mut config = Config::default();
-        config.agents.insert(
-            "test-agent".into(),
-            DelegateAgentConfig {
-                api_key: Some("secret-key".into()),
-                ..Default::default()
-            },
-        );
+        config.agents.insert("test-agent".into(), {
+            let mut agent = DelegateAgentConfig::default();
+            agent.api_key = Some("secret-key".into());
+            agent
+        });
 
         config.encrypt_secrets(&store).unwrap();
         let encrypted_key = config.agents["test-agent"].api_key.as_ref().unwrap();
