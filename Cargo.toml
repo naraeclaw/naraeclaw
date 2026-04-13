@@ -6,7 +6,7 @@ resolver = "2"
 version = "0.6.9"
 edition = "2024"
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/zeroclaw-labs/zeroclaw"
+repository = "https://github.com/naraeclaw/naraeclaw"
 rust-version = "1.87"
 
 [workspace.dependencies]
@@ -27,12 +27,12 @@ zeroclaw-macros = { path = "crates/zeroclaw-macros", version = "0.6.9" }
 aardvark-sys = { path = "crates/aardvark-sys", version = "0.1.0" }
 
 [package]
-name = "zeroclawlabs"
+name = "naraeclawlabs"
 version.workspace = true
 edition.workspace = true
-authors = ["theonlyhennygod"]
+authors = []
 license.workspace = true
-description = "Zero overhead. Zero compromise. 100% Rust. The fastest, smallest AI assistant."
+description = "나래클로 — 한국어 우선 경량 AI 에이전트 런타임. 텔레그램 등 메신저에서 즉시 응답."
 repository.workspace = true
 readme = "README.md"
 keywords = ["ai", "agent", "cli", "assistant", "chatbot"]
@@ -50,7 +50,7 @@ include = [
 ]
 
 [[bin]]
-name = "zeroclaw"
+name = "naraeclaw"
 path = "src/main.rs"
 
 [lib]
