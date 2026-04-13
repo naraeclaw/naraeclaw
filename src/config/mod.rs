@@ -217,6 +217,10 @@ mod tests {
             mention_only: false,
             ack_reactions: None,
             proxy_url: None,
+            webhook_url: None,
+            webhook_listen_addr: "0.0.0.0:8443".to_string(),
+            webhook_path: "/telegram/webhook".to_string(),
+            webhook_secret_token: None,
         };
 
         let discord = DiscordConfig {

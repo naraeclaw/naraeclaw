@@ -3704,6 +3704,14 @@ fn setup_channels(
                     mention_only: existing_tg.map(|t| t.mention_only).unwrap_or(false),
                     ack_reactions: existing_tg.and_then(|t| t.ack_reactions),
                     proxy_url: existing_tg.and_then(|t| t.proxy_url.clone()),
+                    webhook_url: existing_tg.and_then(|t| t.webhook_url.clone()),
+                    webhook_listen_addr: existing_tg
+                        .map(|t| t.webhook_listen_addr.clone())
+                        .unwrap_or_else(|| "0.0.0.0:8443".to_string()),
+                    webhook_path: existing_tg
+                        .map(|t| t.webhook_path.clone())
+                        .unwrap_or_else(|| "/telegram/webhook".to_string()),
+                    webhook_secret_token: existing_tg.and_then(|t| t.webhook_secret_token.clone()),
                 });
             }
             ChannelMenuChoice::Discord => {

@@ -747,6 +747,10 @@ fn apply_tui_selections_to_config(app: &App, config: &mut Config) {
                     mention_only: false,
                     ack_reactions: None,
                     proxy_url: None,
+                    webhook_url: None,
+                    webhook_listen_addr: "0.0.0.0:8443".to_string(),
+                    webhook_path: "/telegram/webhook".to_string(),
+                    webhook_secret_token: None,
                 });
             }
         }
@@ -3468,6 +3472,10 @@ mod tests {
             mention_only: false,
             ack_reactions: None,
             proxy_url: None,
+            webhook_url: None,
+            webhook_listen_addr: "0.0.0.0:8443".to_string(),
+            webhook_path: "/telegram/webhook".to_string(),
+            webhook_secret_token: None,
         });
         apply_tui_selections_to_config(&app, &mut config);
         let tg = config.channels_config.telegram.as_ref().unwrap();
