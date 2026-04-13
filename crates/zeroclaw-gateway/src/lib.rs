@@ -43,10 +43,17 @@ use tower_http::timeout::TimeoutLayer;
 use uuid::Uuid;
 use zeroclaw_api::channel::{Channel, SendMessage};
 use zeroclaw_api::tool::ToolSpec;
+#[cfg(feature = "channel-linq")]
+use zeroclaw_channels::linq::LinqChannel;
 use zeroclaw_channels::{
-    gmail_push::GmailPushChannel, linq::LinqChannel, nextcloud_talk::NextcloudTalkChannel,
-    wati::WatiChannel, whatsapp::WhatsAppChannel,
+    gmail_push::GmailPushChannel, nextcloud_talk::NextcloudTalkChannel, whatsapp::WhatsAppChannel,
 };
+#[cfg(not(feature = "channel-linq"))]
+type LinqChannel = ();
+#[cfg(feature = "channel-wati")]
+use zeroclaw_channels::wati::WatiChannel;
+#[cfg(not(feature = "channel-wati"))]
+type WatiChannel = ();
 use zeroclaw_config::policy::SecurityPolicy;
 use zeroclaw_config::schema::Config;
 use zeroclaw_infra::session_backend::SessionBackend;
@@ -92,10 +99,12 @@ fn whatsapp_memory_key(msg: &zeroclaw_api::channel::ChannelMessage) -> String {
     format!("whatsapp_{}_{}", msg.sender, msg.id)
 }
 
+#[cfg(feature = "channel-linq")]
 fn linq_memory_key(msg: &zeroclaw_api::channel::ChannelMessage) -> String {
     format!("linq_{}_{}", msg.sender, msg.id)
 }
 
+#[cfg(feature = "channel-wati")]
 fn wati_memory_key(msg: &zeroclaw_api::channel::ChannelMessage) -> String {
     format!("wati_{}_{}", msg.sender, msg.id)
 }
@@ -594,6 +603,7 @@ pub async fn run_gateway(
         .map(Arc::from);
 
     // Linq channel (if configured)
+    #[cfg(feature = "channel-linq")]
     let linq_channel: Option<Arc<LinqChannel>> = config.channels_config.linq.as_ref().map(|lq| {
         Arc::new(LinqChannel::new(
             lq.api_token.clone(),
@@ -601,6 +611,8 @@ pub async fn run_gateway(
             lq.allowed_senders.clone(),
         ))
     });
+    #[cfg(not(feature = "channel-linq"))]
+    let linq_channel: Option<Arc<LinqChannel>> = None;
 
     // Linq signing secret for webhook signature verification
     // Priority: environment variable > config file
@@ -622,6 +634,7 @@ pub async fn run_gateway(
         .map(Arc::from);
 
     // WATI channel (if configured)
+    #[cfg(feature = "channel-wati")]
     let wati_channel: Option<Arc<WatiChannel>> =
         config.channels_config.wati.as_ref().map(|wati_cfg| {
             Arc::new(
@@ -634,6 +647,8 @@ pub async fn run_gateway(
                 .with_transcription(config.transcription.clone()),
             )
         });
+    #[cfg(not(feature = "channel-wati"))]
+    let wati_channel: Option<Arc<WatiChannel>> = None;
 
     // Nextcloud Talk channel (if configured)
     let nextcloud_talk_channel: Option<Arc<NextcloudTalkChannel>> =
@@ -1746,6 +1761,7 @@ async fn handle_whatsapp_message(
 }
 
 /// POST /linq — incoming message webhook (iMessage/RCS/SMS via Linq)
+#[cfg(feature = "channel-linq")]
 async fn handle_linq_webhook(
     State(state): State<AppState>,
     headers: HeaderMap,
@@ -1865,7 +1881,16 @@ async fn handle_linq_webhook(
     (StatusCode::OK, Json(serde_json::json!({"status": "ok"})))
 }
 
+#[cfg(not(feature = "channel-linq"))]
+async fn handle_linq_webhook() -> impl IntoResponse {
+    (
+        StatusCode::NOT_FOUND,
+        Json(serde_json::json!({"error": "Linq feature not enabled"})),
+    )
+}
+
 /// GET /wati — WATI webhook verification (echoes hub.challenge)
+#[cfg(feature = "channel-wati")]
 async fn handle_wati_verify(
     State(state): State<AppState>,
     Query(params): Query<WatiVerifyQuery>,
@@ -1883,6 +1908,7 @@ async fn handle_wati_verify(
     (StatusCode::BAD_REQUEST, "Missing hub.challenge".to_string())
 }
 
+#[cfg(feature = "channel-wati")]
 #[derive(Debug, serde::Deserialize)]
 pub struct WatiVerifyQuery {
     #[serde(rename = "hub.challenge")]
@@ -1890,6 +1916,7 @@ pub struct WatiVerifyQuery {
 }
 
 /// POST /wati — incoming WATI WhatsApp message webhook
+#[cfg(feature = "channel-wati")]
 async fn handle_wati_webhook(State(state): State<AppState>, body: Bytes) -> impl IntoResponse {
     let Some(ref wati) = state.wati else {
         return (
@@ -1978,6 +2005,22 @@ async fn handle_wati_webhook(State(state): State<AppState>, body: Bytes) -> impl
 
     // Acknowledge the webhook
     (StatusCode::OK, Json(serde_json::json!({"status": "ok"})))
+}
+
+#[cfg(not(feature = "channel-wati"))]
+async fn handle_wati_verify() -> impl IntoResponse {
+    (
+        StatusCode::NOT_FOUND,
+        "WATI feature not enabled".to_string(),
+    )
+}
+
+#[cfg(not(feature = "channel-wati"))]
+async fn handle_wati_webhook() -> impl IntoResponse {
+    (
+        StatusCode::NOT_FOUND,
+        Json(serde_json::json!({"error": "WATI feature not enabled"})),
+    )
 }
 
 /// POST /nextcloud-talk — incoming message webhook (Nextcloud Talk bot API)
