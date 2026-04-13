@@ -1,13 +1,48 @@
-# AGENTS.md — ZeroClaw
+# AGENTS.md — NaraeClaw
 
 Cross-tool agent instructions for any AI coding assistant working on this repository.
+
+## Project Identity
+
+NaraeClaw is a Korean-first, lightweight fork of [ZeroClaw](https://github.com/zeroclaw-labs/zeroclaw).
+
+Primary fork goals:
+
+1. **Telegram webhook migration** — replace Telegram polling with webhook handling to remove response latency.
+2. **Lightweight defaults** — remove unnecessary channels from default Cargo features.
+3. **Korean localization** — localize system prompts, CLI messages, and documentation for Korean-first usage.
+
+Internal crate names still use `zeroclaw-*`, but the binary name is `naraeclaw`.
 
 ## Commands
 
 ```bash
+# Format
+cargo fmt --all
 cargo fmt --all -- --check
+
+# Lint
 cargo clippy --all-targets -- -D warnings
+
+# Tests
 cargo test
+cargo test --lib
+cargo test --test component
+cargo test --test integration
+cargo test --test system
+cargo test --test integration <test-name>
+
+# Live tests require real API keys and are marked #[ignore]
+cargo test --test live -- --ignored
+
+# Development mode
+cargo run -- onboard
+cargo run -- agent
+
+# Justfile shortcuts, if just is installed
+just ci
+just fmt
+just dev
 ```
 
 Full pre-PR validation (recommended):
@@ -20,7 +55,18 @@ Docs-only changes: run markdown lint and link-integrity checks. If touching boot
 
 ## Project Snapshot
 
-ZeroClaw is a Rust-first autonomous agent runtime optimized for performance, efficiency, stability, extensibility, sustainability, and security.
+NaraeClaw is a Rust edition 2024 autonomous agent runtime optimized for Korean-first operation, performance, efficiency, stability, extensibility, sustainability, and security.
+
+The `naraeclaw` binary (`src/main.rs`) enables the `agent-runtime` feature by default, which activates most agent subsystems.
+
+Message flow:
+
+1. Incoming message
+2. `zeroclaw-channels` transport layer
+3. `zeroclaw-runtime/agent/` agent loop
+4. `zeroclaw-providers` LLM call
+5. `zeroclaw-tools` tool execution
+6. Response delivery
 
 Core architecture is trait-driven and modular. Extend by implementing traits and registering in factory modules.
 
@@ -33,6 +79,13 @@ Key extension points:
 - `crates/zeroclaw-api/src/observability_traits.rs` (`Observer`)
 - `crates/zeroclaw-api/src/runtime_traits.rs` (`RuntimeAdapter`)
 - `crates/zeroclaw-api/src/peripherals_traits.rs` (`Peripheral`) — hardware boards (STM32, RPi GPIO)
+
+## Current Priorities
+
+1. Convert Telegram from polling to webhooks.
+2. Remove unnecessary channels from default Cargo features.
+3. Localize the default system prompt in `crates/zeroclaw-runtime/src/agent/system_prompt.rs`.
+4. Localize CLI help text.
 
 ## Stability Tiers
 
@@ -80,6 +133,26 @@ Tiers are promoted, never demoted, through deliberate team decision.
 - `crates/zeroclaw-tool-call-parser/` — tool call parsing
 - `docs/` — topic-based documentation (setup-guides, reference, ops, security, hardware, contributing, maintainers)
 - `.github/` — CI, templates, automation workflows
+
+## Architecture Notes
+
+- `crates/zeroclaw-runtime/src/agent/` — agent loop core, including `loop_.rs` and `agent.rs`.
+- `crates/zeroclaw-runtime/src/security/` — access control and policy. Treat as high risk.
+- `crates/zeroclaw-runtime/src/cron/` — cron scheduler.
+- `crates/zeroclaw-runtime/src/sop/` — SOP engine.
+- `crates/zeroclaw-runtime/src/skills/` and `crates/zeroclaw-runtime/src/skillforge/` — skill system.
+- `crates/zeroclaw-runtime/src/onboard/` — TUI onboarding wizard.
+- `crates/zeroclaw-channels/` — channel integrations gated by `channel-<name>` Cargo features.
+- `crates/zeroclaw-channels/src/orchestrator/` — channel lifecycle, routing, and media pipeline.
+- `crates/zeroclaw-config/` — TOML-based config. `Configurable` derive generates schema. Config keys are public contract; document defaults and migration path when changing them.
+- `tests/support/` — shared mocks such as `MockProvider`, `MockChannel`, and `EchoTool`.
+- `tests/fixtures/traces/` — JSON fixture replay data for `TraceLlmProvider`.
+
+Telegram latency-related code:
+
+- `crates/zeroclaw-channels/src/telegram.rs:2871` — polling timeout of 30 seconds; target for webhook replacement.
+- `crates/zeroclaw-channels/src/telegram.rs:372` — draft update interval of 1000 ms.
+- `crates/zeroclaw-channels/src/orchestrator/mod.rs:1844` — memory recall query performed on every message.
 
 ## Risk Tiers
 
