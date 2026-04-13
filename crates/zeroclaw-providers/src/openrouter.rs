@@ -13,10 +13,12 @@ pub struct OpenRouterProvider {
     credential: Option<String>,
     timeout_secs: u64,
     max_tokens: Option<u32>,
+    base_url: Option<String>,
 }
 
 const DEFAULT_OPENROUTER_TIMEOUT_SECS: u64 = 120;
 const OPENROUTER_CONNECT_TIMEOUT_SECS: u64 = 10;
+const DEFAULT_OPENROUTER_BASE_URL: &str = "https://openrouter.ai/api/v1";
 
 #[derive(Debug, Serialize)]
 struct ChatRequest {
@@ -163,7 +165,25 @@ impl OpenRouterProvider {
                 .filter(|secs| *secs > 0)
                 .unwrap_or(DEFAULT_OPENROUTER_TIMEOUT_SECS),
             max_tokens: None,
+            base_url: None,
         }
+    }
+
+    /// Override the base URL for the OpenRouter API.
+    /// Allows routing to a compatible proxy or different region endpoint.
+    pub fn with_base_url(mut self, url: Option<&str>) -> Self {
+        self.base_url = url
+            .map(str::trim)
+            .filter(|u| !u.is_empty())
+            .map(|u| u.trim_end_matches('/').to_string());
+        self
+    }
+
+    /// Returns the effective base URL (custom override or default).
+    fn base_url(&self) -> &str {
+        self.base_url
+            .as_deref()
+            .unwrap_or(DEFAULT_OPENROUTER_BASE_URL)
     }
 
     /// Override the HTTP request timeout for LLM API calls.
@@ -372,7 +392,7 @@ impl Provider for OpenRouterProvider {
         // This prevents the first real chat request from timing out on cold start.
         if let Some(credential) = self.credential.as_ref() {
             self.http_client()
-                .get("https://openrouter.ai/api/v1/auth/key")
+                .get(format!("{}/auth/key", self.base_url()))
                 .header("Authorization", format!("Bearer {credential}"))
                 .send()
                 .await?
@@ -414,7 +434,7 @@ impl Provider for OpenRouterProvider {
 
         let response = self
             .http_client()
-            .post("https://openrouter.ai/api/v1/chat/completions")
+            .post(format!("{}/chat/completions", self.base_url()))
             .header("Authorization", format!("Bearer {credential}"))
             .header("HTTP-Referer", "https://github.com/zeroclaw-labs/zeroclaw")
             .header("X-Title", "ZeroClaw")
@@ -464,7 +484,7 @@ impl Provider for OpenRouterProvider {
 
         let response = self
             .http_client()
-            .post("https://openrouter.ai/api/v1/chat/completions")
+            .post(format!("{}/chat/completions", self.base_url()))
             .header("Authorization", format!("Bearer {credential}"))
             .header("HTTP-Referer", "https://github.com/zeroclaw-labs/zeroclaw")
             .header("X-Title", "ZeroClaw")
@@ -512,7 +532,7 @@ impl Provider for OpenRouterProvider {
 
         let response = self
             .http_client()
-            .post("https://openrouter.ai/api/v1/chat/completions")
+            .post(format!("{}/chat/completions", self.base_url()))
             .header("Authorization", format!("Bearer {credential}"))
             .header("HTTP-Referer", "https://github.com/zeroclaw-labs/zeroclaw")
             .header("X-Title", "ZeroClaw")
@@ -603,7 +623,7 @@ impl Provider for OpenRouterProvider {
 
         let response = self
             .http_client()
-            .post("https://openrouter.ai/api/v1/chat/completions")
+            .post(format!("{}/chat/completions", self.base_url()))
             .header("Authorization", format!("Bearer {credential}"))
             .header("HTTP-Referer", "https://github.com/zeroclaw-labs/zeroclaw")
             .header("X-Title", "ZeroClaw")
