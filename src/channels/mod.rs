@@ -42,11 +42,6 @@ pub async fn handle_command(command: crate::ChannelCommands, config: &Config) ->
                     "  ℹ️ Matrix channel support is disabled in this build (enable `channel-matrix`)."
                 );
             }
-            if !cfg!(feature = "channel-lark") {
-                println!(
-                    "  ℹ️ Lark/Feishu channel support is disabled in this build (enable `channel-lark`)."
-                );
-            }
             println!("\nTo start channels: zeroclaw channel start");
             println!("To check health:    zeroclaw channel doctor");
             println!("To configure:      zeroclaw onboard");

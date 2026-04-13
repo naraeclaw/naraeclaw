@@ -14,8 +14,6 @@ pub mod tts;
 pub mod bluesky;
 #[cfg(feature = "channel-clawdtalk")]
 pub mod clawdtalk;
-#[cfg(feature = "channel-dingtalk")]
-pub mod dingtalk;
 #[cfg(feature = "channel-discord")]
 pub mod discord;
 #[cfg(feature = "channel-discord")]
@@ -28,8 +26,6 @@ pub mod gmail_push;
 pub mod imessage;
 #[cfg(feature = "channel-irc")]
 pub mod irc;
-#[cfg(feature = "channel-lark")]
-pub mod lark;
 #[cfg(feature = "channel-line")]
 pub mod line;
 #[cfg(feature = "channel-linq")]
@@ -38,16 +34,12 @@ pub mod linq;
 pub mod matrix;
 #[cfg(feature = "channel-mattermost")]
 pub mod mattermost;
-#[cfg(feature = "channel-mochat")]
-pub mod mochat;
 #[cfg(feature = "channel-nextcloud")]
 pub mod nextcloud_talk;
 #[cfg(feature = "channel-nostr")]
 pub mod nostr;
 #[cfg(feature = "channel-notion")]
 pub mod notion;
-#[cfg(feature = "channel-qq")]
-pub mod qq;
 #[cfg(feature = "channel-reddit")]
 pub mod reddit;
 #[cfg(feature = "channel-signal")]
@@ -66,8 +58,6 @@ pub mod voice_wake;
 pub mod wati;
 #[cfg(feature = "channel-webhook")]
 pub mod webhook;
-#[cfg(feature = "channel-wecom")]
-pub mod wecom;
 #[cfg(feature = "channel-whatsapp-cloud")]
 pub mod whatsapp;
 #[cfg(feature = "whatsapp-web")]

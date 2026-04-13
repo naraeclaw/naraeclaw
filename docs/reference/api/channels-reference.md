@@ -72,11 +72,11 @@ Operational notes:
 
 ## Channel Matrix
 
-### Build Feature Toggles (`channel-matrix`, `channel-lark`)
+### Build Feature Toggles (`channel-matrix`)
 
-Matrix and Lark support are controlled at compile time.
+Matrix support is controlled at compile time.
 
-- Default builds are lean (`default = []`) and do not include Matrix/Lark.
+- Default builds are lean (`default = []`) and do not include Matrix.
 - Typical local check with only hardware support:
 
 ```bash
@@ -89,13 +89,7 @@ cargo check --features hardware
 cargo check --features hardware,channel-matrix
 ```
 
-- Enable Lark explicitly when needed:
-
-```bash
-cargo check --features hardware,channel-lark
-```
-
-If `[channels_config.matrix]`, `[channels_config.lark]`, or `[channels_config.feishu]` is present but the corresponding feature is not compiled in, `zeroclaw channel list`, `zeroclaw channel doctor`, and `zeroclaw channel start` will report that the channel is intentionally skipped for this build.
+If `[channels_config.matrix]` is present but the corresponding feature is not compiled in, `zeroclaw channel list`, `zeroclaw channel doctor`, and `zeroclaw channel start` will report that the channel is intentionally skipped for this build.
 
 ---
 
@@ -115,10 +109,6 @@ If `[channels_config.matrix]`, `[channels_config.lark]`, or `[channels_config.fe
 | Webhook | gateway endpoint (`/webhook`) | Usually yes |
 | Email | IMAP polling + SMTP send | No |
 | IRC | IRC socket | No |
-| Lark | websocket (default) or webhook | Webhook mode only |
-| Feishu | websocket (default) or webhook | Webhook mode only |
-| DingTalk | stream mode | No |
-| QQ | bot gateway | No |
 | Linq | webhook (`/linq`) | Yes (public HTTPS callback) |
 | iMessage | local integration | No |
 | Nostr | relay websocket (NIP-04 / NIP-17) | No |
@@ -135,7 +125,7 @@ For channels with inbound sender allowlists:
 
 Field names differ by channel:
 
-- `allowed_users` (Telegram/Discord/Slack/Mattermost/Matrix/IRC/Lark/Feishu/DingTalk/QQ/Nextcloud Talk)
+- `allowed_users` (Telegram/Discord/Slack/Mattermost/Matrix/IRC/Nextcloud Talk)
 - `allowed_from` (Signal)
 - `allowed_numbers` (WhatsApp)
 - `allowed_senders` (Email/Linq)
@@ -333,39 +323,6 @@ sasl_password = ""                  # optional
 verify_tls = true
 ```
 
-### 4.11 Lark
-
-```toml
-[channels_config.lark]
-app_id = "cli_xxx"
-app_secret = "xxx"
-encrypt_key = ""                    # optional
-verification_token = ""             # optional
-allowed_users = ["*"]
-mention_only = false              # optional: require @mention in groups (DMs always allowed)
-use_feishu = false
-receive_mode = "websocket"          # or "webhook"
-port = 8081                          # required for webhook mode
-```
-
-### 4.12 Feishu
-
-```toml
-[channels_config.feishu]
-app_id = "cli_xxx"
-app_secret = "xxx"
-encrypt_key = ""                    # optional
-verification_token = ""             # optional
-allowed_users = ["*"]
-receive_mode = "websocket"          # or "webhook"
-port = 8081                          # required for webhook mode
-```
-
-Migration note:
-
-- Legacy config `[channels_config.lark] use_feishu = true` is still supported for backward compatibility.
-- Prefer `[channels_config.feishu]` for new setups.
-
 ### 4.13 Nostr
 
 ```toml
@@ -397,24 +354,6 @@ Runtime token behavior:
 - `tenant_access_token` is cached with a refresh deadline based on `expire`/`expires_in` from the auth response.
 - send requests automatically retry once after token invalidation when Feishu/Lark returns either HTTP `401` or business error code `99991663` (`Invalid access token`).
 - if the retry still returns token-invalid responses, the send call fails with the upstream status/body for easier troubleshooting.
-
-### 4.14 DingTalk
-
-```toml
-[channels_config.dingtalk]
-client_id = "ding-app-key"
-client_secret = "ding-app-secret"
-allowed_users = ["*"]
-```
-
-### 4.15 QQ
-
-```toml
-[channels_config.qq]
-app_id = "qq-app-id"
-app_secret = "qq-app-secret"
-allowed_users = ["*"]
-```
 
 ### 4.16 Nextcloud Talk
 
@@ -509,7 +448,7 @@ RUST_LOG=info zeroclaw daemon 2>&1 | tee /tmp/zeroclaw.log
 Then filter channel/gateway events:
 
 ```bash
-rg -n "Matrix|Telegram|Discord|Slack|Mattermost|Signal|WhatsApp|Email|IRC|Lark|DingTalk|QQ|iMessage|Nostr|Webhook|Channel" /tmp/zeroclaw.log
+rg -n "Matrix|Telegram|Discord|Slack|Mattermost|Signal|WhatsApp|Email|IRC|iMessage|Nostr|Webhook|Channel" /tmp/zeroclaw.log
 ```
 
 ### 7.2 Keyword table
@@ -526,9 +465,6 @@ rg -n "Matrix|Telegram|Discord|Slack|Mattermost|Signal|WhatsApp|Email|IRC|Lark|D
 | Webhook / WhatsApp (gateway) | `WhatsApp webhook verified successfully` | `Webhook: rejected — not paired / invalid bearer token` / `Webhook: rejected request — invalid or missing X-Webhook-Secret` / `WhatsApp webhook verification failed — token mismatch` | `Webhook JSON parse error:` |
 | Email | `Email polling every ...` / `Email sent to ...` | `Blocked email from ...` | `Email poll failed:` / `Email poll task panicked:` |
 | IRC | `IRC channel connecting to ...` / `IRC registered as ...` | (allowlist checks are enforced by `allowed_users`) | `IRC SASL authentication failed (...)` / `IRC server does not support SASL...` / `IRC nickname ... is in use, trying ...` |
-| Lark / Feishu | `Lark: WS connected` / `Lark event callback server listening on` | `Lark WS: ignoring ... (not in allowed_users)` / `Lark: ignoring message from unauthorized user:` | `Lark: ping failed, reconnecting` / `Lark: heartbeat timeout, reconnecting` / `Lark: WS read error:` |
-| DingTalk | `DingTalk: connected and listening for messages...` | `DingTalk: ignoring message from unauthorized user:` | `DingTalk WebSocket error:` / `DingTalk: message channel closed` |
-| QQ | `QQ: connected and identified` | `QQ: ignoring C2C message from unauthorized user:` / `QQ: ignoring group message from unauthorized user:` | `QQ: received Reconnect (op 7)` / `QQ: received Invalid Session (op 9)` / `QQ: message channel closed` |
 | Nextcloud Talk (gateway) | `POST /nextcloud-talk — Nextcloud Talk bot webhook` | `Nextcloud Talk webhook signature verification failed` / `Nextcloud Talk: ignoring message from unauthorized actor:` | `Nextcloud Talk send failed:` / `LLM error for Nextcloud Talk message:` |
 | iMessage | `iMessage channel listening (AppleScript bridge)...` | (contact allowlist enforced by `allowed_contacts`) | `iMessage poll error:` |
 | Nostr | `Nostr channel listening as npub1...` | `Nostr: ignoring NIP-04 message from unauthorized pubkey:` / `Nostr: ignoring NIP-17 message from unauthorized pubkey:` | `Failed to decrypt NIP-04 message:` / `Failed to unwrap NIP-17 gift wrap:` / `Nostr relay pool shut down` |

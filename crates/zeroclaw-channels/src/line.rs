@@ -476,8 +476,7 @@ impl LineChannel {
 
     /// Construct a `LineChannel` directly from a [`zeroclaw_config::schema::LineConfig`].
     ///
-    /// Mirrors [`LarkChannel::from_config`] — keeps construction logic inside the
-    /// channel crate rather than duplicating it across orchestrator call sites.
+    /// Keeps construction logic inside the channel crate rather than duplicating it across orchestrator call sites.
     pub fn from_config(config: &zeroclaw_config::schema::LineConfig) -> Self {
         Self::new(
             config.channel_access_token.clone(),
