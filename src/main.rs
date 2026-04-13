@@ -935,7 +935,9 @@ async fn main() -> Result<()> {
         if config_dir.trim().is_empty() {
             bail!("--config-dir cannot be empty");
         }
-        // SAFETY: called early in main before any threads are spawned.
+        // SAFETY: called before Tokio runtime and any threads are spawned.
+        // No concurrent readers exist at this point in the process lifecycle.
+        // Do NOT move this call into an async context or after runtime::block_on.
         unsafe { std::env::set_var("ZEROCLAW_CONFIG_DIR", config_dir) };
     }
 

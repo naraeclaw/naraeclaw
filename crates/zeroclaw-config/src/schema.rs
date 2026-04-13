@@ -8,7 +8,7 @@ use directories::UserDirs;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::{OnceLock, RwLock};
+use std::sync::{Mutex, OnceLock, RwLock};
 #[cfg(unix)]
 use tokio::fs::File;
 use tokio::fs::{self, OpenOptions};
@@ -4454,16 +4454,30 @@ fn validate_proxy_url(field: &str, url: &str) -> Result<()> {
     Ok(())
 }
 
+/// Global mutex serializing all process-level environment variable mutations.
+///
+/// `std::env::set_var` / `remove_var` are not thread-safe: concurrent writes,
+/// or a write racing with a read on another thread, cause undefined behaviour
+/// in the C runtime. Callers that must mutate env vars after the async runtime
+/// has started MUST hold this lock for the duration of the mutation AND ensure
+/// no other thread reads the same key without also holding the lock.
+///
+/// Callers in a blocking (non-async) context: `let _g = ENV_WRITE_MUTEX.lock();`
+/// Callers in an async context: use `tokio::task::spawn_blocking` while holding
+/// this lock inside the closure.
+pub static ENV_WRITE_MUTEX: Mutex<()> = Mutex::new(());
+
 fn set_proxy_env_pair(key: &str, value: Option<&str>) {
     let lowercase_key = key.to_ascii_lowercase();
+    let _guard = ENV_WRITE_MUTEX.lock().unwrap_or_else(|e| e.into_inner());
     if let Some(value) = value.and_then(|candidate| normalize_proxy_url_option(Some(candidate))) {
-        // SAFETY: called during single-threaded config init before async runtime starts.
+        // SAFETY: ENV_WRITE_MUTEX is held, serializing all env mutations.
         unsafe {
             std::env::set_var(key, &value);
             std::env::set_var(lowercase_key, value);
         }
     } else {
-        // SAFETY: called during single-threaded config init before async runtime starts.
+        // SAFETY: ENV_WRITE_MUTEX is held, serializing all env mutations.
         unsafe {
             std::env::remove_var(key);
             std::env::remove_var(lowercase_key);
@@ -4472,7 +4486,8 @@ fn set_proxy_env_pair(key: &str, value: Option<&str>) {
 }
 
 fn clear_proxy_env_pair(key: &str) {
-    // SAFETY: called during single-threaded config init before async runtime starts.
+    let _guard = ENV_WRITE_MUTEX.lock().unwrap_or_else(|e| e.into_inner());
+    // SAFETY: ENV_WRITE_MUTEX is held, serializing all env mutations.
     unsafe {
         std::env::remove_var(key);
         std::env::remove_var(key.to_ascii_lowercase());
