@@ -162,6 +162,42 @@ Telegram latency-related code:
 
 When uncertain, classify as higher risk.
 
+## Worktree Rules
+
+All implementation work starts in a dedicated git worktree. Do not commit directly on `master`.
+
+```bash
+# 1. Start work by creating a worktree and branch.
+git worktree add ../naraeclaw-<owner> -b <owner>/<task-name>
+# Example: git worktree add ../naraeclaw-codex -b codex/telegram-webhook
+
+# 2. Work and commit only inside that worktree.
+
+# 3. Merge into master after review/validation.
+git merge <branch-name>
+
+# 4. Clean up the worktree and branch after merge.
+git worktree remove ../naraeclaw-<owner>
+git branch -d <branch-name>
+```
+
+Branch naming:
+
+- `codex/<task-name>` — Codex-owned work
+- `claude/<task-name>` — Claude-owned work
+- `gemini/<task-name>` — Gemini-owned work
+
+Worktree paths:
+
+- Main: `~/opensource/naraeclaw` — `master`, review and merge only
+- Agents: `~/opensource/naraeclaw-<owner>` — implementation workspace
+
+Parallel work rules:
+
+- Design task slices so different agents do not edit the same files.
+- If overlapping files are unavoidable, serialize the work: merge the first task before starting the next.
+- Ignore unrelated untracked or modified files in another worktree unless the user explicitly asks to handle them.
+
 ## Workflow
 
 1. **Read before write** — inspect existing module, factory wiring, and adjacent tests before editing.
@@ -172,6 +208,7 @@ When uncertain, classify as higher risk.
 6. **Queue hygiene** — stacked PR: declare `Depends on #...`. Replacing old PR: declare `Supersedes #...`.
 
 Branch/commit/PR rules:
+- Start implementation in a task worktree per **Worktree Rules** above.
 - Work from a non-`master` branch. Open a PR to `master`; do not push directly.
 - Use conventional commit titles. Prefer small PRs (`size: XS/S/M`).
 - Follow `.github/pull_request_template.md` fully.
