@@ -70,12 +70,9 @@ shellexpand = "3.1"
 
 [features]
 default = [
-    "channel-discord", "channel-slack", "channel-signal", "channel-mattermost",
-    "channel-irc", "channel-imessage", "channel-dingtalk", "channel-qq",
-    "channel-bluesky", "channel-twitter", "channel-reddit", "channel-notion",
-    "channel-linq", "channel-wati", "channel-nextcloud", "channel-mochat",
-    "channel-wecom", "channel-clawdtalk", "channel-webhook",
-    "channel-whatsapp-cloud", "channel-voice-call",
+    "channel-email", "channel-telegram", "channel-discord", "channel-slack",
+    "channel-signal", "channel-mattermost", "channel-notion", "channel-nextcloud",
+    "channel-webhook", "channel-acp-server", "channel-whatsapp-cloud",
 ]
 # Channels with optional deps
 channel-email = ["dep:lettre", "dep:mail-parser", "dep:async-imap"]
@@ -107,6 +104,18 @@ channel-webhook = []
 channel-whatsapp-cloud = []
 channel-voice-call = []
 channel-acp-server = []
+
+# Optional channel bundles for non-default integrations.
+channels-cn = [
+    "channel-qq", "channel-dingtalk", "channel-mochat", "channel-wecom", "channel-wati",
+]
+channels-social = ["channel-bluesky", "channel-twitter", "channel-reddit"]
+channels-legacy = ["channel-irc", "channel-imessage", "channel-linq", "channel-lark"]
+channels-full = [
+    "channels-cn", "channels-social", "channels-legacy",
+    "channel-clawdtalk", "channel-voice-call",
+]
+
 channel-matrix = ["dep:matrix-sdk"]
 voice-wake = ["dep:cpal", "zeroclaw-config/voice-wake"]
 

@@ -21,41 +21,63 @@ pub mod media_pipeline;
 pub mod mqtt;
 
 // Channel types imported directly from source crates (no shim files)
+#[cfg(feature = "channel-bluesky")]
 pub use crate::bluesky::BlueskyChannel;
+#[cfg(feature = "channel-clawdtalk")]
 pub use crate::clawdtalk::ClawdTalkChannel;
+#[cfg(feature = "channel-dingtalk")]
 pub use crate::dingtalk::DingTalkChannel;
+#[cfg(feature = "channel-discord")]
 pub use crate::discord::DiscordChannel;
+#[cfg(feature = "channel-discord")]
 pub use crate::discord_history::DiscordHistoryChannel;
 #[cfg(feature = "channel-email")]
 pub use crate::email_channel::EmailChannel;
 #[cfg(feature = "channel-email")]
 pub use crate::gmail_push::GmailPushChannel;
+#[cfg(feature = "channel-imessage")]
 pub use crate::imessage::IMessageChannel;
+#[cfg(feature = "channel-irc")]
 pub use crate::irc::IrcChannel;
 #[cfg(feature = "channel-lark")]
 pub use crate::lark::LarkChannel;
 #[cfg(feature = "channel-line")]
 pub use crate::line::LineChannel;
+#[cfg(feature = "channel-linq")]
 pub use crate::linq::LinqChannel;
+#[cfg(feature = "channel-mattermost")]
 pub use crate::mattermost::MattermostChannel;
+#[cfg(feature = "channel-mochat")]
 pub use crate::mochat::MochatChannel;
+#[cfg(feature = "channel-nextcloud")]
 pub use crate::nextcloud_talk::NextcloudTalkChannel;
 #[cfg(feature = "channel-nostr")]
 pub use crate::nostr::NostrChannel;
+#[cfg(feature = "channel-notion")]
 pub use crate::notion::NotionChannel;
+#[cfg(feature = "channel-qq")]
 pub use crate::qq::QQChannel;
+#[cfg(feature = "channel-reddit")]
 pub use crate::reddit::RedditChannel;
+#[cfg(feature = "channel-signal")]
 pub use crate::signal::SignalChannel;
+#[cfg(feature = "channel-slack")]
 pub use crate::slack::SlackChannel;
 pub use crate::transcription;
 pub use crate::tts::{TtsManager, TtsProvider};
+#[cfg(feature = "channel-twitter")]
 pub use crate::twitter::TwitterChannel;
+#[cfg(feature = "channel-voice-call")]
 pub use crate::voice_call::VoiceCallChannel;
 #[cfg(feature = "voice-wake")]
 pub use crate::voice_wake::VoiceWakeChannel;
+#[cfg(feature = "channel-wati")]
 pub use crate::wati::WatiChannel;
+#[cfg(feature = "channel-webhook")]
 pub use crate::webhook::WebhookChannel;
+#[cfg(feature = "channel-wecom")]
 pub use crate::wecom::WeComChannel;
+#[cfg(feature = "channel-whatsapp-cloud")]
 pub use crate::whatsapp::WhatsAppChannel;
 pub use zeroclaw_api::channel::{Channel, ChannelMessage, SendMessage};
 // Local channel types (in misc, not zeroclaw-channels)
@@ -4033,6 +4055,7 @@ fn build_channel_by_id(config: &Config, channel_id: &str) -> Result<Arc<dyn Chan
                 anyhow::bail!("WhatsApp channel requires the `whatsapp-web` feature");
             }
         }
+        #[cfg(feature = "channel-qq")]
         "qq" => {
             let qq = config
                 .channels_config
@@ -4079,6 +4102,7 @@ fn build_channel_by_id(config: &Config, channel_id: &str) -> Result<Arc<dyn Chan
                 anyhow::bail!("Feishu channel requires the `channel-lark` feature");
             }
         }
+        #[cfg(feature = "channel-dingtalk")]
         "dingtalk" => {
             let dt = config
                 .channels_config
@@ -4094,6 +4118,7 @@ fn build_channel_by_id(config: &Config, channel_id: &str) -> Result<Arc<dyn Chan
                 .with_proxy_url(dt.proxy_url.clone()),
             ))
         }
+        #[cfg(feature = "channel-wecom")]
         "wecom" => {
             let wc = config
                 .channels_config
@@ -4119,6 +4144,7 @@ fn build_channel_by_id(config: &Config, channel_id: &str) -> Result<Arc<dyn Chan
                 nc.proxy_url.clone(),
             )))
         }
+        #[cfg(feature = "channel-wati")]
         "wati" => {
             let wati_cfg = config
                 .channels_config
@@ -4133,6 +4159,7 @@ fn build_channel_by_id(config: &Config, channel_id: &str) -> Result<Arc<dyn Chan
                 wati_cfg.proxy_url.clone(),
             )))
         }
+        #[cfg(feature = "channel-linq")]
         "linq" => {
             let lq = config
                 .channels_config
@@ -4163,6 +4190,7 @@ fn build_channel_by_id(config: &Config, channel_id: &str) -> Result<Arc<dyn Chan
                 .context("Gmail Push channel is not configured")?;
             Ok(Arc::new(GmailPushChannel::new(gp.clone())))
         }
+        #[cfg(feature = "channel-irc")]
         "irc" => {
             let irc_cfg = config
                 .channels_config
@@ -4182,6 +4210,7 @@ fn build_channel_by_id(config: &Config, channel_id: &str) -> Result<Arc<dyn Chan
                 verify_tls: irc_cfg.verify_tls.unwrap_or(true),
             })))
         }
+        #[cfg(feature = "channel-twitter")]
         "twitter" => {
             let tw = config
                 .channels_config
@@ -4193,6 +4222,7 @@ fn build_channel_by_id(config: &Config, channel_id: &str) -> Result<Arc<dyn Chan
                 tw.allowed_users.clone(),
             )))
         }
+        #[cfg(feature = "channel-mochat")]
         "mochat" => {
             let mc = config
                 .channels_config
@@ -4225,6 +4255,7 @@ fn build_channel_by_id(config: &Config, channel_id: &str) -> Result<Arc<dyn Chan
                 dh.respond_to_dms,
             )))
         }
+        #[cfg(feature = "channel-imessage")]
         "imessage" => {
             let im = config
                 .channels_config
@@ -4440,6 +4471,7 @@ fn collect_configured_channels(
         }
     }
 
+    #[cfg(feature = "channel-imessage")]
     if let Some(ref im) = config.channels_config.imessage {
         if im.enabled {
             channels.push(ConfiguredChannel {
@@ -4591,6 +4623,7 @@ fn collect_configured_channels(
         }
     }
 
+    #[cfg(feature = "channel-linq")]
     if let Some(ref lq) = config.channels_config.linq {
         if lq.enabled {
             channels.push(ConfiguredChannel {
@@ -4606,6 +4639,7 @@ fn collect_configured_channels(
         }
     }
 
+    #[cfg(feature = "channel-wati")]
     if let Some(ref wati_cfg) = config.channels_config.wati {
         if wati_cfg.enabled {
             let wati_channel = WatiChannel::new_with_proxy(
@@ -4661,6 +4695,7 @@ fn collect_configured_channels(
         });
     }
 
+    #[cfg(feature = "channel-irc")]
     if let Some(ref irc) = config.channels_config.irc {
         if irc.enabled {
             channels.push(ConfiguredChannel {
@@ -4760,6 +4795,7 @@ fn collect_configured_channels(
         );
     }
 
+    #[cfg(feature = "channel-dingtalk")]
     if let Some(ref dt) = config.channels_config.dingtalk {
         if dt.enabled {
             channels.push(ConfiguredChannel {
@@ -4778,6 +4814,7 @@ fn collect_configured_channels(
         }
     }
 
+    #[cfg(feature = "channel-qq")]
     if let Some(ref qq) = config.channels_config.qq {
         if qq.enabled {
             channels.push(ConfiguredChannel {
@@ -4797,6 +4834,7 @@ fn collect_configured_channels(
         }
     }
 
+    #[cfg(feature = "channel-twitter")]
     if let Some(ref tw) = config.channels_config.twitter {
         channels.push(ConfiguredChannel {
             display_name: "X/Twitter",
@@ -4807,6 +4845,7 @@ fn collect_configured_channels(
         });
     }
 
+    #[cfg(feature = "channel-mochat")]
     if let Some(ref mc) = config.channels_config.mochat {
         channels.push(ConfiguredChannel {
             display_name: "Mochat",
@@ -4819,6 +4858,7 @@ fn collect_configured_channels(
         });
     }
 
+    #[cfg(feature = "channel-wecom")]
     if let Some(ref wc) = config.channels_config.wecom {
         if wc.enabled {
             channels.push(ConfiguredChannel {
@@ -4833,6 +4873,7 @@ fn collect_configured_channels(
         }
     }
 
+    #[cfg(feature = "channel-clawdtalk")]
     if let Some(ref ct) = config.channels_config.clawdtalk {
         if ct.enabled {
             channels.push(ConfiguredChannel {
@@ -4872,6 +4913,7 @@ fn collect_configured_channels(
         }
     }
 
+    #[cfg(feature = "channel-reddit")]
     if let Some(ref rd) = config.channels_config.reddit {
         channels.push(ConfiguredChannel {
             display_name: "Reddit",
@@ -4885,6 +4927,7 @@ fn collect_configured_channels(
         });
     }
 
+    #[cfg(feature = "channel-bluesky")]
     if let Some(ref bs) = config.channels_config.bluesky {
         channels.push(ConfiguredChannel {
             display_name: "Bluesky",
