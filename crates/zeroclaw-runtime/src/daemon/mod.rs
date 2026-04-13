@@ -1057,19 +1057,6 @@ mod tests {
     }
 
     #[test]
-    fn detects_dingtalk_as_supervised_channel() {
-        let mut config = Config::default();
-        config.channels_config.dingtalk = Some(zeroclaw_config::schema::DingTalkConfig {
-            enabled: true,
-            client_id: "client_id".into(),
-            client_secret: "client_secret".into(),
-            allowed_users: vec!["*".into()],
-            proxy_url: None,
-        });
-        assert!(has_supervised_channels(&config));
-    }
-
-    #[test]
     fn detects_mattermost_as_supervised_channel() {
         let mut config = Config::default();
         config.channels_config.mattermost = Some(zeroclaw_config::schema::MattermostConfig {
@@ -1081,19 +1068,6 @@ mod tests {
             thread_replies: Some(true),
             mention_only: Some(false),
             interrupt_on_new_message: false,
-            proxy_url: None,
-        });
-        assert!(has_supervised_channels(&config));
-    }
-
-    #[test]
-    fn detects_qq_as_supervised_channel() {
-        let mut config = Config::default();
-        config.channels_config.qq = Some(zeroclaw_config::schema::QQConfig {
-            enabled: true,
-            app_id: "app-id".into(),
-            app_secret: "app-secret".into(),
-            allowed_users: vec!["*".into()],
             proxy_url: None,
         });
         assert!(has_supervised_channels(&config));

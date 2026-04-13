@@ -135,30 +135,6 @@ pub fn all_integrations() -> Vec<IntegrationEntry> {
             category: IntegrationCategory::Chat,
             status_fn: |_| IntegrationStatus::ComingSoon,
         },
-        IntegrationEntry {
-            name: "DingTalk",
-            description: "DingTalk Stream Mode",
-            category: IntegrationCategory::Chat,
-            status_fn: |c| {
-                if c.channels_config.dingtalk.is_some() {
-                    IntegrationStatus::Active
-                } else {
-                    IntegrationStatus::Available
-                }
-            },
-        },
-        IntegrationEntry {
-            name: "QQ Official",
-            description: "Tencent QQ Bot SDK",
-            category: IntegrationCategory::Chat,
-            status_fn: |c| {
-                if c.channels_config.qq.is_some() {
-                    IntegrationStatus::Active
-                } else {
-                    IntegrationStatus::Available
-                }
-            },
-        },
         // ── AI Models ───────────────────────────────────────────
         IntegrationEntry {
             name: "OpenRouter",

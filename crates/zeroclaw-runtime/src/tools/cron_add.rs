@@ -58,7 +58,7 @@ impl Tool for CronAddTool {
     fn description(&self) -> &str {
         "Create a scheduled cron job (shell or agent) with cron/at/every schedules. \
          Use job_type='agent' with a prompt to run the AI agent on schedule. \
-         To deliver output to a channel (Discord, Telegram, Slack, Mattermost, Matrix, QQ), set \
+         To deliver output to a channel (Discord, Telegram, Slack, Mattermost, Matrix), set \
          delivery={\"mode\":\"announce\",\"channel\":\"discord\",\"to\":\"<channel_id_or_chat_id>\"}. \
          This is the preferred tool for sending scheduled/delayed messages to users via channels."
     }

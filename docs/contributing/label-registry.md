@@ -59,7 +59,6 @@ Each channel gets a specific label in addition to the base `channel` label.
 | `channel:bluesky` | `bluesky.rs` |
 | `channel:clawdtalk` | `clawdtalk.rs` |
 | `channel:cli` | `cli.rs` |
-| `channel:dingtalk` | `dingtalk.rs` |
 | `channel:discord` | `discord.rs`, `discord_history.rs` |
 | `channel:email` | `email_channel.rs`, `gmail_push.rs` |
 | `channel:imessage` | `imessage.rs` |
@@ -68,7 +67,6 @@ Each channel gets a specific label in addition to the base `channel` label.
 | `channel:linq` | `linq.rs` |
 | `channel:matrix` | `matrix.rs` |
 | `channel:mattermost` | `mattermost.rs` |
-| `channel:mochat` | `mochat.rs` |
 | `channel:mqtt` | `mqtt.rs` |
 | `channel:nextcloud-talk` | `nextcloud_talk.rs` |
 | `channel:nostr` | `nostr.rs` |
@@ -81,7 +79,6 @@ Each channel gets a specific label in addition to the base `channel` label.
 | `channel:twitter` | `twitter.rs` |
 | `channel:wati` | `wati.rs` |
 | `channel:webhook` | `webhook.rs` |
-| `channel:wecom` | `wecom.rs` |
 | `channel:whatsapp` | `whatsapp.rs`, `whatsapp_storage.rs`, `whatsapp_web.rs` |
 
 ### Per-component provider labels
