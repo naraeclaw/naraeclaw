@@ -6859,6 +6859,14 @@ fn default_matrix_draft_update_interval_ms() -> u64 {
     1500
 }
 
+fn default_telegram_webhook_listen_addr() -> String {
+    "0.0.0.0:8443".to_string()
+}
+
+fn default_telegram_webhook_path() -> String {
+    "/telegram/webhook".to_string()
+}
+
 /// Telegram bot channel configuration.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, Configurable)]
 #[cfg_attr(feature = "schema-export", derive(schemars::JsonSchema))]
@@ -6895,6 +6903,21 @@ pub struct TelegramConfig {
     /// Overrides the global `[proxy]` setting for this channel only.
     #[serde(default)]
     pub proxy_url: Option<String>,
+    /// Public HTTPS URL registered with Telegram via `setWebhook`.
+    /// When set, Telegram receives updates in webhook mode instead of polling.
+    #[serde(default)]
+    pub webhook_url: Option<String>,
+    /// Local bind address for the embedded Telegram webhook server.
+    #[serde(default = "default_telegram_webhook_listen_addr")]
+    pub webhook_listen_addr: String,
+    /// Local HTTP path for Telegram webhook POST requests.
+    #[serde(default = "default_telegram_webhook_path")]
+    pub webhook_path: String,
+    /// Optional Telegram secret token verified from
+    /// `X-Telegram-Bot-Api-Secret-Token`.
+    #[serde(default)]
+    #[secret]
+    pub webhook_secret_token: Option<String>,
 }
 
 impl ChannelConfig for TelegramConfig {
@@ -11603,6 +11626,10 @@ auto_save = true
                     mention_only: false,
                     ack_reactions: None,
                     proxy_url: None,
+                    webhook_url: None,
+                    webhook_listen_addr: "0.0.0.0:8443".to_string(),
+                    webhook_path: "/telegram/webhook".to_string(),
+                    webhook_secret_token: None,
                 }),
                 discord: None,
                 discord_history: None,
@@ -12423,6 +12450,10 @@ default_temperature = 0.7
             mention_only: false,
             ack_reactions: None,
             proxy_url: None,
+            webhook_url: Some("https://bot.example.com/telegram".into()),
+            webhook_listen_addr: "127.0.0.1:9443".to_string(),
+            webhook_path: "/telegram".to_string(),
+            webhook_secret_token: Some("secret-token".into()),
         };
         let json = serde_json::to_string(&tc).unwrap();
         let parsed: TelegramConfig = serde_json::from_str(&json).unwrap();
@@ -12431,6 +12462,13 @@ default_temperature = 0.7
         assert_eq!(parsed.stream_mode, StreamMode::Partial);
         assert_eq!(parsed.draft_update_interval_ms, 500);
         assert!(parsed.interrupt_on_new_message);
+        assert_eq!(
+            parsed.webhook_url.as_deref(),
+            Some("https://bot.example.com/telegram")
+        );
+        assert_eq!(parsed.webhook_listen_addr, "127.0.0.1:9443");
+        assert_eq!(parsed.webhook_path, "/telegram");
+        assert_eq!(parsed.webhook_secret_token.as_deref(), Some("secret-token"));
     }
 
     #[test]
@@ -15441,6 +15479,10 @@ require_otp_to_resume = true
             mention_only: false,
             ack_reactions: None,
             proxy_url: None,
+            webhook_url: None,
+            webhook_listen_addr: "0.0.0.0:8443".to_string(),
+            webhook_path: "/telegram/webhook".to_string(),
+            webhook_secret_token: None,
         });
 
         // Save (triggers encryption)
@@ -15985,6 +16027,39 @@ require_otp_to_resume = true
             debug_output.contains("[REDACTED]"),
             "Debug output must show [REDACTED] for client_secret"
         );
+    }
+
+    #[test]
+    async fn telegram_config_webhook_defaults_deserialize() {
+        let toml_str = r#"
+            bot_token = "123:ABC"
+            allowed_users = ["alice"]
+        "#;
+        let cfg: TelegramConfig = toml::from_str(toml_str).unwrap();
+        assert_eq!(cfg.webhook_url, None);
+        assert_eq!(cfg.webhook_listen_addr, "0.0.0.0:8443");
+        assert_eq!(cfg.webhook_path, "/telegram/webhook");
+        assert_eq!(cfg.webhook_secret_token, None);
+    }
+
+    #[test]
+    async fn telegram_config_webhook_fields_deserialize() {
+        let toml_str = r#"
+            bot_token = "123:ABC"
+            allowed_users = ["alice"]
+            webhook_url = "https://bot.example.com/telegram"
+            webhook_listen_addr = "127.0.0.1:9443"
+            webhook_path = "/telegram"
+            webhook_secret_token = "secret-token"
+        "#;
+        let cfg: TelegramConfig = toml::from_str(toml_str).unwrap();
+        assert_eq!(
+            cfg.webhook_url.as_deref(),
+            Some("https://bot.example.com/telegram")
+        );
+        assert_eq!(cfg.webhook_listen_addr, "127.0.0.1:9443");
+        assert_eq!(cfg.webhook_path, "/telegram");
+        assert_eq!(cfg.webhook_secret_token.as_deref(), Some("secret-token"));
     }
 
     #[test]

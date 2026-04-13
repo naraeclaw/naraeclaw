@@ -340,6 +340,14 @@ pub struct TelegramChannel {
         Arc<std::sync::Mutex<std::collections::HashMap<String, (String, std::time::Instant)>>>,
     /// Per-channel proxy URL override.
     proxy_url: Option<String>,
+    /// Public HTTPS URL registered with Telegram when webhook mode is enabled.
+    webhook_url: Option<String>,
+    /// Local bind address for the embedded webhook server.
+    webhook_listen_addr: String,
+    /// Local path that receives Telegram webhook POST requests.
+    webhook_path: String,
+    /// Optional token verified from `X-Telegram-Bot-Api-Secret-Token`.
+    webhook_secret_token: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -384,6 +392,10 @@ impl TelegramChannel {
             voice_chats: Arc::new(std::sync::Mutex::new(std::collections::HashSet::new())),
             pending_voice: Arc::new(std::sync::Mutex::new(std::collections::HashMap::new())),
             proxy_url: None,
+            webhook_url: None,
+            webhook_listen_addr: "0.0.0.0:8443".to_string(),
+            webhook_path: "/telegram/webhook".to_string(),
+            webhook_secret_token: None,
         }
     }
 
@@ -396,6 +408,22 @@ impl TelegramChannel {
     /// Set a per-channel proxy URL that overrides the global proxy config.
     pub fn with_proxy_url(mut self, proxy_url: Option<String>) -> Self {
         self.proxy_url = proxy_url;
+        self
+    }
+
+    /// Configure Telegram webhook receive mode. When `webhook_url` is `None`,
+    /// the channel falls back to long polling.
+    pub fn with_webhook(
+        mut self,
+        webhook_url: Option<String>,
+        webhook_listen_addr: String,
+        webhook_path: String,
+        webhook_secret_token: Option<String>,
+    ) -> Self {
+        self.webhook_url = webhook_url.filter(|url| !url.trim().is_empty());
+        self.webhook_listen_addr = webhook_listen_addr;
+        self.webhook_path = Self::normalize_webhook_path(&webhook_path);
+        self.webhook_secret_token = webhook_secret_token.filter(|token| !token.trim().is_empty());
         self
     }
 
@@ -451,6 +479,115 @@ impl TelegramChannel {
             self.tts_config = Some(config);
         }
         self
+    }
+
+    fn normalize_webhook_path(path: &str) -> String {
+        let trimmed = path.trim();
+        if trimmed.is_empty() {
+            return "/telegram/webhook".to_string();
+        }
+        if trimmed.starts_with('/') {
+            trimmed.to_string()
+        } else {
+            format!("/{trimmed}")
+        }
+    }
+
+    fn clone_for_webhook(&self) -> Self {
+        Self {
+            bot_token: self.bot_token.clone(),
+            allowed_users: self.allowed_users.clone(),
+            pairing: self.pairing.clone(),
+            client: self.client.clone(),
+            typing_handle: Mutex::new(None),
+            stream_mode: self.stream_mode,
+            draft_update_interval_ms: self.draft_update_interval_ms,
+            last_draft_edit: Mutex::new(std::collections::HashMap::new()),
+            mention_only: self.mention_only,
+            bot_username: Mutex::new(self.bot_username.lock().clone()),
+            api_base: self.api_base.clone(),
+            transcription: self.transcription.clone(),
+            transcription_manager: self.transcription_manager.clone(),
+            voice_transcriptions: Mutex::new(self.voice_transcriptions.lock().clone()),
+            workspace_dir: self.workspace_dir.clone(),
+            ack_reactions: self.ack_reactions,
+            tts_config: self.tts_config.clone(),
+            voice_chats: self.voice_chats.clone(),
+            pending_voice: self.pending_voice.clone(),
+            proxy_url: self.proxy_url.clone(),
+            webhook_url: self.webhook_url.clone(),
+            webhook_listen_addr: self.webhook_listen_addr.clone(),
+            webhook_path: self.webhook_path.clone(),
+            webhook_secret_token: self.webhook_secret_token.clone(),
+        }
+    }
+
+    async fn register_webhook(&self) -> anyhow::Result<()> {
+        let Some(webhook_url) = self.webhook_url.as_deref() else {
+            return Ok(());
+        };
+
+        let mut body = serde_json::json!({
+            "url": webhook_url,
+            "allowed_updates": ["message"],
+            "drop_pending_updates": false,
+        });
+        if let Some(secret) = self.webhook_secret_token.as_deref() {
+            body["secret_token"] = serde_json::Value::String(secret.to_string());
+        }
+
+        let resp = self
+            .http_client()
+            .post(self.api_url("setWebhook"))
+            .json(&body)
+            .send()
+            .await
+            .context("Failed to call Telegram setWebhook")?;
+
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let err = resp.text().await.unwrap_or_default();
+            anyhow::bail!("Telegram setWebhook failed ({status}): {err}");
+        }
+
+        let data: serde_json::Value = resp
+            .json()
+            .await
+            .context("Failed to parse Telegram setWebhook response")?;
+        if !data
+            .get("ok")
+            .and_then(serde_json::Value::as_bool)
+            .unwrap_or(false)
+        {
+            let description = data
+                .get("description")
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or("unknown Telegram API error");
+            anyhow::bail!("Telegram setWebhook API error: {description}");
+        }
+
+        Ok(())
+    }
+
+    async fn delete_webhook_for_polling(&self) {
+        let body = serde_json::json!({ "drop_pending_updates": false });
+        match self
+            .http_client()
+            .post(self.api_url("deleteWebhook"))
+            .json(&body)
+            .send()
+            .await
+        {
+            Ok(resp) if resp.status().is_success() => {}
+            Ok(resp) => {
+                let status = resp.status();
+                let body = resp.text().await.unwrap_or_default();
+                tracing::warn!("Telegram deleteWebhook before polling failed ({status}): {body}");
+            }
+            Err(err) => {
+                tracing::warn!("Telegram deleteWebhook before polling request failed: {err}");
+            }
+        }
     }
 
     /// Parse reply_target into (chat_id, optional thread_id).
@@ -2347,6 +2484,137 @@ Allowlist Telegram username (without '@') or numeric user ID.",
         self.send_media_by_url("sendVoice", "voice", chat_id, thread_id, url, caption)
             .await
     }
+
+    async fn process_update(
+        &self,
+        update: &serde_json::Value,
+        tx: &tokio::sync::mpsc::Sender<ChannelMessage>,
+    ) -> bool {
+        let msg = if let Some(m) = self.parse_update_message(update) {
+            m
+        } else if let Some(m) = self.try_parse_voice_message(update).await {
+            m
+        } else if let Some(m) = self.try_parse_attachment_message(update).await {
+            m
+        } else {
+            Box::pin(self.handle_unauthorized_message(update)).await;
+            return true;
+        };
+
+        if self.ack_reactions
+            && let Some((reaction_chat_id, reaction_message_id)) =
+                Self::extract_update_message_target(update)
+        {
+            self.try_add_ack_reaction_nonblocking(reaction_chat_id, reaction_message_id);
+        }
+
+        let (typing_chat_id, typing_thread_id) = Self::parse_reply_target(&msg.reply_target);
+        let mut typing_body = serde_json::json!({
+            "chat_id": typing_chat_id,
+            "action": "typing"
+        });
+        if let Some(thread_id) = typing_thread_id {
+            typing_body["message_thread_id"] = serde_json::Value::String(thread_id);
+        }
+        let _ = self
+            .http_client()
+            .post(self.api_url("sendChatAction"))
+            .json(&typing_body)
+            .send()
+            .await;
+
+        tx.send(msg).await.is_ok()
+    }
+
+    async fn listen_webhook(
+        &self,
+        tx: tokio::sync::mpsc::Sender<ChannelMessage>,
+    ) -> anyhow::Result<()> {
+        use axum::{
+            Router,
+            body::Bytes,
+            extract::State,
+            http::{HeaderMap, StatusCode},
+            routing::post,
+        };
+
+        if self.mention_only {
+            let _ = self.get_bot_username().await;
+        }
+
+        struct TelegramWebhookState {
+            channel: Arc<TelegramChannel>,
+            tx: tokio::sync::mpsc::Sender<ChannelMessage>,
+            secret_token: Option<String>,
+        }
+
+        async fn handle_telegram_webhook(
+            State(state): State<Arc<TelegramWebhookState>>,
+            headers: HeaderMap,
+            body: Bytes,
+        ) -> StatusCode {
+            if let Some(expected) = state.secret_token.as_deref() {
+                let received = headers
+                    .get("x-telegram-bot-api-secret-token")
+                    .and_then(|value| value.to_str().ok());
+                if received != Some(expected) {
+                    tracing::warn!("Telegram webhook: invalid secret token");
+                    return StatusCode::UNAUTHORIZED;
+                }
+            }
+
+            let update: serde_json::Value = match serde_json::from_slice(&body) {
+                Ok(update) => update,
+                Err(err) => {
+                    tracing::warn!("Telegram webhook: invalid JSON payload: {err}");
+                    return StatusCode::BAD_REQUEST;
+                }
+            };
+
+            if state.channel.process_update(&update, &state.tx).await {
+                StatusCode::OK
+            } else {
+                StatusCode::SERVICE_UNAVAILABLE
+            }
+        }
+
+        let state = Arc::new(TelegramWebhookState {
+            channel: Arc::new(self.clone_for_webhook()),
+            tx,
+            secret_token: self.webhook_secret_token.clone(),
+        });
+        let listen_path = Self::normalize_webhook_path(&self.webhook_path);
+        let listen_addr: std::net::SocketAddr =
+            self.webhook_listen_addr.parse().with_context(|| {
+                format!(
+                    "Invalid Telegram webhook listen address: {}",
+                    self.webhook_listen_addr
+                )
+            })?;
+
+        let app = Router::new()
+            .route(&listen_path, post(handle_telegram_webhook))
+            .with_state(state);
+
+        let listener = tokio::net::TcpListener::bind(listen_addr)
+            .await
+            .with_context(|| format!("Failed to bind Telegram webhook server on {listen_addr}"))?;
+
+        self.register_webhook().await?;
+
+        tracing::info!(
+            "Telegram webhook listening on http://{}{}; registered public URL {}",
+            listen_addr,
+            listen_path,
+            self.webhook_url.as_deref().unwrap_or("<unset>")
+        );
+
+        axum::serve(listener, app)
+            .await
+            .map_err(|e| anyhow::anyhow!("Telegram webhook server error: {e}"))?;
+
+        Ok(())
+    }
 }
 
 #[async_trait]
@@ -2778,13 +3046,19 @@ impl Channel for TelegramChannel {
     }
 
     async fn listen(&self, tx: tokio::sync::mpsc::Sender<ChannelMessage>) -> anyhow::Result<()> {
+        if self.webhook_url.is_some() {
+            return self.listen_webhook(tx).await;
+        }
+
+        self.delete_webhook_for_polling().await;
+
         let mut offset: i64 = 0;
 
         if self.mention_only {
             let _ = self.get_bot_username().await;
         }
 
-        tracing::info!("Telegram channel listening for messages...");
+        tracing::info!("Telegram channel listening for messages via polling...");
 
         // Startup probe: claim the getUpdates slot before entering the long-poll loop.
         // A previous daemon's 30-second poll may still be active on Telegram's server.
@@ -2930,40 +3204,7 @@ Ensure only one `zeroclaw` process is using this bot token."
                         offset = uid + 1;
                     }
 
-                    let msg = if let Some(m) = self.parse_update_message(update) {
-                        m
-                    } else if let Some(m) = self.try_parse_voice_message(update).await {
-                        m
-                    } else if let Some(m) = self.try_parse_attachment_message(update).await {
-                        m
-                    } else {
-                        Box::pin(self.handle_unauthorized_message(update)).await;
-                        continue;
-                    };
-
-                    if self.ack_reactions
-                        && let Some((reaction_chat_id, reaction_message_id)) =
-                            Self::extract_update_message_target(update)
-                    {
-                        self.try_add_ack_reaction_nonblocking(
-                            reaction_chat_id,
-                            reaction_message_id,
-                        );
-                    }
-
-                    // Send "typing" indicator immediately when we receive a message
-                    let typing_body = serde_json::json!({
-                        "chat_id": &msg.reply_target,
-                        "action": "typing"
-                    });
-                    let _ = self
-                        .http_client()
-                        .post(self.api_url("sendChatAction"))
-                        .json(&typing_body)
-                        .send()
-                        .await; // Ignore errors for typing indicator
-
-                    if tx.send(msg).await.is_err() {
+                    if !self.process_update(update, &tx).await {
                         return Ok(());
                     }
                 }
@@ -3178,6 +3419,95 @@ mod tests {
             ch.api_url("getMe"),
             "https://api.telegram.org/bot123:ABC/getMe"
         );
+    }
+
+    #[test]
+    fn telegram_webhook_path_is_normalized() {
+        assert_eq!(
+            TelegramChannel::normalize_webhook_path("telegram"),
+            "/telegram"
+        );
+        assert_eq!(
+            TelegramChannel::normalize_webhook_path("/telegram"),
+            "/telegram"
+        );
+        assert_eq!(
+            TelegramChannel::normalize_webhook_path(""),
+            "/telegram/webhook"
+        );
+    }
+
+    #[test]
+    fn telegram_with_webhook_filters_empty_url_and_secret() {
+        let ch = TelegramChannel::new("123:ABC".into(), vec!["*".into()], false).with_webhook(
+            Some("   ".into()),
+            "127.0.0.1:9443".into(),
+            "telegram".into(),
+            Some("".into()),
+        );
+        assert_eq!(ch.webhook_url, None);
+        assert_eq!(ch.webhook_listen_addr, "127.0.0.1:9443");
+        assert_eq!(ch.webhook_path, "/telegram");
+        assert_eq!(ch.webhook_secret_token, None);
+    }
+
+    #[tokio::test]
+    async fn telegram_register_webhook_posts_expected_body() {
+        use wiremock::matchers::{body_partial_json, method, path};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/bot123:ABC/setWebhook"))
+            .and(body_partial_json(serde_json::json!({
+                "url": "https://bot.example.com/telegram",
+                "allowed_updates": ["message"],
+                "drop_pending_updates": false,
+                "secret_token": "secret-token",
+            })))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "ok": true,
+                "result": true,
+            })))
+            .expect(1)
+            .mount(&server)
+            .await;
+
+        let ch = TelegramChannel::new("123:ABC".into(), vec!["*".into()], false)
+            .with_api_base(server.uri())
+            .with_webhook(
+                Some("https://bot.example.com/telegram".into()),
+                "127.0.0.1:9443".into(),
+                "/telegram".into(),
+                Some("secret-token".into()),
+            );
+
+        ch.register_webhook().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn telegram_delete_webhook_for_polling_preserves_pending_updates() {
+        use wiremock::matchers::{body_partial_json, method, path};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/bot123:ABC/deleteWebhook"))
+            .and(body_partial_json(serde_json::json!({
+                "drop_pending_updates": false,
+            })))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "ok": true,
+                "result": true,
+            })))
+            .expect(1)
+            .mount(&server)
+            .await;
+
+        let ch = TelegramChannel::new("123:ABC".into(), vec!["*".into()], false)
+            .with_api_base(server.uri());
+
+        ch.delete_webhook_for_polling().await;
     }
 
     #[test]

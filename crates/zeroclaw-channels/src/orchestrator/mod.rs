@@ -3898,6 +3898,12 @@ fn build_channel_by_id(config: &Config, channel_id: &str) -> Result<Arc<dyn Chan
                 )
                 .with_ack_reactions(ack)
                 .with_streaming(tg.stream_mode, tg.draft_update_interval_ms)
+                .with_webhook(
+                    tg.webhook_url.clone(),
+                    tg.webhook_listen_addr.clone(),
+                    tg.webhook_path.clone(),
+                    tg.webhook_secret_token.clone(),
+                )
                 .with_transcription(config.transcription.clone())
                 .with_tts(config.tts.clone())
                 .with_workspace_dir(config.workspace_dir.clone()),
@@ -4312,6 +4318,12 @@ fn collect_configured_channels(
                     )
                     .with_ack_reactions(ack)
                     .with_streaming(tg.stream_mode, tg.draft_update_interval_ms)
+                    .with_webhook(
+                        tg.webhook_url.clone(),
+                        tg.webhook_listen_addr.clone(),
+                        tg.webhook_path.clone(),
+                        tg.webhook_secret_token.clone(),
+                    )
                     .with_transcription(config.transcription.clone())
                     .with_tts(config.tts.clone())
                     .with_workspace_dir(config.workspace_dir.clone())
@@ -11411,6 +11423,10 @@ This is an example JSON object for profile settings."#;
             mention_only: false,
             ack_reactions: None,
             proxy_url: None,
+            webhook_url: None,
+            webhook_listen_addr: "0.0.0.0:8443".to_string(),
+            webhook_path: "/telegram/webhook".to_string(),
+            webhook_secret_token: None,
         });
         match build_channel_by_id(&config, "telegram") {
             Ok(channel) => assert_eq!(channel.name(), "telegram"),
