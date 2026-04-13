@@ -3189,10 +3189,11 @@ fn setup_tool_mode() -> Result<(ComposioConfig, SecretsConfig)> {
                 style("✓").green().bold(),
                 style("enabled").green()
             );
-            ComposioConfig {
-                enabled: true,
-                api_key: Some(api_key),
-                ..ComposioConfig::default()
+            {
+                let mut c = ComposioConfig::default();
+                c.enabled = true;
+                c.api_key = Some(api_key);
+                c
             }
         }
     } else {
