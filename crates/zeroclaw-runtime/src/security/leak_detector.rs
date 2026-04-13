@@ -6,6 +6,7 @@
 //!
 //! Contributed from RustyClaw (MIT licensed).
 
+use base64::{Engine as _, engine::general_purpose};
 use regex::Regex;
 use std::collections::HashMap;
 use std::sync::OnceLock;
@@ -27,20 +28,20 @@ pub enum LeakResult {
     },
 }
 
-/// Credential leak detector for outbound content.
+/// Single credential filtering engine for outbound content.
 #[derive(Debug, Clone)]
-pub struct LeakDetector {
+pub struct CredentialFilter {
     /// Sensitivity threshold (0.0-1.0, higher = more aggressive detection).
     sensitivity: f64,
 }
 
-impl Default for LeakDetector {
+impl Default for CredentialFilter {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl LeakDetector {
+impl CredentialFilter {
     /// Create a new leak detector with default sensitivity.
     pub fn new() -> Self {
         Self { sensitivity: 0.7 }
@@ -58,20 +59,99 @@ impl LeakDetector {
         let mut patterns = Vec::new();
         let mut redacted = content.to_string();
 
-        // Check each pattern type
-        self.check_api_keys(content, &mut patterns, &mut redacted);
-        self.check_aws_credentials(content, &mut patterns, &mut redacted);
-        self.check_generic_secrets(content, &mut patterns, &mut redacted);
-        self.check_private_keys(content, &mut patterns, &mut redacted);
-        self.check_jwt_tokens(content, &mut patterns, &mut redacted);
-        self.check_database_urls(content, &mut patterns, &mut redacted);
-        self.check_high_entropy_tokens(content, &mut patterns, &mut redacted);
+        self.check_encoded_variants(content, &mut patterns, &mut redacted);
+        self.scan_direct(content, &mut patterns, &mut redacted);
 
         if patterns.is_empty() {
             LeakResult::Clean
         } else {
             LeakResult::Detected { patterns, redacted }
         }
+    }
+
+    /// Scrub credentials from text while preserving a small prefix for context.
+    pub fn scrub_credentials(&self, input: &str) -> String {
+        let scrubbed = sensitive_kv_regex()
+            .replace_all(input, |caps: &regex::Captures| {
+                let full_match = &caps[0];
+                let key = &caps[1];
+                let val = caps
+                    .get(2)
+                    .or(caps.get(3))
+                    .or(caps.get(4))
+                    .map(|m| m.as_str())
+                    .unwrap_or("");
+                let prefix = if val.len() > 4 {
+                    val.char_indices()
+                        .nth(4)
+                        .map(|(byte_idx, _)| &val[..byte_idx])
+                        .unwrap_or(val)
+                } else {
+                    ""
+                };
+
+                if full_match.contains(':') {
+                    if full_match.contains('"') {
+                        format!("\"{}\": \"{}*[REDACTED]\"", key, prefix)
+                    } else {
+                        format!("{}: {}*[REDACTED]", key, prefix)
+                    }
+                } else if full_match.contains('=') {
+                    if full_match.contains('"') {
+                        format!("{}=\"{}*[REDACTED]\"", key, prefix)
+                    } else {
+                        format!("{}={}*[REDACTED]", key, prefix)
+                    }
+                } else {
+                    format!("{}: {}*[REDACTED]", key, prefix)
+                }
+            })
+            .to_string();
+
+        let mut patterns = Vec::new();
+        let mut redacted = scrubbed.clone();
+        self.scan_post_scrub(&scrubbed, &mut patterns, &mut redacted);
+        if patterns.is_empty() {
+            scrubbed
+        } else {
+            redacted
+        }
+    }
+
+    /// Create an incremental filter for content delivered in chunks.
+    pub fn stream(&self) -> CredentialFilterStream {
+        CredentialFilterStream::new(self.clone())
+    }
+
+    fn scan_direct(&self, content: &str, patterns: &mut Vec<String>, redacted: &mut String) {
+        self.check_api_keys(content, patterns, redacted);
+        self.check_aws_credentials(content, patterns, redacted);
+        self.check_generic_secrets(content, patterns, redacted);
+        self.check_private_keys(content, patterns, redacted);
+        self.check_jwt_tokens(content, patterns, redacted);
+        self.check_database_urls(content, patterns, redacted);
+        self.check_high_entropy_tokens(content, patterns, redacted);
+    }
+
+    fn check_encoded_variants(
+        &self,
+        content: &str,
+        patterns: &mut Vec<String>,
+        redacted: &mut String,
+    ) {
+        self.check_base64_variants(content, patterns, redacted);
+        self.check_hex_variants(content, patterns, redacted);
+        self.check_url_encoded_variants(content, patterns, redacted);
+    }
+
+    fn scan_post_scrub(&self, content: &str, patterns: &mut Vec<String>, redacted: &mut String) {
+        self.check_encoded_variants(content, patterns, redacted);
+        self.check_api_keys(content, patterns, redacted);
+        self.check_aws_credentials(content, patterns, redacted);
+        self.check_private_keys(content, patterns, redacted);
+        self.check_jwt_tokens(content, patterns, redacted);
+        self.check_database_urls(content, patterns, redacted);
+        self.check_high_entropy_tokens(content, patterns, redacted);
     }
 
     /// Check for common API key patterns.
@@ -334,6 +414,193 @@ impl LeakDetector {
             }
         }
     }
+
+    fn check_base64_variants(
+        &self,
+        content: &str,
+        patterns: &mut Vec<String>,
+        redacted: &mut String,
+    ) {
+        static BASE64_PATTERN: OnceLock<Regex> = OnceLock::new();
+        let regex =
+            BASE64_PATTERN.get_or_init(|| Regex::new(r"\b[A-Za-z0-9+/_-]{24,}={0,2}\b").unwrap());
+
+        for mat in regex.find_iter(content) {
+            let candidate = mat.as_str();
+            if !candidate.ends_with('=') && !has_encoding_context(content, mat.start(), "base64") {
+                continue;
+            }
+            if let Some(decoded) = decode_base64_candidate(candidate)
+                && let Some(mut decoded_patterns) = self.detect_direct_patterns(&decoded)
+            {
+                patterns.push("Base64-encoded credential".to_string());
+                patterns.append(&mut decoded_patterns);
+                *redacted = redacted.replace(candidate, "[REDACTED_ENCODED_CREDENTIAL]");
+            }
+        }
+    }
+
+    fn check_hex_variants(&self, content: &str, patterns: &mut Vec<String>, redacted: &mut String) {
+        static HEX_PATTERN: OnceLock<Regex> = OnceLock::new();
+        let regex = HEX_PATTERN.get_or_init(|| Regex::new(r"(?i)\b[0-9a-f]{32,}\b").unwrap());
+
+        for mat in regex.find_iter(content) {
+            let candidate = mat.as_str();
+            if !has_encoding_context(content, mat.start(), "hex") {
+                continue;
+            }
+            if candidate.len() % 2 != 0 {
+                continue;
+            }
+            if let Ok(bytes) = hex::decode(candidate)
+                && let Ok(decoded) = String::from_utf8(bytes)
+                && is_mostly_printable(&decoded)
+                && let Some(mut decoded_patterns) = self.detect_direct_patterns(&decoded)
+            {
+                patterns.push("Hex-encoded credential".to_string());
+                patterns.append(&mut decoded_patterns);
+                *redacted = redacted.replace(candidate, "[REDACTED_ENCODED_CREDENTIAL]");
+            }
+        }
+    }
+
+    fn check_url_encoded_variants(
+        &self,
+        content: &str,
+        patterns: &mut Vec<String>,
+        redacted: &mut String,
+    ) {
+        static URL_ENCODED_PATTERN: OnceLock<Regex> = OnceLock::new();
+        let regex = URL_ENCODED_PATTERN
+            .get_or_init(|| Regex::new(r"(?:%[0-9A-Fa-f]{2}|[A-Za-z0-9._~+\-]){12,}").unwrap());
+
+        for candidate in regex.find_iter(content).map(|m| m.as_str()) {
+            if !candidate.contains('%') {
+                continue;
+            }
+            if let Ok(decoded) = urlencoding::decode(candidate)
+                && let Some(mut decoded_patterns) = self.detect_direct_patterns(&decoded)
+            {
+                patterns.push("URL-encoded credential".to_string());
+                patterns.append(&mut decoded_patterns);
+                *redacted = redacted.replace(candidate, "[REDACTED_ENCODED_CREDENTIAL]");
+            }
+        }
+    }
+
+    fn detect_direct_patterns(&self, content: &str) -> Option<Vec<String>> {
+        let mut patterns = Vec::new();
+        let mut redacted = content.to_string();
+        self.scan_direct(content, &mut patterns, &mut redacted);
+        (!patterns.is_empty()).then_some(patterns)
+    }
+}
+
+/// Backward-compatible leak detector facade backed by [`CredentialFilter`].
+#[derive(Debug, Clone)]
+pub struct LeakDetector {
+    filter: CredentialFilter,
+}
+
+impl Default for LeakDetector {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl LeakDetector {
+    /// Create a new leak detector with default sensitivity.
+    pub fn new() -> Self {
+        Self {
+            filter: CredentialFilter::new(),
+        }
+    }
+
+    /// Create a detector with custom sensitivity.
+    pub fn with_sensitivity(sensitivity: f64) -> Self {
+        Self {
+            filter: CredentialFilter::with_sensitivity(sensitivity),
+        }
+    }
+
+    /// Scan content for potential credential leaks.
+    pub fn scan(&self, content: &str) -> LeakResult {
+        self.filter.scan(content)
+    }
+}
+
+/// Incremental credential filter for content assembled from streamed chunks.
+#[derive(Debug, Clone)]
+pub struct CredentialFilterStream {
+    filter: CredentialFilter,
+    buffer: String,
+}
+
+impl CredentialFilterStream {
+    fn new(filter: CredentialFilter) -> Self {
+        Self {
+            filter,
+            buffer: String::new(),
+        }
+    }
+
+    /// Add the next chunk to the stream buffer.
+    pub fn push_chunk(&mut self, chunk: &str) {
+        self.buffer.push_str(chunk);
+    }
+
+    /// Scan all chunks seen so far and return the filtered content.
+    pub fn finish(self) -> String {
+        match self.filter.scan(&self.buffer) {
+            LeakResult::Clean => self.buffer,
+            LeakResult::Detected { redacted, .. } => redacted,
+        }
+    }
+}
+
+fn has_encoding_context(content: &str, candidate_start: usize, label: &str) -> bool {
+    let start = content[..candidate_start]
+        .char_indices()
+        .rev()
+        .nth(32)
+        .map(|(idx, _)| idx)
+        .unwrap_or(0);
+    content[start..candidate_start]
+        .to_ascii_lowercase()
+        .contains(label)
+}
+
+fn sensitive_kv_regex() -> &'static Regex {
+    static SENSITIVE_KV_REGEX: OnceLock<Regex> = OnceLock::new();
+    SENSITIVE_KV_REGEX.get_or_init(|| {
+        Regex::new(r#"(?i)(token|api[_-]?key|password|secret|user[_-]?key|bearer|credential)["']?\s*[:=]\s*(?:"([^"]{8,})"|'([^']{8,})'|([a-zA-Z0-9_\-\.]{8,}))"#).unwrap()
+    })
+}
+
+fn decode_base64_candidate(candidate: &str) -> Option<String> {
+    let engines = [
+        &general_purpose::STANDARD,
+        &general_purpose::STANDARD_NO_PAD,
+        &general_purpose::URL_SAFE,
+        &general_purpose::URL_SAFE_NO_PAD,
+    ];
+
+    for engine in engines {
+        if let Ok(bytes) = engine.decode(candidate)
+            && let Ok(decoded) = String::from_utf8(bytes)
+            && is_mostly_printable(&decoded)
+        {
+            return Some(decoded);
+        }
+    }
+    None
+}
+
+fn is_mostly_printable(value: &str) -> bool {
+    !value.is_empty()
+        && value
+            .chars()
+            .all(|c| !c.is_control() || c == '\n' || c == '\r' || c == '\t')
 }
 
 /// Extract candidate tokens by splitting on characters outside the
@@ -449,6 +716,79 @@ MIIEowIBAAKCAQEA0ZPr5JeyVDonXsKhfq...
             }
             LeakResult::Clean => panic!("Should detect database URL"),
         }
+    }
+
+    #[test]
+    fn detects_base64_encoded_credentials() {
+        let filter = CredentialFilter::new();
+        let secret = "api_key=sk-ant-abcdefghijklmnopqrstuvwxyz123456";
+        let encoded = general_purpose::STANDARD.encode(secret);
+        let content = format!("base64 secret: {encoded}");
+        let result = filter.scan(&content);
+        match result {
+            LeakResult::Detected { patterns, redacted } => {
+                assert!(patterns.iter().any(|p| p.contains("Base64")));
+                assert!(!redacted.contains(&encoded));
+                assert!(redacted.contains("[REDACTED_ENCODED_CREDENTIAL]"));
+            }
+            LeakResult::Clean => panic!("Should detect base64-encoded credential"),
+        }
+    }
+
+    #[test]
+    fn detects_hex_encoded_credentials() {
+        let filter = CredentialFilter::new();
+        let secret = "token=sk-ant-abcdefghijklmnopqrstuvwxyz123456";
+        let encoded = hex::encode(secret);
+        let content = format!("hex secret: {encoded}");
+        let result = filter.scan(&content);
+        match result {
+            LeakResult::Detected { patterns, redacted } => {
+                assert!(patterns.iter().any(|p| p.contains("Hex")));
+                assert!(!redacted.contains(&encoded));
+                assert!(redacted.contains("[REDACTED_ENCODED_CREDENTIAL]"));
+            }
+            LeakResult::Clean => panic!("Should detect hex-encoded credential"),
+        }
+    }
+
+    #[test]
+    fn detects_url_encoded_credentials() {
+        let filter = CredentialFilter::new();
+        let secret = "password=supersecret123456";
+        let encoded = urlencoding::encode(secret).into_owned();
+        let content = format!("url secret: {encoded}");
+        let result = filter.scan(&content);
+        match result {
+            LeakResult::Detected { patterns, redacted } => {
+                assert!(patterns.iter().any(|p| p.contains("URL")));
+                assert!(!redacted.contains(&encoded));
+                assert!(redacted.contains("[REDACTED_ENCODED_CREDENTIAL]"));
+            }
+            LeakResult::Clean => panic!("Should detect URL-encoded credential"),
+        }
+    }
+
+    #[test]
+    fn stream_filter_detects_credentials_split_across_chunks() {
+        let mut stream = CredentialFilter::new().stream();
+        stream.push_chunk("api_key=sk-ant-abcdefghijkl");
+        stream.push_chunk("mnopqrstuvwxyz123456");
+
+        let filtered = stream.finish();
+
+        assert!(!filtered.contains("sk-ant-abcdefghijklmnopqrstuvwxyz123456"));
+        assert!(filtered.contains("[REDACTED"));
+    }
+
+    #[test]
+    fn scrub_credentials_uses_credential_filter_engine() {
+        let filter = CredentialFilter::new();
+        let input = "API_KEY=sk-1234567890abcdef and AKIAIOSFODNN7EXAMPLE";
+        let scrubbed = filter.scrub_credentials(input);
+
+        assert!(scrubbed.contains("API_KEY=sk-1*[REDACTED]"));
+        assert!(!scrubbed.contains("AKIAIOSFODNN7EXAMPLE"));
     }
 
     #[test]
