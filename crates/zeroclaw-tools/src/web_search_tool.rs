@@ -107,6 +107,7 @@ impl WebSearchTool {
         let raw_key = config
             .web_search
             .brave_api_key
+            .clone()
             .filter(|k| !k.is_empty())
             .ok_or_else(|| anyhow::anyhow!("Brave API key not configured"))?;
 
@@ -287,6 +288,7 @@ impl WebSearchTool {
         config
             .web_search
             .searxng_instance_url
+            .clone()
             .filter(|u| !u.is_empty())
             .ok_or_else(|| {
                 anyhow::anyhow!(
