@@ -9,12 +9,12 @@ pub use schema::{
     ComposioConfig, Config, ConversationalAiConfig, CostConfig, CronConfig, CronJobDecl,
     CronScheduleDecl, DEFAULT_GWS_SERVICES, DataRetentionConfig, DeepgramSttConfig,
     DelegateAgentConfig, DelegateToolConfig, DiscordConfig, DockerRuntimeConfig, EdgeTtsConfig,
-    ElevenLabsTtsConfig, EmbeddingRouteConfig, EstopConfig, FeishuConfig, GatewayConfig,
-    GeminiCliConfig, GoogleSttConfig, GoogleTtsConfig, GoogleWorkspaceAllowedOperation,
-    GoogleWorkspaceConfig, HardwareConfig, HardwareTransport, HeartbeatConfig, HooksConfig,
-    HttpRequestConfig, IMessageConfig, IdentityConfig, ImageGenConfig, ImageProviderDalleConfig,
+    ElevenLabsTtsConfig, EmbeddingRouteConfig, EstopConfig, GatewayConfig, GeminiCliConfig,
+    GoogleSttConfig, GoogleTtsConfig, GoogleWorkspaceAllowedOperation, GoogleWorkspaceConfig,
+    HardwareConfig, HardwareTransport, HeartbeatConfig, HooksConfig, HttpRequestConfig,
+    IMessageConfig, IdentityConfig, ImageGenConfig, ImageProviderDalleConfig,
     ImageProviderFluxConfig, ImageProviderImagenConfig, ImageProviderStabilityConfig, JiraConfig,
-    KnowledgeConfig, LarkConfig, LinkEnricherConfig, LinkedInConfig, LinkedInContentConfig,
+    KnowledgeConfig, LinkEnricherConfig, LinkedInConfig, LinkedInContentConfig,
     LinkedInImageConfig, LocalWhisperConfig, MatrixConfig, McpConfig, McpServerConfig,
     McpTransport, MediaPipelineConfig, MemoryConfig, MemoryPolicyConfig, Microsoft365Config,
     ModelRouteConfig, MqttConfig, MultimodalConfig, NextcloudTalkConfig, NodeTransportConfig,
@@ -238,31 +238,6 @@ mod tests {
             stall_timeout_secs: 0,
         };
 
-        let lark = LarkConfig {
-            enabled: true,
-            app_id: "app-id".into(),
-            app_secret: "app-secret".into(),
-            encrypt_key: None,
-            verification_token: None,
-            allowed_users: vec![],
-            mention_only: false,
-            use_feishu: false,
-            receive_mode: crate::config::schema::LarkReceiveMode::Websocket,
-            port: None,
-            proxy_url: None,
-        };
-        let feishu = FeishuConfig {
-            enabled: true,
-            app_id: "app-id".into(),
-            app_secret: "app-secret".into(),
-            encrypt_key: None,
-            verification_token: None,
-            allowed_users: vec![],
-            receive_mode: crate::config::schema::LarkReceiveMode::Websocket,
-            port: None,
-            proxy_url: None,
-        };
-
         let nextcloud_talk = NextcloudTalkConfig {
             enabled: true,
             base_url: "https://cloud.example.com".into(),
@@ -275,8 +250,6 @@ mod tests {
 
         assert_eq!(telegram.allowed_users.len(), 1);
         assert_eq!(discord.guild_id.as_deref(), Some("123"));
-        assert_eq!(lark.app_id, "app-id");
-        assert_eq!(feishu.app_id, "app-id");
         assert_eq!(nextcloud_talk.base_url, "https://cloud.example.com");
     }
 }

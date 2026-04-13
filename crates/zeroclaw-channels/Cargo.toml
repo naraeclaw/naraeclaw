@@ -77,7 +77,6 @@ default = [
 # Channels with optional deps
 channel-email = ["dep:lettre", "dep:mail-parser", "dep:async-imap"]
 channel-telegram = ["dep:image"]
-channel-lark = ["dep:prost"]
 channel-line = []
 channel-nostr = ["dep:nostr-sdk", "zeroclaw-config/channel-nostr"]
 whatsapp-web = ["dep:wa-rs", "dep:wa-rs-core", "dep:wa-rs-binary", "dep:wa-rs-proto", "dep:serde-big-array", "dep:wa-rs-ureq-http", "dep:wa-rs-tokio-transport", "dep:qrcode"]
@@ -88,8 +87,6 @@ channel-signal = []
 channel-mattermost = []
 channel-irc = []
 channel-imessage = []
-channel-dingtalk = []
-channel-qq = []
 channel-bluesky = []
 channel-twitter = []
 channel-reddit = []
@@ -97,8 +94,6 @@ channel-notion = []
 channel-linq = []
 channel-wati = []
 channel-nextcloud = []
-channel-mochat = []
-channel-wecom = []
 channel-clawdtalk = []
 channel-webhook = []
 channel-whatsapp-cloud = []
@@ -106,13 +101,10 @@ channel-voice-call = []
 channel-acp-server = []
 
 # Optional channel bundles for non-default integrations.
-channels-cn = [
-    "channel-qq", "channel-dingtalk", "channel-mochat", "channel-wecom", "channel-wati",
-]
 channels-social = ["channel-bluesky", "channel-twitter", "channel-reddit"]
-channels-legacy = ["channel-irc", "channel-imessage", "channel-linq", "channel-lark"]
+channels-legacy = ["channel-irc", "channel-imessage", "channel-linq"]
 channels-full = [
-    "channels-cn", "channels-social", "channels-legacy",
+    "channels-social", "channels-legacy",
     "channel-clawdtalk", "channel-voice-call",
 ]
 

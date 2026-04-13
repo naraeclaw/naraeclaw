@@ -24,14 +24,10 @@ const SUPPORTED_PROXY_SERVICE_KEYS: &[&str] = &[
     "provider.ollama",
     "provider.openai",
     "provider.openrouter",
-    "channel.dingtalk",
     "channel.discord",
-    "channel.feishu",
-    "channel.lark",
     "channel.matrix",
     "channel.mattermost",
     "channel.nextcloud_talk",
-    "channel.qq",
     "channel.signal",
     "channel.slack",
     "channel.telegram",
@@ -6565,30 +6561,12 @@ pub struct ChannelsConfig {
     /// IRC channel configuration.
     #[nested]
     pub irc: Option<IrcConfig>,
-    /// Lark channel configuration.
-    #[nested]
-    pub lark: Option<LarkConfig>,
     /// LINE Messaging API channel configuration.
     #[nested]
     pub line: Option<LineConfig>,
-    /// Feishu channel configuration.
-    #[nested]
-    pub feishu: Option<FeishuConfig>,
-    /// DingTalk channel configuration.
-    #[nested]
-    pub dingtalk: Option<DingTalkConfig>,
-    /// WeCom (WeChat Enterprise) Bot Webhook channel configuration.
-    #[nested]
-    pub wecom: Option<WeComConfig>,
-    /// QQ Official Bot channel configuration.
-    #[nested]
-    pub qq: Option<QQConfig>,
     /// X/Twitter channel configuration.
     #[nested]
     pub twitter: Option<TwitterConfig>,
-    /// Mochat customer service channel configuration.
-    #[nested]
-    pub mochat: Option<MochatConfig>,
     #[cfg(feature = "channel-nostr")]
     #[nested]
     pub nostr: Option<NostrConfig>,
@@ -6732,26 +6710,6 @@ impl ChannelsConfig {
                 Box::new(ConfigWrapper::new(self.irc.as_ref())),
                 self.irc.is_some()
             ),
-            (
-                Box::new(ConfigWrapper::new(self.lark.as_ref())),
-                self.lark.is_some(),
-            ),
-            (
-                Box::new(ConfigWrapper::new(self.feishu.as_ref())),
-                self.feishu.is_some(),
-            ),
-            (
-                Box::new(ConfigWrapper::new(self.dingtalk.as_ref())),
-                self.dingtalk.is_some(),
-            ),
-            (
-                Box::new(ConfigWrapper::new(self.wecom.as_ref())),
-                self.wecom.is_some(),
-            ),
-            (
-                Box::new(ConfigWrapper::new(self.qq.as_ref())),
-                self.qq.is_some()
-            ),
             #[cfg(feature = "channel-nostr")]
             (
                 Box::new(ConfigWrapper::new(self.nostr.as_ref())),
@@ -6819,14 +6777,8 @@ impl Default for ChannelsConfig {
             email: None,
             gmail_push: None,
             irc: None,
-            lark: None,
             line: None,
-            feishu: None,
-            dingtalk: None,
-            wecom: None,
-            qq: None,
             twitter: None,
-            mochat: None,
             #[cfg(feature = "channel-nostr")]
             nostr: None,
             clawdtalk: None,
@@ -7742,73 +7694,6 @@ fn default_irc_port() -> u16 {
     6697
 }
 
-/// How ZeroClaw receives events from Feishu / Lark.
-///
-/// - `websocket` (default) — persistent WSS long-connection; no public URL required.
-/// - `webhook`             — HTTP callback server; requires a public HTTPS endpoint.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
-#[cfg_attr(feature = "schema-export", derive(schemars::JsonSchema))]
-#[serde(rename_all = "lowercase")]
-pub enum LarkReceiveMode {
-    #[default]
-    Websocket,
-    Webhook,
-}
-
-/// Lark/Feishu configuration for messaging integration.
-/// Lark is the international version; Feishu is the Chinese version.
-#[derive(Debug, Clone, Default, Serialize, Deserialize, Configurable)]
-#[cfg_attr(feature = "schema-export", derive(schemars::JsonSchema))]
-#[prefix = "channels.lark"]
-pub struct LarkConfig {
-    /// Whether this channel is active (must be explicitly enabled). Default: false.
-    #[serde(default)]
-    pub enabled: bool,
-    /// App ID from Lark/Feishu developer console
-    pub app_id: String,
-    /// App Secret from Lark/Feishu developer console
-    #[secret]
-    pub app_secret: String,
-    /// Encrypt key for webhook message decryption (optional)
-    #[serde(default)]
-    #[secret]
-    pub encrypt_key: Option<String>,
-    /// Verification token for webhook validation (optional)
-    #[serde(default)]
-    #[secret]
-    pub verification_token: Option<String>,
-    /// Allowed user IDs or union IDs (empty = deny all, "*" = allow all)
-    #[serde(default)]
-    pub allowed_users: Vec<String>,
-    /// When true, only respond to messages that @-mention the bot in groups.
-    /// Direct messages are always processed.
-    #[serde(default)]
-    pub mention_only: bool,
-    /// Whether to use the Feishu (Chinese) endpoint instead of Lark (International)
-    #[serde(default)]
-    pub use_feishu: bool,
-    /// Event receive mode: "websocket" (default) or "webhook"
-    #[serde(default)]
-    pub receive_mode: LarkReceiveMode,
-    /// HTTP port for webhook mode only. Must be set when receive_mode = "webhook".
-    /// Not required (and ignored) for websocket mode.
-    #[serde(default)]
-    pub port: Option<u16>,
-    /// Per-channel proxy URL (http, https, socks5, socks5h).
-    /// Overrides the global `[proxy]` setting for this channel only.
-    #[serde(default)]
-    pub proxy_url: Option<String>,
-}
-
-impl ChannelConfig for LarkConfig {
-    fn name() -> &'static str {
-        "Lark"
-    }
-    fn desc() -> &'static str {
-        "Lark Bot"
-    }
-}
-
 /// DM (1:1 chat) access policy for the LINE channel.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[cfg_attr(feature = "schema-export", derive(schemars::JsonSchema))]
@@ -7895,52 +7780,6 @@ impl ChannelConfig for LineConfig {
     }
     fn desc() -> &'static str {
         "connect your LINE bot"
-    }
-}
-
-/// Feishu configuration for messaging integration.
-#[derive(Debug, Clone, Default, Serialize, Deserialize, Configurable)]
-#[cfg_attr(feature = "schema-export", derive(schemars::JsonSchema))]
-#[prefix = "channels.feishu"]
-pub struct FeishuConfig {
-    /// Whether this channel is active (must be explicitly enabled). Default: false.
-    #[serde(default)]
-    pub enabled: bool,
-    /// App ID from Feishu developer console
-    pub app_id: String,
-    /// App Secret from Feishu developer console
-    #[secret]
-    pub app_secret: String,
-    /// Encrypt key for webhook message decryption (optional)
-    #[serde(default)]
-    #[secret]
-    pub encrypt_key: Option<String>,
-    /// Verification token for webhook validation (optional)
-    #[serde(default)]
-    #[secret]
-    pub verification_token: Option<String>,
-    /// Allowed user IDs or union IDs (empty = deny all, "*" = allow all)
-    #[serde(default)]
-    pub allowed_users: Vec<String>,
-    /// Event receive mode: "websocket" (default) or "webhook"
-    #[serde(default)]
-    pub receive_mode: LarkReceiveMode,
-    /// HTTP port for webhook mode only. Must be set when receive_mode = "webhook".
-    /// Not required (and ignored) for websocket mode.
-    #[serde(default)]
-    pub port: Option<u16>,
-    /// Per-channel proxy URL (http, https, socks5, socks5h).
-    /// Overrides the global `[proxy]` setting for this channel only.
-    #[serde(default)]
-    pub proxy_url: Option<String>,
-}
-
-impl ChannelConfig for FeishuConfig {
-    fn name() -> &'static str {
-        "Feishu"
-    }
-    fn desc() -> &'static str {
-        "Feishu Bot"
     }
 }
 
@@ -8461,93 +8300,6 @@ impl Default for AuditConfig {
     }
 }
 
-/// DingTalk configuration for Stream Mode messaging
-#[derive(Debug, Clone, Default, Serialize, Deserialize, Configurable)]
-#[cfg_attr(feature = "schema-export", derive(schemars::JsonSchema))]
-#[prefix = "channels.dingtalk"]
-pub struct DingTalkConfig {
-    /// Whether this channel is active (must be explicitly enabled). Default: false.
-    #[serde(default)]
-    pub enabled: bool,
-    /// Client ID (AppKey) from DingTalk developer console
-    pub client_id: String,
-    /// Client Secret (AppSecret) from DingTalk developer console
-    #[secret]
-    pub client_secret: String,
-    /// Allowed user IDs (staff IDs). Empty = deny all, "*" = allow all
-    #[serde(default)]
-    pub allowed_users: Vec<String>,
-    /// Per-channel proxy URL (http, https, socks5, socks5h).
-    /// Overrides the global `[proxy]` setting for this channel only.
-    #[serde(default)]
-    pub proxy_url: Option<String>,
-}
-
-impl ChannelConfig for DingTalkConfig {
-    fn name() -> &'static str {
-        "DingTalk"
-    }
-    fn desc() -> &'static str {
-        "DingTalk Stream Mode"
-    }
-}
-
-/// WeCom (WeChat Enterprise) Bot Webhook configuration
-#[derive(Debug, Clone, Default, Serialize, Deserialize, Configurable)]
-#[cfg_attr(feature = "schema-export", derive(schemars::JsonSchema))]
-#[prefix = "channels.wecom"]
-pub struct WeComConfig {
-    /// Whether this channel is active (must be explicitly enabled). Default: false.
-    #[serde(default)]
-    pub enabled: bool,
-    /// Webhook key from WeCom Bot configuration
-    #[secret]
-    pub webhook_key: String,
-    /// Allowed user IDs. Empty = deny all, "*" = allow all
-    #[serde(default)]
-    pub allowed_users: Vec<String>,
-}
-
-impl ChannelConfig for WeComConfig {
-    fn name() -> &'static str {
-        "WeCom"
-    }
-    fn desc() -> &'static str {
-        "WeCom Bot Webhook"
-    }
-}
-
-/// QQ Official Bot configuration (Tencent QQ Bot SDK)
-#[derive(Debug, Clone, Default, Serialize, Deserialize, Configurable)]
-#[cfg_attr(feature = "schema-export", derive(schemars::JsonSchema))]
-#[prefix = "channels.qq"]
-pub struct QQConfig {
-    /// Whether this channel is active (must be explicitly enabled). Default: false.
-    #[serde(default)]
-    pub enabled: bool,
-    /// App ID from QQ Bot developer console
-    pub app_id: String,
-    /// App Secret from QQ Bot developer console
-    #[secret]
-    pub app_secret: String,
-    /// Allowed user IDs. Empty = deny all, "*" = allow all
-    #[serde(default)]
-    pub allowed_users: Vec<String>,
-    /// Per-channel proxy URL (http, https, socks5, socks5h).
-    /// Overrides the global `[proxy]` setting for this channel only.
-    #[serde(default)]
-    pub proxy_url: Option<String>,
-}
-
-impl ChannelConfig for QQConfig {
-    fn name() -> &'static str {
-        "QQ Official"
-    }
-    fn desc() -> &'static str {
-        "Tencent QQ Bot"
-    }
-}
-
 /// X/Twitter channel configuration (Twitter API v2)
 #[derive(Debug, Clone, Default, Serialize, Deserialize, Configurable)]
 #[cfg_attr(feature = "schema-export", derive(schemars::JsonSchema))]
@@ -8570,40 +8322,6 @@ impl ChannelConfig for TwitterConfig {
     }
     fn desc() -> &'static str {
         "X/Twitter Bot via API v2"
-    }
-}
-
-/// Mochat channel configuration (Mochat customer service API)
-#[derive(Debug, Clone, Default, Serialize, Deserialize, Configurable)]
-#[cfg_attr(feature = "schema-export", derive(schemars::JsonSchema))]
-#[prefix = "channels.mochat"]
-pub struct MochatConfig {
-    /// Whether this channel is active (must be explicitly enabled). Default: false.
-    #[serde(default)]
-    pub enabled: bool,
-    /// Mochat API base URL
-    pub api_url: String,
-    /// Mochat API token
-    #[secret]
-    pub api_token: String,
-    /// Allowed user IDs. Empty = deny all, "*" = allow all
-    #[serde(default)]
-    pub allowed_users: Vec<String>,
-    /// Poll interval in seconds for new messages. Default: 5
-    #[serde(default = "default_mochat_poll_interval")]
-    pub poll_interval_secs: u64,
-}
-
-fn default_mochat_poll_interval() -> u64 {
-    5
-}
-
-impl ChannelConfig for MochatConfig {
-    fn name() -> &'static str {
-        "Mochat"
-    }
-    fn desc() -> &'static str {
-        "Mochat Customer Service"
     }
 }
 
@@ -11152,7 +10870,6 @@ impl_enum_prop_kind!(
     WhatsAppChatPolicy,
     LineDmPolicy,
     LineGroupPolicy,
-    LarkReceiveMode,
     OtpMethod,
     SandboxBackend,
     AutonomyLevel,
@@ -11659,14 +11376,8 @@ auto_save = true
                 email: None,
                 gmail_push: None,
                 irc: None,
-                lark: None,
                 line: None,
-                feishu: None,
-                dingtalk: None,
-                wecom: None,
-                qq: None,
                 twitter: None,
-                mochat: None,
                 #[cfg(feature = "channel-nostr")]
                 nostr: None,
                 clawdtalk: None,
@@ -12302,115 +12013,6 @@ default_temperature = 0.7
         config.browser.computer_use.api_key = Some("browser-credential".into());
         config.web_search.brave_api_key = Some("brave-credential".into());
         config.storage.provider.config.db_url = Some("postgres://user:pw@host/db".into());
-        config.channels_config.feishu = Some(FeishuConfig {
-            enabled: true,
-            app_id: "cli_feishu_123".into(),
-            app_secret: "feishu-secret".into(),
-            encrypt_key: Some("feishu-encrypt".into()),
-            verification_token: Some("feishu-verify".into()),
-            allowed_users: vec!["*".into()],
-            receive_mode: LarkReceiveMode::Websocket,
-            port: None,
-            proxy_url: None,
-        });
-
-        config.agents.insert(
-            "worker".into(),
-            DelegateAgentConfig {
-                provider: "openrouter".into(),
-                model: "model-test".into(),
-                system_prompt: None,
-                api_key: Some("agent-credential".into()),
-                temperature: None,
-                max_depth: 3,
-                agentic: false,
-                allowed_tools: Vec::new(),
-                max_iterations: 10,
-                timeout_secs: None,
-                agentic_timeout_secs: None,
-                skills_directory: None,
-                memory_namespace: None,
-            },
-        );
-
-        config.save().await.unwrap();
-
-        let contents = tokio::fs::read_to_string(config.config_path.clone())
-            .await
-            .unwrap();
-        let stored: Config = toml::from_str(&contents).unwrap();
-        let store = crate::secrets::SecretStore::new(&dir, true);
-
-        let root_encrypted = stored.api_key.as_deref().unwrap();
-        assert!(crate::secrets::SecretStore::is_encrypted(root_encrypted));
-        assert_eq!(store.decrypt(root_encrypted).unwrap(), "root-credential");
-
-        let composio_encrypted = stored.composio.api_key.as_deref().unwrap();
-        assert!(crate::secrets::SecretStore::is_encrypted(
-            composio_encrypted
-        ));
-        assert_eq!(
-            store.decrypt(composio_encrypted).unwrap(),
-            "composio-credential"
-        );
-
-        let browser_encrypted = stored.browser.computer_use.api_key.as_deref().unwrap();
-        assert!(crate::secrets::SecretStore::is_encrypted(browser_encrypted));
-        assert_eq!(
-            store.decrypt(browser_encrypted).unwrap(),
-            "browser-credential"
-        );
-
-        let web_search_encrypted = stored.web_search.brave_api_key.as_deref().unwrap();
-        assert!(crate::secrets::SecretStore::is_encrypted(
-            web_search_encrypted
-        ));
-        assert_eq!(
-            store.decrypt(web_search_encrypted).unwrap(),
-            "brave-credential"
-        );
-
-        let worker = stored.agents.get("worker").unwrap();
-        let worker_encrypted = worker.api_key.as_deref().unwrap();
-        assert!(crate::secrets::SecretStore::is_encrypted(worker_encrypted));
-        assert_eq!(store.decrypt(worker_encrypted).unwrap(), "agent-credential");
-
-        let storage_db_url = stored.storage.provider.config.db_url.as_deref().unwrap();
-        assert!(crate::secrets::SecretStore::is_encrypted(storage_db_url));
-        assert_eq!(
-            store.decrypt(storage_db_url).unwrap(),
-            "postgres://user:pw@host/db"
-        );
-
-        let feishu = stored.channels_config.feishu.as_ref().unwrap();
-        assert!(crate::secrets::SecretStore::is_encrypted(
-            &feishu.app_secret
-        ));
-        assert_eq!(store.decrypt(&feishu.app_secret).unwrap(), "feishu-secret");
-        assert!(
-            feishu
-                .encrypt_key
-                .as_deref()
-                .is_some_and(crate::secrets::SecretStore::is_encrypted)
-        );
-        assert_eq!(
-            store
-                .decrypt(feishu.encrypt_key.as_deref().unwrap())
-                .unwrap(),
-            "feishu-encrypt"
-        );
-        assert!(
-            feishu
-                .verification_token
-                .as_deref()
-                .is_some_and(crate::secrets::SecretStore::is_encrypted)
-        );
-        assert_eq!(
-            store
-                .decrypt(feishu.verification_token.as_deref().unwrap())
-                .unwrap(),
-            "feishu-verify"
-        );
 
         let _ = fs::remove_dir_all(&dir).await;
     }
@@ -12722,14 +12324,8 @@ allowed_users = ["@ops:matrix.org"]
             email: None,
             gmail_push: None,
             irc: None,
-            lark: None,
             line: None,
-            feishu: None,
-            dingtalk: None,
-            wecom: None,
-            qq: None,
             twitter: None,
-            mochat: None,
             #[cfg(feature = "channel-nostr")]
             nostr: None,
             clawdtalk: None,
@@ -13103,14 +12699,8 @@ channel_ids = ["C123", "D456"]
             email: None,
             gmail_push: None,
             irc: None,
-            lark: None,
             line: None,
-            feishu: None,
-            dingtalk: None,
-            wecom: None,
-            qq: None,
             twitter: None,
-            mochat: None,
             #[cfg(feature = "channel-nostr")]
             nostr: None,
             clawdtalk: None,
@@ -14145,55 +13735,6 @@ default_model = "legacy-model"
     }
 
     #[test]
-    async fn load_or_init_decrypts_feishu_channel_secrets() {
-        let _env_guard = env_override_lock().await;
-        let temp_home =
-            std::env::temp_dir().join(format!("zeroclaw_test_home_{}", uuid::Uuid::new_v4()));
-        let config_dir = temp_home.join(".zeroclaw");
-        let config_path = config_dir.join("config.toml");
-
-        fs::create_dir_all(&config_dir).await.unwrap();
-
-        let original_home = std::env::var("HOME").ok();
-        // SAFETY: test-only, single-threaded test runner.
-        unsafe { std::env::set_var("HOME", &temp_home) };
-        // SAFETY: test-only, single-threaded test runner.
-        unsafe { std::env::remove_var("ZEROCLAW_WORKSPACE") };
-
-        let mut config = Config::default();
-        config.config_path = config_path.clone();
-        config.workspace_dir = config_dir.join("workspace");
-        config.secrets.encrypt = true;
-        config.channels_config.feishu = Some(FeishuConfig {
-            enabled: true,
-            app_id: "cli_feishu_123".into(),
-            app_secret: "feishu-secret".into(),
-            encrypt_key: Some("feishu-encrypt".into()),
-            verification_token: Some("feishu-verify".into()),
-            allowed_users: vec!["*".into()],
-            receive_mode: LarkReceiveMode::Websocket,
-            port: None,
-            proxy_url: None,
-        });
-        config.save().await.unwrap();
-
-        let loaded = Box::pin(Config::load_or_init()).await.unwrap();
-        let feishu = loaded.channels_config.feishu.as_ref().unwrap();
-        assert_eq!(feishu.app_secret, "feishu-secret");
-        assert_eq!(feishu.encrypt_key.as_deref(), Some("feishu-encrypt"));
-        assert_eq!(feishu.verification_token.as_deref(), Some("feishu-verify"));
-
-        if let Some(home) = original_home {
-            // SAFETY: test-only, single-threaded test runner.
-            unsafe { std::env::set_var("HOME", home) };
-        } else {
-            // SAFETY: test-only, single-threaded test runner.
-            unsafe { std::env::remove_var("HOME") };
-        }
-        let _ = fs::remove_dir_all(temp_home).await;
-    }
-
-    #[test]
     async fn load_or_init_uses_persisted_active_workspace_marker() {
         let _env_guard = env_override_lock().await;
         let temp_home =
@@ -14972,135 +14513,6 @@ default_model = "persisted-profile"
         assert_eq!(parsed.boards.len(), 1);
         assert_eq!(parsed.boards[0].board, "nucleo-f401re");
         assert_eq!(parsed.boards[0].path.as_deref(), Some("/dev/ttyACM0"));
-    }
-
-    #[test]
-    async fn lark_config_serde() {
-        let lc = LarkConfig {
-            enabled: true,
-            app_id: "cli_123456".into(),
-            app_secret: "secret_abc".into(),
-            encrypt_key: Some("encrypt_key".into()),
-            verification_token: Some("verify_token".into()),
-            allowed_users: vec!["user_123".into(), "user_456".into()],
-            mention_only: false,
-            use_feishu: true,
-            receive_mode: LarkReceiveMode::Websocket,
-            port: None,
-            proxy_url: None,
-        };
-        let json = serde_json::to_string(&lc).unwrap();
-        let parsed: LarkConfig = serde_json::from_str(&json).unwrap();
-        assert_eq!(parsed.app_id, "cli_123456");
-        assert_eq!(parsed.app_secret, "secret_abc");
-        assert_eq!(parsed.encrypt_key.as_deref(), Some("encrypt_key"));
-        assert_eq!(parsed.verification_token.as_deref(), Some("verify_token"));
-        assert_eq!(parsed.allowed_users.len(), 2);
-        assert!(parsed.use_feishu);
-    }
-
-    #[test]
-    async fn lark_config_toml_roundtrip() {
-        let lc = LarkConfig {
-            enabled: true,
-            app_id: "cli_123456".into(),
-            app_secret: "secret_abc".into(),
-            encrypt_key: Some("encrypt_key".into()),
-            verification_token: Some("verify_token".into()),
-            allowed_users: vec!["*".into()],
-            mention_only: false,
-            use_feishu: false,
-            receive_mode: LarkReceiveMode::Webhook,
-            port: Some(9898),
-            proxy_url: None,
-        };
-        let toml_str = toml::to_string(&lc).unwrap();
-        let parsed: LarkConfig = toml::from_str(&toml_str).unwrap();
-        assert_eq!(parsed.app_id, "cli_123456");
-        assert_eq!(parsed.app_secret, "secret_abc");
-        assert!(!parsed.use_feishu);
-    }
-
-    #[test]
-    async fn lark_config_deserializes_without_optional_fields() {
-        let json = r#"{"app_id":"cli_123","app_secret":"secret"}"#;
-        let parsed: LarkConfig = serde_json::from_str(json).unwrap();
-        assert!(parsed.encrypt_key.is_none());
-        assert!(parsed.verification_token.is_none());
-        assert!(parsed.allowed_users.is_empty());
-        assert!(!parsed.mention_only);
-        assert!(!parsed.use_feishu);
-    }
-
-    #[test]
-    async fn lark_config_defaults_to_lark_endpoint() {
-        let json = r#"{"app_id":"cli_123","app_secret":"secret"}"#;
-        let parsed: LarkConfig = serde_json::from_str(json).unwrap();
-        assert!(
-            !parsed.use_feishu,
-            "use_feishu should default to false (Lark)"
-        );
-    }
-
-    #[test]
-    async fn lark_config_with_wildcard_allowed_users() {
-        let json = r#"{"app_id":"cli_123","app_secret":"secret","allowed_users":["*"]}"#;
-        let parsed: LarkConfig = serde_json::from_str(json).unwrap();
-        assert_eq!(parsed.allowed_users, vec!["*"]);
-    }
-
-    #[test]
-    async fn feishu_config_serde() {
-        let fc = FeishuConfig {
-            enabled: true,
-            app_id: "cli_feishu_123".into(),
-            app_secret: "secret_abc".into(),
-            encrypt_key: Some("encrypt_key".into()),
-            verification_token: Some("verify_token".into()),
-            allowed_users: vec!["user_123".into(), "user_456".into()],
-            receive_mode: LarkReceiveMode::Websocket,
-            port: None,
-            proxy_url: None,
-        };
-        let json = serde_json::to_string(&fc).unwrap();
-        let parsed: FeishuConfig = serde_json::from_str(&json).unwrap();
-        assert_eq!(parsed.app_id, "cli_feishu_123");
-        assert_eq!(parsed.app_secret, "secret_abc");
-        assert_eq!(parsed.encrypt_key.as_deref(), Some("encrypt_key"));
-        assert_eq!(parsed.verification_token.as_deref(), Some("verify_token"));
-        assert_eq!(parsed.allowed_users.len(), 2);
-    }
-
-    #[test]
-    async fn feishu_config_toml_roundtrip() {
-        let fc = FeishuConfig {
-            enabled: true,
-            app_id: "cli_feishu_123".into(),
-            app_secret: "secret_abc".into(),
-            encrypt_key: Some("encrypt_key".into()),
-            verification_token: Some("verify_token".into()),
-            allowed_users: vec!["*".into()],
-            receive_mode: LarkReceiveMode::Webhook,
-            port: Some(9898),
-            proxy_url: None,
-        };
-        let toml_str = toml::to_string(&fc).unwrap();
-        let parsed: FeishuConfig = toml::from_str(&toml_str).unwrap();
-        assert_eq!(parsed.app_id, "cli_feishu_123");
-        assert_eq!(parsed.app_secret, "secret_abc");
-        assert_eq!(parsed.receive_mode, LarkReceiveMode::Webhook);
-        assert_eq!(parsed.port, Some(9898));
-    }
-
-    #[test]
-    async fn feishu_config_deserializes_without_optional_fields() {
-        let json = r#"{"app_id":"cli_123","app_secret":"secret"}"#;
-        let parsed: FeishuConfig = serde_json::from_str(json).unwrap();
-        assert!(parsed.encrypt_key.is_none());
-        assert!(parsed.verification_token.is_none());
-        assert!(parsed.allowed_users.is_empty());
-        assert_eq!(parsed.receive_mode, LarkReceiveMode::Websocket);
-        assert!(parsed.port.is_none());
     }
 
     // ── LINE ──────────────────────────────────────────────────

@@ -1043,22 +1043,6 @@ fn mask_sensitive_fields(
         mask_optional_secret(&mut irc.nickserv_password);
         mask_optional_secret(&mut irc.sasl_password);
     }
-    if let Some(lark) = masked.channels_config.lark.as_mut() {
-        mask_required_secret(&mut lark.app_secret);
-        mask_optional_secret(&mut lark.encrypt_key);
-        mask_optional_secret(&mut lark.verification_token);
-    }
-    if let Some(feishu) = masked.channels_config.feishu.as_mut() {
-        mask_required_secret(&mut feishu.app_secret);
-        mask_optional_secret(&mut feishu.encrypt_key);
-        mask_optional_secret(&mut feishu.verification_token);
-    }
-    if let Some(dingtalk) = masked.channels_config.dingtalk.as_mut() {
-        mask_required_secret(&mut dingtalk.client_secret);
-    }
-    if let Some(qq) = masked.channels_config.qq.as_mut() {
-        mask_required_secret(&mut qq.app_secret);
-    }
     #[cfg(feature = "channel-nostr")]
     if let Some(nostr) = masked.channels_config.nostr.as_mut() {
         mask_required_secret(&mut nostr.private_key);
@@ -1203,40 +1187,6 @@ fn restore_masked_sensitive_fields(
             &current_ch.nickserv_password,
         );
         restore_optional_secret(&mut incoming_ch.sasl_password, &current_ch.sasl_password);
-    }
-    if let (Some(incoming_ch), Some(current_ch)) = (
-        incoming.channels_config.lark.as_mut(),
-        current.channels_config.lark.as_ref(),
-    ) {
-        restore_required_secret(&mut incoming_ch.app_secret, &current_ch.app_secret);
-        restore_optional_secret(&mut incoming_ch.encrypt_key, &current_ch.encrypt_key);
-        restore_optional_secret(
-            &mut incoming_ch.verification_token,
-            &current_ch.verification_token,
-        );
-    }
-    if let (Some(incoming_ch), Some(current_ch)) = (
-        incoming.channels_config.feishu.as_mut(),
-        current.channels_config.feishu.as_ref(),
-    ) {
-        restore_required_secret(&mut incoming_ch.app_secret, &current_ch.app_secret);
-        restore_optional_secret(&mut incoming_ch.encrypt_key, &current_ch.encrypt_key);
-        restore_optional_secret(
-            &mut incoming_ch.verification_token,
-            &current_ch.verification_token,
-        );
-    }
-    if let (Some(incoming_ch), Some(current_ch)) = (
-        incoming.channels_config.dingtalk.as_mut(),
-        current.channels_config.dingtalk.as_ref(),
-    ) {
-        restore_required_secret(&mut incoming_ch.client_secret, &current_ch.client_secret);
-    }
-    if let (Some(incoming_ch), Some(current_ch)) = (
-        incoming.channels_config.qq.as_mut(),
-        current.channels_config.qq.as_ref(),
-    ) {
-        restore_required_secret(&mut incoming_ch.app_secret, &current_ch.app_secret);
     }
     #[cfg(feature = "channel-nostr")]
     if let (Some(incoming_ch), Some(current_ch)) = (
@@ -1695,17 +1645,6 @@ mod tests {
             allowed_numbers: vec![],
             proxy_url: None,
         });
-        cfg.channels_config.feishu = Some(zeroclaw_config::schema::FeishuConfig {
-            enabled: true,
-            app_id: "cli_aabbcc".to_string(),
-            app_secret: "feishu-secret".to_string(),
-            encrypt_key: Some("feishu-encrypt".to_string()),
-            verification_token: Some("feishu-verify".to_string()),
-            allowed_users: vec!["*".to_string()],
-            receive_mode: zeroclaw_config::schema::LarkReceiveMode::Websocket,
-            port: None,
-            proxy_url: None,
-        });
         cfg.channels_config.email = Some(zeroclaw_config::scattered_types::EmailConfig {
             imap_host: "imap.example.com".to_string(),
             imap_port: 993,
@@ -1764,30 +1703,6 @@ mod tests {
         assert_eq!(parsed.memory.qdrant.api_key.as_deref(), Some(MASKED_SECRET));
         assert_eq!(
             parsed
-                .channels_config
-                .feishu
-                .as_ref()
-                .map(|v| v.app_secret.as_str()),
-            Some(MASKED_SECRET)
-        );
-        assert_eq!(
-            parsed
-                .channels_config
-                .feishu
-                .as_ref()
-                .and_then(|v| v.encrypt_key.as_deref()),
-            Some(MASKED_SECRET)
-        );
-        assert_eq!(
-            parsed
-                .channels_config
-                .feishu
-                .as_ref()
-                .and_then(|v| v.verification_token.as_deref()),
-            Some(MASKED_SECRET)
-        );
-        assert_eq!(
-            parsed
                 .model_routes
                 .first()
                 .and_then(|v| v.api_key.as_deref()),
@@ -1834,17 +1749,6 @@ mod tests {
             api_url: "https://live-mt-server.wati.io".to_string(),
             tenant_id: None,
             allowed_numbers: vec![],
-            proxy_url: None,
-        });
-        current.channels_config.feishu = Some(zeroclaw_config::schema::FeishuConfig {
-            enabled: true,
-            app_id: "cli_current".to_string(),
-            app_secret: "feishu-secret-real".to_string(),
-            encrypt_key: Some("feishu-encrypt-real".to_string()),
-            verification_token: Some("feishu-verify-real".to_string()),
-            allowed_users: vec!["*".to_string()],
-            receive_mode: zeroclaw_config::schema::LarkReceiveMode::Websocket,
-            port: None,
             proxy_url: None,
         });
         current.channels_config.email = Some(zeroclaw_config::scattered_types::EmailConfig {
@@ -1908,11 +1812,6 @@ mod tests {
         if let Some(wati) = incoming.channels_config.wati.as_mut() {
             wati.api_token = MASKED_SECRET.to_string();
         }
-        if let Some(feishu) = incoming.channels_config.feishu.as_mut() {
-            feishu.app_secret = MASKED_SECRET.to_string();
-            feishu.encrypt_key = Some(MASKED_SECRET.to_string());
-            feishu.verification_token = Some("feishu-verify-new".to_string());
-        }
         if let Some(email) = incoming.channels_config.email.as_mut() {
             email.password = MASKED_SECRET.to_string();
         }
@@ -1960,30 +1859,6 @@ mod tests {
                 .as_ref()
                 .map(|v| v.api_token.as_str()),
             Some("wati-real")
-        );
-        assert_eq!(
-            hydrated
-                .channels_config
-                .feishu
-                .as_ref()
-                .map(|v| v.app_secret.as_str()),
-            Some("feishu-secret-real")
-        );
-        assert_eq!(
-            hydrated
-                .channels_config
-                .feishu
-                .as_ref()
-                .and_then(|v| v.encrypt_key.as_deref()),
-            Some("feishu-encrypt-real")
-        );
-        assert_eq!(
-            hydrated
-                .channels_config
-                .feishu
-                .as_ref()
-                .and_then(|v| v.verification_token.as_deref()),
-            Some("feishu-verify-new")
         );
         assert_eq!(
             hydrated.model_routes[0].api_key.as_deref(),
