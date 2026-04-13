@@ -16,9 +16,9 @@ use std::io::{self, IsTerminal};
 
 use zeroclaw_config::schema::Config;
 use zeroclaw_config::schema::{
-    DiscordConfig, FeishuConfig, IMessageConfig, IrcConfig, LarkConfig, LarkReceiveMode,
-    MatrixConfig, MattermostConfig, NextcloudTalkConfig, SignalConfig, SlackConfig, StreamMode,
-    TelegramConfig, WhatsAppChatPolicy, WhatsAppConfig, WhatsAppWebMode,
+    DiscordConfig, IMessageConfig, IrcConfig, MatrixConfig, MattermostConfig, NextcloudTalkConfig,
+    SignalConfig, SlackConfig, StreamMode, TelegramConfig, WhatsAppChatPolicy, WhatsAppConfig,
+    WhatsAppWebMode,
 };
 
 use super::theme;
@@ -206,7 +206,6 @@ const CHANNELS: &[(&str, &str, bool)] = &[
     ("LINE", "Messaging API", false),
     ("Mattermost", "plugin", false),
     ("Nextcloud Talk", "self-hosted", false),
-    ("Feishu/Lark", "\u{98de}\u{4e66}", false),
     ("BlueBubbles", "macOS app", false),
     ("Zalo", "Bot API", false),
     ("Synology Chat", "Webhook", false),
@@ -898,36 +897,6 @@ fn apply_tui_selections_to_config(app: &App, config: &mut Config) {
                     allowed_users: vec![],
                     proxy_url: None,
                     bot_name: None,
-                });
-            }
-        }
-        "Feishu/Lark" => {
-            if config.channels_config.feishu.is_none() {
-                config.channels_config.feishu = Some(FeishuConfig {
-                    enabled: true,
-                    app_id: String::from("YOUR_FEISHU_APP_ID"),
-                    app_secret: String::from("YOUR_FEISHU_APP_SECRET"),
-                    encrypt_key: None,
-                    verification_token: None,
-                    allowed_users: vec![],
-                    receive_mode: LarkReceiveMode::default(),
-                    port: None,
-                    proxy_url: None,
-                });
-            }
-            if config.channels_config.lark.is_none() {
-                config.channels_config.lark = Some(LarkConfig {
-                    enabled: true,
-                    app_id: String::from("YOUR_LARK_APP_ID"),
-                    app_secret: String::from("YOUR_LARK_APP_SECRET"),
-                    encrypt_key: None,
-                    verification_token: None,
-                    allowed_users: vec![],
-                    mention_only: false,
-                    use_feishu: false,
-                    receive_mode: LarkReceiveMode::default(),
-                    port: None,
-                    proxy_url: None,
                 });
             }
         }
@@ -2238,7 +2207,6 @@ fn render_channel_status(frame: &mut Frame, area: Rect) {
         ("LINE", "needs token + secret", false),
         ("Mattermost", "needs token + url", false),
         ("Nextcloud Talk", "needs setup", false),
-        ("Feishu", "needs app credentials", false),
         ("BlueBubbles", "needs setup", false),
         ("Zalo", "needs token", false),
         ("Synology Chat", "needs token + incoming webhook", false),
@@ -3431,20 +3399,6 @@ mod tests {
     }
 
     #[test]
-    fn save_channel_feishu_lark() {
-        let mut app = test_app();
-        let idx = CHANNELS.iter().position(|c| c.0 == "Feishu/Lark").unwrap();
-        app.channel_idx = idx;
-        let mut config = Config::default();
-        apply_tui_selections_to_config(&app, &mut config);
-        assert!(
-            config.channels_config.feishu.is_some(),
-            "feishu should be set"
-        );
-        assert!(config.channels_config.lark.is_some(), "lark should be set");
-    }
-
-    #[test]
     fn save_channel_skip_does_not_create_stubs() {
         let mut app = test_app();
         let idx = CHANNELS.iter().position(|c| c.0 == "Skip for now").unwrap();
@@ -3820,7 +3774,6 @@ mod tests {
             "iMessage",
             "Mattermost",
             "Nextcloud Talk",
-            "Feishu/Lark",
         ];
         for channel_name in &channels_to_test {
             let mut app = test_app();

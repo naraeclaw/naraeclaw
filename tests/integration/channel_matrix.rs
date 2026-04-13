@@ -800,39 +800,6 @@ fn make_platform_message(platform: &str) -> ChannelMessage {
             interruption_scope_id: None,
             attachments: vec![],
         },
-        "wecom" => ChannelMessage {
-            id: "wc_1".into(),
-            sender: "wecom_user1".into(),
-            reply_target: "wecom_user1".into(),
-            content: "hi".into(),
-            channel: "wecom".into(),
-            timestamp: 1700000000,
-            thread_ts: None,
-            interruption_scope_id: None,
-            attachments: vec![],
-        },
-        "dingtalk" => ChannelMessage {
-            id: "dt_1".into(),
-            sender: "staff_123".into(),
-            reply_target: "conversation_456".into(),
-            content: "hi".into(),
-            channel: "dingtalk".into(),
-            timestamp: 1700000000,
-            thread_ts: None,
-            interruption_scope_id: None,
-            attachments: vec![],
-        },
-        "qq" => ChannelMessage {
-            id: "qq_1".into(),
-            sender: "qq_user_789".into(),
-            reply_target: "qq_group_101".into(),
-            content: "hi".into(),
-            channel: "qq".into(),
-            timestamp: 1700000000,
-            thread_ts: None,
-            interruption_scope_id: None,
-            attachments: vec![],
-        },
         "linq" => ChannelMessage {
             id: "lq_1".into(),
             sender: "+15551112222".into(),
@@ -881,9 +848,6 @@ const ALL_PLATFORMS: &[&str] = &[
     "mattermost",
     "whatsapp",
     "nextcloud_talk",
-    "wecom",
-    "dingtalk",
-    "qq",
     "linq",
     "wati",
     "cli",
@@ -925,19 +889,11 @@ fn all_platforms_channel_field_matches_platform_name() {
     }
 }
 
-/// Discord, Slack, IRC, Mattermost, DingTalk, QQ, Nextcloud Talk all have
+/// Discord, Slack, IRC, Mattermost, Nextcloud Talk all have
 /// reply_target != sender (channel-based platforms).
 #[test]
 fn channel_platforms_have_distinct_sender_and_reply_target() {
-    let channel_based = [
-        "discord",
-        "slack",
-        "irc",
-        "mattermost",
-        "dingtalk",
-        "qq",
-        "nextcloud_talk",
-    ];
+    let channel_based = ["discord", "slack", "irc", "mattermost", "nextcloud_talk"];
 
     for platform in &channel_based {
         let msg = make_platform_message(platform);
@@ -948,12 +904,12 @@ fn channel_platforms_have_distinct_sender_and_reply_target() {
     }
 }
 
-/// Telegram, iMessage, Email, Signal, WhatsApp, CLI, Linq, WATI, WeCom
+/// Telegram, iMessage, Email, Signal, WhatsApp, CLI, Linq, WATI
 /// are DM-style: reply_target == sender.
 #[test]
 fn dm_platforms_have_same_sender_and_reply_target() {
     let dm_platforms = [
-        "telegram", "imessage", "email", "signal", "whatsapp", "cli", "linq", "wati", "wecom",
+        "telegram", "imessage", "email", "signal", "whatsapp", "cli", "linq", "wati",
     ];
 
     for platform in &dm_platforms {
@@ -1288,9 +1244,6 @@ async fn capability_matrix_spec() {
         "whatsapp",
         "mattermost",
         "cli",
-        "dingtalk",
-        "qq",
-        "wecom",
         "linq",
         "wati",
         "nextcloud_talk",

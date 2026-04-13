@@ -111,10 +111,10 @@ To build with Matrix support explicitly enabled:
 cargo check --features channel-matrix
 ```
 
-To build with Matrix + Lark + hardware support:
+To build with Matrix + hardware support:
 
 ```bash
-cargo check --features hardware,channel-matrix,channel-lark
+cargo check --features hardware,channel-matrix
 ```
 
 Lock-contention mitigation:

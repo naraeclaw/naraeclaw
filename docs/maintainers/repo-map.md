@@ -91,7 +91,7 @@ Providers: `anthropic`, `openai`, `openai_codex`, `openrouter`, `gemini`, `ollam
 |---|---|---|
 | `channels/` | `traits.rs`, `mod.rs` (6.6k), + 22 channel files | **Input/output transports.** `Channel` trait: `send()`, `listen()`, `health_check()`, `start_typing()`, draft updates. Factory in `mod.rs` wires config to channel instances, manages per-sender conversation history (max 50 messages). |
 
-Channels: `telegram` (4.6k), `discord`, `slack`, `whatsapp`, `whatsapp_web`, `matrix`, `signal`, `email_channel`, `qq`, `dingtalk`, `lark`, `imessage`, `irc`, `nostr`, `mattermost`, `nextcloud_talk`, `wati`, `mqtt`, `linq`, `clawdtalk`, `cli`
+Channels: `telegram` (4.6k), `discord`, `slack`, `whatsapp`, `whatsapp_web`, `matrix`, `signal`, `email_channel`, `imessage`, `irc`, `nostr`, `mattermost`, `nextcloud_talk`, `wati`, `mqtt`, `linq`, `clawdtalk`, `cli`
 
 ### Tools (Agent Capabilities)
 
