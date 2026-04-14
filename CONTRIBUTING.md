@@ -1,6 +1,6 @@
-# Contributing to ZeroClaw
+# NaraeClaw 기여 가이드
 
-Thanks for your interest in contributing to ZeroClaw! This guide will help you get started.
+NaraeClaw에 기여해 주셔서 감사합니다. 이 가이드는 시작하는 방법을 안내합니다.
 
 ---
 
@@ -23,7 +23,7 @@ git push origin --delete main 2>/dev/null
 
 All PRs must target **`master`**. PRs targeting `main` will be rejected.
 
-**Background:** ZeroClaw previously used `main` in some documentation and scripts, which caused 404 errors, broken CI refs, and contributor confusion (see [#2929](https://github.com/zeroclaw-labs/zeroclaw/issues/2929), [#3061](https://github.com/zeroclaw-labs/zeroclaw/issues/3061), [#3194](https://github.com/zeroclaw-labs/zeroclaw/pull/3194)). As of March 2026, all references have been corrected, stale branches cleaned up, and the `main` branch permanently deleted.
+**Background:** `master`가 단일 기본 브랜치입니다. `main` 브랜치는 존재하지 않습니다. 모든 PR은 `master`를 대상으로 해야 합니다.
 
 ---
 
@@ -42,7 +42,7 @@ All PRs must target **`master`**. PRs targeting `main` will be rejected.
 
 Welcome — contributions of all sizes are valued. If this is your first contribution, here is how to get started:
 
-1. **Find an issue.** Look for issues labeled [`good first issue`](https://github.com/zeroclaw-labs/zeroclaw/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22) — these are scoped for newcomers and include context to get moving quickly.
+1. **Find an issue.** Look for issues labeled `good first issue` — these are scoped for newcomers and include context to get moving quickly.
 
 2. **Pick a scope.** Good first contributions include:
    - Typo and documentation fixes
@@ -55,7 +55,7 @@ Welcome — contributions of all sizes are valued. If this is your first contrib
    - Make your changes and run `cargo fmt && cargo clippy && cargo test`
    - Open a PR against `master` using the PR template
 
-4. **Start with Track A.** ZeroClaw uses three [collaboration tracks](#collaboration-tracks-risk-based) (A/B/C) based on risk. First-time contributors should target **Track A** (docs, tests, chore) — these require lighter review and are the fastest path to a merged PR.
+4. **Start with Track A.** NaraeClaw uses three [collaboration tracks](#collaboration-tracks-risk-based) (A/B/C) based on risk. First-time contributors should target **Track A** (docs, tests, chore) — these require lighter review and are the fastest path to a merged PR.
 
 If you get stuck, open a draft PR early and ask questions in the description.
 
@@ -63,8 +63,8 @@ If you get stuck, open a draft PR early and ask questions in the description.
 
 ```bash
 # Clone the repo
-git clone https://github.com/zeroclaw-labs/zeroclaw.git
-cd zeroclaw
+git clone https://github.com/juikkim/naraeclaw.git
+cd naraeclaw
 
 # Enable the pre-push hook (runs fmt, clippy, tests before every push)
 git config core.hooksPath .githooks
@@ -138,7 +138,7 @@ git push --no-verify
 
 ## Local Secret Management (Required)
 
-ZeroClaw supports layered secret management for local development and CI hygiene.
+NaraeClaw supports layered secret management for local development and CI hygiene.
 
 ### Secret Storage Options
 
@@ -271,7 +271,7 @@ Before requesting review, ensure all of the following are true:
 - Security impact and rollback path are explicitly described.
 - No personal/sensitive data is introduced in code/docs/tests/fixtures/logs/examples/commit messages.
 - Tests/fixtures/examples use neutral project-scoped wording (no identity-specific or first-person phrasing).
-- If identity-like wording is required, use ZeroClaw-centric labels only (for example: `ZeroClawAgent`, `ZeroClawOperator`, `zeroclaw_user`).
+- If identity-like wording is required, use NaraeClaw-centric labels only (for example: `NaraeClawAgent`, `NaraeClawOperator`, `zeroclaw_user`).
 - If docs were changed, update `docs/README.md` navigation and reciprocal links with related docs.
 - If a new operational doc was added, start from `docs/contributing/doc-template.md` and keep risk/rollback/troubleshooting sections where applicable.
 - Linked issue (or rationale for no issue) is included.
@@ -298,7 +298,7 @@ When PR traffic is high (especially with AI-assisted contributions), these rules
 - **Security-first review**: changes in `src/security/`, runtime, gateway, and CI need stricter validation.
 - **Risk-first triage**: use labels (`risk: high`, `risk: medium`, `risk: low`) to route review depth.
 - **Privacy-first hygiene**: redact/anonymize sensitive payloads and keep tests/examples neutral and project-scoped.
-- **Identity normalization**: when identity traits are unavoidable, use ZeroClaw/project-native roles instead of personal or real-world identities.
+- **Identity normalization**: when identity traits are unavoidable, use NaraeClaw/project-native roles instead of personal or real-world identities.
 - **Supersede hygiene**: if your PR replaces an older open PR, add `Supersedes #...` and request maintainers close the outdated one.
 
 Full maintainer workflow: [`docs/contributing/pr-workflow.md`](docs/contributing/pr-workflow.md).
@@ -323,7 +323,7 @@ Agent implementation playbook lives in [`AGENTS.md`](AGENTS.md).
 
 ## Architecture: Trait-Based Pluggability
 
-ZeroClaw's architecture is built on **traits** — every subsystem is swappable. This means contributing a new integration is as simple as implementing a trait and registering it in the factory function.
+NaraeClaw's architecture is built on **traits** — every subsystem is swappable. This means contributing a new integration is as simple as implementing a trait and registering it in the factory function.
 
 ```
 src/
@@ -345,7 +345,7 @@ Use these defaults unless an existing subsystem pattern clearly overrides them.
 - **Trait implementers**: keep predictable suffixes (`*Provider`, `*Channel`, `*Tool`, `*Memory`, `*Observer`, `*RuntimeAdapter`).
 - **Factory keys**: keep lowercase and stable (`openai`, `discord`, `shell`); avoid adding aliases without migration need.
 - **Tests**: use behavior-oriented names (`subject_expected_behavior`) and neutral project-scoped fixtures.
-- **Identity-like labels**: if unavoidable, use ZeroClaw-native identifiers only (`ZeroClawAgent`, `zeroclaw_user`, `zeroclaw_node`).
+- **Identity-like labels**: if unavoidable, use NaraeClaw-native identifiers only (`NaraeClawAgent`, `zeroclaw_user`, `zeroclaw_node`).
 
 ## Architecture Boundary Rules (Required)
 
@@ -371,7 +371,7 @@ Use these quick examples to align implementation choices before opening a PR.
 - **Good test name**: `allowlist_denies_unknown_user`, `provider_returns_error_on_invalid_model`
 
 - **Bad identity-like label**: `john_user`, `alice_bot`
-- **Good identity-like label**: `ZeroClawAgent`, `zeroclaw_user`, `zeroclaw_node`
+- **Good identity-like label**: `NaraeClawAgent`, `zeroclaw_user`, `zeroclaw_node`
 
 ### Architecture boundary examples
 
@@ -457,7 +457,7 @@ impl Channel for YourChannel {
 
 ## How to Mark Config Fields as Secrets
 
-ZeroClaw uses a `#[derive(Configurable)]` proc macro to automatically handle secret
+NaraeClaw uses a `#[derive(Configurable)]` proc macro to automatically handle secret
 field discovery, encryption, decryption, and CLI management. When adding a new
 channel, provider, or integration with sensitive fields (API keys, tokens, passwords):
 
@@ -600,7 +600,7 @@ impl Tool for YourTool {
 - [ ] Follows code naming conventions and architecture boundary rules in this guide
 - [ ] No personal/sensitive data in code/docs/tests/fixtures/logs/examples/commit messages
 - [ ] Test names/messages/fixtures/examples are neutral and project-focused
-- [ ] Any required identity-like wording uses ZeroClaw/project-native labels only
+- [ ] Any required identity-like wording uses NaraeClaw/project-native labels only
 
 ## Commit Convention
 
