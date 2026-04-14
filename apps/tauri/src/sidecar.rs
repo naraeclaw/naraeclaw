@@ -14,39 +14,50 @@ fn sidecar_slot() -> &'static Mutex<Option<tokio::process::Child>> {
     SIDECAR.get_or_init(|| Mutex::new(None))
 }
 
+/// Target triple embedded by build.rs — used to find the Tauri-bundled sidecar binary.
+const TARGET_TRIPLE: &str = env!("NARAECLAW_TARGET_TRIPLE");
+
 /// Resolve the path to the `naraeclaw` binary.
 ///
 /// Resolution order:
-/// 1. Sibling to current executable — works in bundled Tauri `.app`
-/// 2. `NARAECLAW_BIN` environment variable override
-/// 3. Walk up from the current executable looking for `target/release/naraeclaw`
-///    — works during `cargo tauri dev`
-/// 4. `naraeclaw` on `PATH`
+/// 1. `naraeclaw-{triple}` sibling to current exe — Tauri's sidecar naming convention
+///    for the bundled `.app`
+/// 2. `naraeclaw` sibling to current exe — plain name fallback
+/// 3. `NARAECLAW_BIN` environment variable override
+/// 4. Walk up from the current exe looking for `target/release/naraeclaw` then
+///    `target/debug/naraeclaw` — covers `cargo tauri dev` with either profile
+/// 5. `naraeclaw` on `PATH`
 fn resolve_binary() -> PathBuf {
-    // 1. Sibling to current exe (bundled case — Tauri puts externalBin in Resources)
+    // 1 & 2. Sibling to current exe (bundled Tauri app places sidecar next to main binary)
     if let Ok(exe) = std::env::current_exe() {
-        let sibling = exe
-            .parent()
-            .unwrap_or(std::path::Path::new("."))
-            .join("naraeclaw");
-        if sibling.exists() {
-            return sibling;
+        let dir = exe.parent().unwrap_or(std::path::Path::new("."));
+        // Tauri names the sidecar with the target triple suffix
+        let suffixed = dir.join(format!("naraeclaw-{TARGET_TRIPLE}"));
+        if suffixed.exists() {
+            return suffixed;
+        }
+        let plain = dir.join("naraeclaw");
+        if plain.exists() {
+            return plain;
         }
     }
 
-    // 2. Explicit env override
+    // 3. Explicit env override
     if let Ok(path) = std::env::var("NARAECLAW_BIN") {
         return PathBuf::from(path);
     }
 
-    // 3. Walk up from exe to find workspace root (development builds)
+    // 4. Walk up from exe to find workspace root (development builds)
     if let Ok(exe) = std::env::current_exe() {
         let mut dir = exe.parent().map(std::path::Path::to_path_buf);
         for _ in 0..10 {
-            if let Some(d) = dir {
-                let candidate = d.join("target").join("release").join("naraeclaw");
-                if candidate.exists() {
-                    return candidate;
+            if let Some(ref d) = dir {
+                // Check release before debug so `cargo build --release` is preferred
+                for profile in ["release", "debug"] {
+                    let candidate = d.join("target").join(profile).join("naraeclaw");
+                    if candidate.exists() {
+                        return candidate;
+                    }
                 }
                 dir = d.parent().map(|p| p.to_path_buf());
             } else {
@@ -55,7 +66,7 @@ fn resolve_binary() -> PathBuf {
         }
     }
 
-    // 4. Rely on PATH
+    // 5. Rely on PATH
     PathBuf::from("naraeclaw")
 }
 
