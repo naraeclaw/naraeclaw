@@ -60,7 +60,7 @@ static RUNTIME_PROXY_CLIENT_CACHE: OnceLock<RwLock<HashMap<String, reqwest::Clie
 
 /// Top-level ZeroClaw configuration, loaded from `config.toml`.
 ///
-/// Resolution order: `ZEROCLAW_WORKSPACE` env → `active_workspace.toml` marker → `~/.zeroclaw/config.toml`.
+/// Resolution order: `ZEROCLAW_WORKSPACE` env → `active_workspace.toml` marker → `~/.naraeclaw/config.toml`.
 #[derive(Debug, Clone, Serialize, Deserialize, Configurable)]
 #[cfg_attr(feature = "schema-export", derive(schemars::JsonSchema))]
 pub struct Config {
@@ -8977,13 +8977,13 @@ fn default_config_dir() -> Result<PathBuf> {
     if let Ok(home) = std::env::var("HOME")
         && !home.is_empty()
     {
-        return Ok(PathBuf::from(home).join(".zeroclaw"));
+        return Ok(PathBuf::from(home).join(".naraeclaw"));
     }
 
     let home = UserDirs::new()
         .map(|u| u.home_dir().to_path_buf())
         .context("Could not find home directory")?;
-    Ok(home.join(".zeroclaw"))
+    Ok(home.join(".naraeclaw"))
 }
 
 fn active_workspace_state_path(default_dir: &Path) -> PathBuf {
@@ -9131,20 +9131,29 @@ pub fn resolve_config_dir_for_workspace(workspace_dir: &Path) -> (PathBuf, PathB
         );
     }
 
-    let legacy_config_dir = workspace_dir
+    let naraeclaw_config_dir = workspace_dir
         .parent()
-        .map(|parent| parent.join(".zeroclaw"));
-    if let Some(legacy_dir) = legacy_config_dir {
-        if legacy_dir.join("config.toml").exists() {
-            return (legacy_dir, workspace_config_dir);
+        .map(|parent| parent.join(".naraeclaw"));
+    if let Some(config_dir) = naraeclaw_config_dir {
+        if config_dir.join("config.toml").exists() {
+            return (config_dir, workspace_config_dir);
         }
 
         if workspace_dir
             .file_name()
             .is_some_and(|name| name == std::ffi::OsStr::new("workspace"))
         {
-            return (legacy_dir, workspace_config_dir);
+            return (config_dir, workspace_config_dir);
         }
+    }
+
+    let legacy_config_dir = workspace_dir
+        .parent()
+        .map(|parent| parent.join(".zeroclaw"));
+    if let Some(legacy_dir) = legacy_config_dir
+        && legacy_dir.join("config.toml").exists()
+    {
+        return (legacy_dir, workspace_config_dir);
     }
 
     (
@@ -9156,7 +9165,7 @@ pub fn resolve_config_dir_for_workspace(workspace_dir: &Path) -> (PathBuf, PathB
 /// Resolve the current runtime config/workspace directories for onboarding flows.
 ///
 /// This mirrors the same precedence used by `Config::load_or_init()`:
-/// `ZEROCLAW_CONFIG_DIR` > `ZEROCLAW_WORKSPACE` > active workspace marker > defaults.
+/// `NARAECLAW_CONFIG_DIR`/`ZEROCLAW_CONFIG_DIR` > `NARAECLAW_WORKSPACE`/`ZEROCLAW_WORKSPACE` > active workspace marker > defaults.
 pub async fn resolve_runtime_dirs_for_onboarding() -> Result<(PathBuf, PathBuf)> {
     let (default_zeroclaw_dir, default_workspace_dir) = default_config_and_workspace_dirs()?;
     let (config_dir, workspace_dir, _) =
@@ -9175,8 +9184,8 @@ enum ConfigResolutionSource {
 impl ConfigResolutionSource {
     const fn as_str(self) -> &'static str {
         match self {
-            Self::EnvConfigDir => "ZEROCLAW_CONFIG_DIR",
-            Self::EnvWorkspace => "ZEROCLAW_WORKSPACE",
+            Self::EnvConfigDir => "NARAECLAW_CONFIG_DIR",
+            Self::EnvWorkspace => "NARAECLAW_WORKSPACE",
             Self::ActiveWorkspaceMarker => "active_workspace.toml",
             Self::DefaultConfigDir => "default",
         }
@@ -9216,7 +9225,9 @@ async fn resolve_runtime_config_dirs(
     default_zeroclaw_dir: &Path,
     default_workspace_dir: &Path,
 ) -> Result<(PathBuf, PathBuf, ConfigResolutionSource)> {
-    if let Ok(custom_config_dir) = std::env::var("ZEROCLAW_CONFIG_DIR") {
+    if let Ok(custom_config_dir) =
+        std::env::var("NARAECLAW_CONFIG_DIR").or_else(|_| std::env::var("ZEROCLAW_CONFIG_DIR"))
+    {
         let custom_config_dir = custom_config_dir.trim();
         if !custom_config_dir.is_empty() {
             let zeroclaw_dir = expand_tilde_path(custom_config_dir);
@@ -9228,7 +9239,8 @@ async fn resolve_runtime_config_dirs(
         }
     }
 
-    if let Ok(custom_workspace) = std::env::var("ZEROCLAW_WORKSPACE")
+    if let Ok(custom_workspace) =
+        std::env::var("NARAECLAW_WORKSPACE").or_else(|_| std::env::var("ZEROCLAW_WORKSPACE"))
         && !custom_workspace.is_empty()
     {
         let expanded = expand_tilde_path(&custom_workspace);
@@ -13391,7 +13403,7 @@ requires_openai_auth = true
         let temp_home =
             std::env::temp_dir().join(format!("zeroclaw_test_home_{}", uuid::Uuid::new_v4()));
         let workspace_dir = temp_home.join("workspace");
-        let resolved_config_path = temp_home.join(".zeroclaw").join("config.toml");
+        let resolved_config_path = temp_home.join(".naraeclaw").join("config.toml");
 
         let original_home = std::env::var("HOME").ok();
         // SAFETY: test-only, single-threaded test runner.
@@ -13665,7 +13677,7 @@ requires_openai_auth = true
         let temp_home =
             std::env::temp_dir().join(format!("zeroclaw_test_home_{}", uuid::Uuid::new_v4()));
         let workspace_dir = temp_home.join("workspace");
-        let legacy_config_path = temp_home.join(".zeroclaw").join("config.toml");
+        let legacy_config_path = temp_home.join(".naraeclaw").join("config.toml");
 
         let original_home = std::env::var("HOME").ok();
         // SAFETY: test-only, single-threaded test runner.
@@ -13739,7 +13751,7 @@ default_model = "legacy-model"
         let _env_guard = env_override_lock().await;
         let temp_home =
             std::env::temp_dir().join(format!("zeroclaw_test_home_{}", uuid::Uuid::new_v4()));
-        let temp_default_dir = temp_home.join(".zeroclaw");
+        let temp_default_dir = temp_home.join(".naraeclaw");
         let custom_config_dir = temp_home.join("profiles").join("agent-alpha");
 
         fs::create_dir_all(&custom_config_dir).await.unwrap();
@@ -13790,7 +13802,7 @@ default_model = "legacy-model"
         let _env_guard = env_override_lock().await;
         let temp_home =
             std::env::temp_dir().join(format!("zeroclaw_test_home_{}", uuid::Uuid::new_v4()));
-        let temp_default_dir = temp_home.join(".zeroclaw");
+        let temp_default_dir = temp_home.join(".naraeclaw");
         let marker_config_dir = temp_home.join("profiles").join("persisted-profile");
         let env_workspace_dir = temp_home.join("env-workspace");
 
@@ -13834,7 +13846,7 @@ default_model = "legacy-model"
     async fn persist_active_workspace_marker_is_cleared_for_default_config_dir() {
         let temp_home =
             std::env::temp_dir().join(format!("zeroclaw_test_home_{}", uuid::Uuid::new_v4()));
-        let default_config_dir = temp_home.join(".zeroclaw");
+        let default_config_dir = temp_home.join(".naraeclaw");
         let custom_config_dir = temp_home.join("profiles").join("custom-profile");
         let marker_path = default_config_dir.join(ACTIVE_WORKSPACE_STATE_FILE);
 
