@@ -33,7 +33,7 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 // ── Docs base URL ───────────────────────────────────────────────────
 
-const DOCS_BASE: &str = "https://www.zeroclawlabs.ai/docs";
+const DOCS_BASE: &str = "https://www.naraeclaw.ai/docs";
 
 // ── Screens ─────────────────────────────────────────────────────────
 
@@ -321,15 +321,17 @@ struct App {
 impl App {
     fn new() -> Self {
         // Resolve gateway port: env vars → default
-        let port = std::env::var("ZEROCLAW_GATEWAY_PORT")
+        let port = std::env::var("NARAECLAW_GATEWAY_PORT")
+            .or_else(|_| std::env::var("ZEROCLAW_GATEWAY_PORT"))
             .or_else(|_| std::env::var("PORT"))
             .ok()
             .and_then(|s| s.parse::<u16>().ok())
             .unwrap_or(42617);
 
         // Resolve gateway host: env var → default
-        let host =
-            std::env::var("ZEROCLAW_GATEWAY_HOST").unwrap_or_else(|_| "127.0.0.1".to_string());
+        let host = std::env::var("NARAECLAW_GATEWAY_HOST")
+            .or_else(|_| std::env::var("ZEROCLAW_GATEWAY_HOST"))
+            .unwrap_or_else(|_| "127.0.0.1".to_string());
 
         Self {
             screen: Screen::Welcome,
@@ -429,9 +431,9 @@ impl App {
         self.pairing_required = true;
     }
 
-    /// Run `zeroclaw gateway get-paircode --new` locally to generate a code.
+    /// Run `naraeclaw gateway get-paircode --new` locally to generate a code.
     async fn generate_code_via_cli() -> Option<String> {
-        let output = tokio::process::Command::new("zeroclaw")
+        let output = tokio::process::Command::new("naraeclaw")
             .args(["gateway", "get-paircode", "--new"])
             .output()
             .await
@@ -439,14 +441,14 @@ impl App {
         Self::extract_code_from_output(&output.stdout)
     }
 
-    /// Run `docker exec <container> zeroclaw gateway get-paircode --new`.
+    /// Run `docker exec <container> naraeclaw gateway get-paircode --new`.
     async fn generate_code_via_docker() -> Option<String> {
-        // Find zeroclaw container
+        // Find naraeclaw container
         let ps = tokio::process::Command::new("docker")
             .args([
                 "ps",
                 "--filter",
-                "ancestor=ghcr.io/zeroclaw-labs/zeroclaw",
+                "ancestor=ghcr.io/naraeclaw-labs/naraeclaw",
                 "--format",
                 "{{.Names}}",
             ])
@@ -461,7 +463,7 @@ impl App {
         if container.is_empty() {
             // Also try by container name
             let ps2 = tokio::process::Command::new("docker")
-                .args(["ps", "--filter", "name=zeroclaw", "--format", "{{.Names}}"])
+                .args(["ps", "--filter", "name=naraeclaw", "--format", "{{.Names}}"])
                 .output()
                 .await
                 .ok()?;
@@ -477,7 +479,7 @@ impl App {
                 .args([
                     "exec",
                     &container,
-                    "zeroclaw",
+                    "naraeclaw",
                     "gateway",
                     "get-paircode",
                     "--new",
@@ -491,7 +493,7 @@ impl App {
             .args([
                 "exec",
                 &container,
-                "zeroclaw",
+                "naraeclaw",
                 "gateway",
                 "get-paircode",
                 "--new",
@@ -637,7 +639,7 @@ pub async fn run_tui_onboarding() -> Result<()> {
                 };
 
                 println!();
-                println!("  \u{1f980} ZeroClaw {VERSION} configured successfully!");
+                println!("  \u{1f980} NaraeClaw {VERSION} configured successfully!");
                 println!(
                     "     Provider:   {} ({})",
                     app.selected_provider(),
@@ -665,16 +667,16 @@ pub async fn run_tui_onboarding() -> Result<()> {
                 let channel = app.selected_channel();
                 if channel != "Skip for now" {
                     println!("  Next: edit config.toml to add your {channel} credentials.");
-                    println!("        zeroclaw config edit");
+                    println!("        naraeclaw config edit");
                     println!();
                 }
-                println!("  Run `zeroclaw daemon` to start your agent.");
+                println!("  Run `naraeclaw daemon` to start your agent.");
                 println!();
             }
             Err(e) => {
                 eprintln!();
                 eprintln!("  \u{2717} Failed to save configuration: {e}");
-                eprintln!("  You can re-run: zeroclaw onboard --tui");
+                eprintln!("  You can re-run: naraeclaw onboard --tui");
                 eprintln!();
             }
         }
@@ -731,7 +733,7 @@ fn apply_tui_selections_to_config(app: &App, config: &mut Config) {
     // ── Channel ─────────────────────────────────────────────────────
     // Create a stub config for the selected channel with placeholder
     // values so the section appears in config.toml. The user fills in
-    // real tokens via `zeroclaw config edit` or the dashboard.
+    // real tokens via `naraeclaw config edit` or the dashboard.
     let channel = app.selected_channel();
     match channel {
         "Telegram" => {
@@ -834,7 +836,7 @@ fn apply_tui_selections_to_config(app: &App, config: &mut Config) {
                     enabled: true,
                     server: String::from("irc.libera.chat"),
                     port: 6697,
-                    nickname: String::from("zeroclaw-bot"),
+                    nickname: String::from("naraeclaw-bot"),
                     username: None,
                     channels: vec![String::from("#your-channel")],
                     allowed_users: vec![],
@@ -955,9 +957,9 @@ fn apply_tui_selections_to_config(app: &App, config: &mut Config) {
     config.gateway.require_pairing = app.pairing_required;
 }
 
-/// If a ZeroClaw Docker container is running, reconfigure it via `docker exec`.
+/// If a NaraeClaw Docker container is running, reconfigure it via `docker exec`.
 async fn push_config_to_docker(app: &App) {
-    // Find zeroclaw container
+    // Find naraeclaw container
     let container = find_docker_container().await;
     let container = match container {
         Some(c) => c,
@@ -966,11 +968,11 @@ async fn push_config_to_docker(app: &App) {
 
     let provider_id = app.selected_provider_id();
 
-    // Use `zeroclaw onboard --quick` inside the container to reconfigure
+    // Use `naraeclaw onboard --quick` inside the container to reconfigure
     let mut args = vec![
         "exec".to_string(),
         container,
-        "zeroclaw".to_string(),
+        "naraeclaw".to_string(),
         "onboard".to_string(),
         "--quick".to_string(),
         "--provider".to_string(),
@@ -1000,7 +1002,7 @@ async fn find_docker_container() -> Option<String> {
         .args([
             "ps",
             "--filter",
-            "ancestor=ghcr.io/zeroclaw-labs/zeroclaw",
+            "ancestor=ghcr.io/naraeclaw-labs/naraeclaw",
             "--format",
             "{{.Names}}",
         ])
@@ -1018,7 +1020,7 @@ async fn find_docker_container() -> Option<String> {
     }
     // Try by container name
     let ps2 = tokio::process::Command::new("docker")
-        .args(["ps", "--filter", "name=zeroclaw", "--format", "{{.Names}}"])
+        .args(["ps", "--filter", "name=naraeclaw", "--format", "{{.Names}}"])
         .output()
         .await
         .ok()?;
@@ -1387,11 +1389,8 @@ fn render(frame: &mut Frame, app: &App) {
     // Version line
     let version_line = Line::from(vec![
         Span::styled("\u{1f980} ", theme::accent_style()),
-        Span::styled(format!("ZeroClaw {VERSION}"), theme::heading_style()),
-        Span::styled(
-            "  \u{2502}  Zero overhead. Zero compromise.",
-            theme::dim_style(),
-        ),
+        Span::styled(format!("NaraeClaw {VERSION}"), theme::heading_style()),
+        Span::styled("  \u{2502}  Local-first. Korean-first.", theme::dim_style()),
     ]);
     frame.render_widget(
         Paragraph::new(version_line).alignment(Alignment::Center),
@@ -1499,7 +1498,7 @@ fn render(frame: &mut Frame, app: &App) {
 fn setup_title() -> Paragraph<'static> {
     Paragraph::new(Line::from(vec![
         Span::styled("\u{250c}  ", theme::border_style()),
-        Span::styled("ZeroClaw setup", theme::heading_style()),
+        Span::styled("NaraeClaw setup", theme::heading_style()),
     ]))
 }
 
@@ -1516,14 +1515,14 @@ fn render_welcome(frame: &mut Frame, area: Rect) {
     let lines = vec![
         Line::from(""),
         Line::from(Span::styled(
-            "\u{250c}  ZeroClaw setup",
+            "\u{250c}  NaraeClaw setup",
             theme::heading_style(),
         )),
         Line::from(Span::styled("\u{2502}", theme::border_style())),
         Line::from(vec![
             Span::styled("\u{2502}  ", theme::border_style()),
             Span::styled(
-                "Welcome to ZeroClaw \u{2014} the fastest, smallest AI assistant.",
+                "Welcome to NaraeClaw \u{2014} the fastest, smallest AI assistant.",
                 theme::body_style(),
             ),
         ]),
@@ -1565,11 +1564,11 @@ fn render_security(frame: &mut Frame, area: Rect) {
         )),
         Line::from(""),
         Line::from(Span::styled(
-            "ZeroClaw is optimized for single-operator deployments.",
+            "NaraeClaw is optimized for single-operator deployments.",
             theme::body_style(),
         )),
         Line::from(Span::styled(
-            "By default, ZeroClaw is a personal agent: one trusted operator",
+            "By default, NaraeClaw is a personal agent: one trusted operator",
             theme::body_style(),
         )),
         Line::from(Span::styled("boundary.", theme::body_style())),
@@ -1583,7 +1582,7 @@ fn render_security(frame: &mut Frame, area: Rect) {
         )),
         Line::from(""),
         Line::from(Span::styled(
-            "ZeroClaw is not a hostile multi-tenant boundary by default.",
+            "NaraeClaw is not a hostile multi-tenant boundary by default.",
             theme::body_style(),
         )),
         Line::from(Span::styled(
@@ -1600,7 +1599,7 @@ fn render_security(frame: &mut Frame, area: Rect) {
             theme::body_style(),
         )),
         Line::from(Span::styled(
-            "control, don't run ZeroClaw.",
+            "control, don't run NaraeClaw.",
             theme::body_style(),
         )),
         Line::from(""),
@@ -1644,11 +1643,11 @@ fn render_security(frame: &mut Frame, area: Rect) {
         Line::from(""),
         Line::from(Span::styled("Run regularly:", theme::heading_style())),
         Line::from(Span::styled(
-            "  zeroclaw security audit --deep",
+            "  naraeclaw security audit --deep",
             theme::dim_style(),
         )),
         Line::from(Span::styled(
-            "  zeroclaw security audit --fix",
+            "  naraeclaw security audit --fix",
             theme::dim_style(),
         )),
         Line::from(""),
@@ -2265,7 +2264,7 @@ fn render_how_channels_work(frame: &mut Frame, area: Rect) {
             theme::body_style(),
         )),
         Line::from(Span::styled(
-            "  Approve with: zeroclaw pairing approve <channel> <code>",
+            "  Approve with: naraeclaw pairing approve <channel> <code>",
             theme::dim_style(),
         )),
         Line::from(Span::styled(
@@ -2273,7 +2272,7 @@ fn render_how_channels_work(frame: &mut Frame, area: Rect) {
             theme::body_style(),
         )),
         Line::from(Span::styled(
-            "  Multi-user DMs: run: zeroclaw config set session.dmScope",
+            "  Multi-user DMs: run: naraeclaw config set session.dmScope",
             theme::body_style(),
         )),
         Line::from(Span::styled(
@@ -3001,7 +3000,7 @@ fn render_what_now(frame: &mut Frame, area: Rect) {
             lines: vec![
                 Line::from(""),
                 Line::from(Span::styled(
-                    "  What now: https://zeroclawlabs.ai/showcase",
+                    "  What now: https://naraeclaw.ai/showcase",
                     theme::body_style(),
                 )),
                 Line::from(Span::styled(
@@ -3030,7 +3029,7 @@ fn render_complete(frame: &mut Frame, area: Rect, app: &App) {
     let title = Line::from(vec![
         Span::styled("\u{2514}  ", theme::border_style()),
         Span::styled(
-            "Onboarding complete. Use the dashboard link above to control ZeroClaw.",
+            "Onboarding complete. Use the dashboard link above to control NaraeClaw.",
             theme::heading_style(),
         ),
     ]);
@@ -3041,7 +3040,7 @@ fn render_complete(frame: &mut Frame, area: Rect, app: &App) {
     let mut summary_lines = vec![
         Line::from(""),
         Line::from(Span::styled(
-            "  \u{1f980} ZeroClaw configured successfully!",
+            "  \u{1f980} NaraeClaw configured successfully!",
             theme::success_style().add_modifier(Modifier::BOLD),
         )),
         Line::from(""),
@@ -3085,11 +3084,11 @@ fn render_complete(frame: &mut Frame, area: Rect, app: &App) {
     summary_lines.extend([
         Line::from(""),
         Line::from(Span::styled(
-            "  Run `zeroclaw daemon` to start your agent.",
+            "  Run `naraeclaw daemon` to start your agent.",
             theme::body_style(),
         )),
         Line::from(Span::styled(
-            "  Run `zeroclaw doctor` to validate your setup.",
+            "  Run `naraeclaw doctor` to validate your setup.",
             theme::body_style(),
         )),
         Line::from(""),
@@ -3338,7 +3337,7 @@ mod tests {
             .expect("irc should be Some");
         assert_eq!(irc.server, "irc.libera.chat");
         assert_eq!(irc.port, 6697);
-        assert_eq!(irc.nickname, "zeroclaw-bot");
+        assert_eq!(irc.nickname, "naraeclaw-bot");
     }
 
     #[test]
