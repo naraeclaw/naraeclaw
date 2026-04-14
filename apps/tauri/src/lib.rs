@@ -1,4 +1,4 @@
-//! ZeroClaw Desktop — Tauri application library.
+//! NaraeClaw Desktop — Tauri application library.
 
 pub mod commands;
 pub mod gateway_client;
@@ -11,6 +11,7 @@ use gateway_client::GatewayClient;
 use state::shared_state;
 use std::time::Duration;
 use tauri::{Manager, RunEvent};
+use tauri_plugin_store::StoreExt;
 
 /// Attempt to auto-pair with the gateway so the WebView has a valid token
 /// before the React frontend mounts. Runs on localhost so the admin endpoints
@@ -79,6 +80,45 @@ fn set_dock_icon() {
     }
 }
 
+/// Restore window size and position from the persisted store.
+fn restore_window_state<R: tauri::Runtime>(app: &tauri::App<R>) {
+    let Ok(store) = app.store("naraeclaw.json") else { return };
+    let Some(window) = app.get_webview_window("main") else { return };
+    if let (Some(w), Some(h)) = (
+        store.get("window_width").and_then(|v| v.as_u64()),
+        store.get("window_height").and_then(|v| v.as_u64()),
+    ) {
+        let _ = window.set_size(tauri::Size::Physical(tauri::PhysicalSize {
+            width: w as u32,
+            height: h as u32,
+        }));
+    }
+    if let (Some(x), Some(y)) = (
+        store.get("window_x").and_then(|v| v.as_i64()),
+        store.get("window_y").and_then(|v| v.as_i64()),
+    ) {
+        let _ = window.set_position(tauri::Position::Physical(tauri::PhysicalPosition {
+            x: x as i32,
+            y: y as i32,
+        }));
+    }
+}
+
+/// Save window size and position to the persisted store.
+fn save_window_state<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
+    let Some(window) = app.get_webview_window("main") else { return };
+    let Ok(store) = app.store("naraeclaw.json") else { return };
+    if let Ok(size) = window.outer_size() {
+        store.set("window_width", size.width);
+        store.set("window_height", size.height);
+    }
+    if let Ok(pos) = window.outer_position() {
+        store.set("window_x", pos.x);
+        store.set("window_y", pos.y);
+    }
+    let _ = store.save();
+}
+
 /// Configure and run the Tauri application.
 pub fn run() {
     let shared = shared_state();
@@ -109,6 +149,9 @@ pub fn run() {
 
             // Set up the system tray.
             let _ = tray::setup_tray(app);
+
+            // Restore saved window size and position from previous session.
+            restore_window_state(app);
 
             // Spawn the naraeclaw agent sidecar. The gateway HTTP server it starts
             // is what the WebView connects to. We show the window only after the
@@ -172,15 +215,17 @@ pub fn run() {
         })
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
-        .run(|_app, event| {
+        .run(|app_handle, event| {
             match event {
                 // Keep the app running in the background when all windows are closed.
                 // This is the standard pattern for menu bar / tray apps.
                 RunEvent::ExitRequested { api, .. } => {
                     api.prevent_exit();
                 }
-                // On actual exit (user clicked Quit in the tray menu), kill the sidecar.
+                // On actual exit (user clicked Quit in the tray menu):
+                // save window state, then kill the sidecar.
                 RunEvent::Exit => {
+                    save_window_state(app_handle);
                     tauri::async_runtime::block_on(sidecar::shutdown_agent());
                 }
                 _ => {}
