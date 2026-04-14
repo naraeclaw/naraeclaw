@@ -103,7 +103,7 @@ sandbox-bubblewrap = []
 
 [dev-dependencies]
 axum = { version = "0.8", default-features = false, features = ["http1", "json", "tokio"] }
-rcgen = "0.13"
+rcgen = "0.14"
 tempfile = "3.26"
 tokio = { version = "1.51", features = ["rt-multi-thread", "macros"] }
 scopeguard = "1.2"
