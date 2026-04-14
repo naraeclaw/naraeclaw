@@ -6,10 +6,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **NaraeClaw**는 [ZeroClaw](https://github.com/zeroclaw-labs/zeroclaw) 포크로, 한국어 우선·경량화를 목표로 합니다.
 
-주요 개선 목표:
-1. **텔레그램 Webhook 전환** — `crates/zeroclaw-channels/src/telegram.rs` polling → webhook (응답 지연 제거)
-2. **경량화** — 기본 feature에서 불필요한 채널 제거
-3. **한국어화** — 시스템 프롬프트, CLI 메시지, 문서 한국어
+핵심 개선 완료 (2026-04-13 기준):
+- ✅ **텔레그램 Webhook 전환** — polling → webhook 완료 (응답 지연 제거)
+- ✅ **경량화** — 기본 feature에서 불필요한 채널 제거 완료
+- ✅ **보안 강화** — `unsafe set_var` 제거, `OnceLock`/`zeroize`/`CredentialFilter` 도입 완료
 
 내부 크레이트명은 여전히 `zeroclaw-*`이나, 바이너리 이름은 `naraeclaw`입니다.
 
@@ -71,21 +71,57 @@ Rust edition 2024 워크스페이스. `naraeclaw` 바이너리(`src/main.rs`)는
 
 **채널** (`crates/zeroclaw-channels/`): 각 채널은 `channel-<이름>` Cargo feature로 게이팅됨. `orchestrator/`가 채널 생명주기와 미디어 파이프라인 담당.
 
-**텔레그램 지연 관련 코드 위치:**
-- `crates/zeroclaw-channels/src/telegram.rs:2871` — polling timeout 30초 (webhook으로 교체 대상)
+**텔레그램 Webhook 관련 코드 위치:**
+- `crates/zeroclaw-channels/src/telegram.rs` — webhook 핸들러 (Axum 기반)
 - `crates/zeroclaw-channels/src/telegram.rs:372` — draft 업데이트 간격 1000ms
-- `crates/zeroclaw-channels/src/orchestrator/mod.rs:1844` — 메모리 recall (매 메시지마다 DB 쿼리)
+- `crates/zeroclaw-channels/src/orchestrator/mod.rs` — 채널 생명주기 및 라우팅
 
 **Config** (`crates/zeroclaw-config/`): TOML 기반, `Configurable` derive 매크로로 스키마 자동 생성. Config 키는 공개 계약 — 변경 시 기본값과 마이그레이션 경로 문서화 필수.
 
 **테스트 인프라** (`tests/support/`): `MockProvider`, `MockChannel`, `EchoTool` 등 공유 목. JSON fixture replay는 `TraceLlmProvider` 사용 (`tests/fixtures/traces/`).
 
-## 작업 우선순위
+## 작업 우선순위 (V2 — 데스크탑 앱 포팅)
 
-1. `telegram.rs` polling → webhook 전환
-2. `Cargo.toml` default feature에서 불필요한 채널 제거
-3. `zeroclaw-runtime/src/agent/system_prompt.rs` 한국어 기본 프롬프트
-4. CLI help 텍스트 한국어화
+핵심 V1 작업은 모두 완료됨. 현재 우선순위:
+
+1. **Gateway sidecar 번들링** — `naraeclaw agent` 실행파일을 Tauri sidecar로 묶어 앱 실행 시 자동 시작 (`apps/tauri/`)
+2. **창 기본 표시 + 브랜딩** — `visible: false` → `true`, 창 크기 저장, 아이콘·앱 이름 NaraeClaw
+3. **한국어 UI** — 웹 프론트엔드(`/web/src/`) 메뉴·버튼·안내 텍스트 한국어화
+4. **시스템 알림** — 텔레그램 메시지 수신 시 native notification
+
+자세한 계획: `Plan.md`
+
+## 작업 워크플로우 — Worktree 규칙
+
+**모든 작업은 worktree에서 시작한다.** master에 직접 커밋하지 않는다.
+
+```bash
+# 1. 작업 시작 — worktree + 브랜치 생성
+git worktree add ../naraeclaw-<담당자> -b <담당자>/<작업명>
+# 예) git worktree add ../naraeclaw-claude -b claude/feature-lightweight
+
+# 2. 해당 worktree 안에서만 작업·커밋
+
+# 3. 완료 후 master에 머지
+git merge <브랜치명>
+
+# 4. worktree·브랜치 정리
+git worktree remove ../naraeclaw-<담당자>
+git branch -d <브랜치명>
+```
+
+**브랜치 네이밍:**
+- `claude/<작업명>` — Claude(이 대화)가 담당
+- `codex/<작업명>` — Codex가 담당
+- `gemini/<작업명>` — Gemini가 담당
+
+**Worktree 경로 규칙:**
+- 메인: `~/opensource/naraeclaw` (master, 리뷰·머지 전용)
+- 에이전트: `~/opensource/naraeclaw-<담당자>` (작업 공간)
+
+**병렬 작업 시 파일 충돌 최소화:**
+- 한 작업 단위는 수정 파일이 서로 겹치지 않도록 설계한다
+- 겹치는 파일이 불가피하면 순차 진행(앞 작업 머지 후 다음 시작)
 
 ## 작업 워크플로우 — Worktree 규칙
 

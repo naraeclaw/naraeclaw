@@ -6,11 +6,13 @@ Cross-tool agent instructions for any AI coding assistant working on this reposi
 
 NaraeClaw is a Korean-first, lightweight fork of [ZeroClaw](https://github.com/zeroclaw-labs/zeroclaw).
 
-Primary fork goals:
+V1 fork goals (all completed as of 2026-04-13):
 
-1. **Telegram webhook migration** — replace Telegram polling with webhook handling to remove response latency.
-2. **Lightweight defaults** — remove unnecessary channels from default Cargo features.
-3. **Korean localization** — localize system prompts, CLI messages, and documentation for Korean-first usage.
+- ✅ **Telegram webhook migration** — replaced polling with Axum-based webhook handling.
+- ✅ **Lightweight defaults** — removed unnecessary channels from default Cargo features.
+- ✅ **Security hardening** — eliminated `unsafe set_var`, introduced `OnceLock`, `zeroize`, and `CredentialFilter`.
+
+Current focus: V2 desktop app porting (see `Plan.md`).
 
 Internal crate names still use `zeroclaw-*`, but the binary name is `naraeclaw`.
 
