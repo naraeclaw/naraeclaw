@@ -3,11 +3,13 @@
 pub mod commands;
 pub mod gateway_client;
 pub mod health;
+pub mod sidecar;
 pub mod state;
 pub mod tray;
 
 use gateway_client::GatewayClient;
 use state::shared_state;
+use std::time::Duration;
 use tauri::{Manager, RunEvent};
 
 /// Attempt to auto-pair with the gateway so the WebView has a valid token
@@ -108,18 +110,62 @@ pub fn run() {
             // Set up the system tray.
             let _ = tray::setup_tray(app);
 
-            // Auto-pair with gateway and inject token into the WebView.
-            let app_handle = app.handle().clone();
-            let pair_state = shared.clone();
+            // Spawn the naraeclaw agent sidecar. The gateway HTTP server it starts
+            // is what the WebView connects to. We show the window only after the
+            // gateway is healthy to avoid a blank-page flash.
             tauri::async_runtime::spawn(async move {
-                if let Some(token) = auto_pair(&pair_state).await
-                    && let Some(window) = app_handle.get_webview_window("main")
-                {
-                    inject_token_into_webview(&window, &token);
+                if let Err(e) = sidecar::spawn_agent().await {
+                    tracing::error!("Failed to start naraeclaw agent: {e}");
                 }
             });
 
-            // Start background health polling.
+            // Wait for the gateway to become healthy, then show the window and
+            // attempt auto-pairing. Times out after 30 seconds.
+            let app_handle = app.handle().clone();
+            let ready_state = shared.clone();
+            tauri::async_runtime::spawn(async move {
+                const MAX_WAIT: u64 = 30;
+                const POLL_MS: u64 = 500;
+                let steps = (MAX_WAIT * 1000) / POLL_MS;
+
+                let gateway_url = {
+                    let s = ready_state.read().await;
+                    s.gateway_url.clone()
+                };
+
+                for _ in 0..steps {
+                    tokio::time::sleep(Duration::from_millis(POLL_MS)).await;
+                    if GatewayClient::new(&gateway_url, None)
+                        .get_health()
+                        .await
+                        .unwrap_or(false)
+                    {
+                        // Gateway is ready — show the window.
+                        if let Some(window) = app_handle.get_webview_window("main") {
+                            let _ = window.show();
+                            let _ = window.set_focus();
+                        }
+                        // Attempt auto-pairing and inject token.
+                        if let Some(token) = auto_pair(&ready_state).await
+                            && let Some(window) = app_handle.get_webview_window("main")
+                        {
+                            inject_token_into_webview(&window, &token);
+                        }
+                        return;
+                    }
+                }
+
+                tracing::warn!(
+                    "naraeclaw agent did not become healthy within {MAX_WAIT}s — \
+                     showing window anyway"
+                );
+                if let Some(window) = app_handle.get_webview_window("main") {
+                    let _ = window.show();
+                    let _ = window.set_focus();
+                }
+            });
+
+            // Start background health polling (tray icon / status updates).
             health::spawn_health_poller(app.handle().clone(), shared.clone());
 
             Ok(())
@@ -127,10 +173,17 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|_app, event| {
-            // Keep the app running in the background when all windows are closed.
-            // This is the standard pattern for menu bar / tray apps.
-            if let RunEvent::ExitRequested { api, .. } = event {
-                api.prevent_exit();
+            match event {
+                // Keep the app running in the background when all windows are closed.
+                // This is the standard pattern for menu bar / tray apps.
+                RunEvent::ExitRequested { api, .. } => {
+                    api.prevent_exit();
+                }
+                // On actual exit (user clicked Quit in the tray menu), kill the sidecar.
+                RunEvent::Exit => {
+                    tauri::async_runtime::block_on(sidecar::shutdown_agent());
+                }
+                _ => {}
             }
         });
 }
