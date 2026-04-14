@@ -1,66 +1,56 @@
 # GEMINI.md - NaraeClaw Project Context
 
 ## Project Overview
-**NaraeClaw (나래클로)** is a lightweight, Korean-first AI agent runtime optimized for messaging platforms like Telegram. It is a fork of [ZeroClaw](https://github.com/zeroclaw-labs/zeroclaw), aimed at reducing overhead and providing a seamless experience for Korean users.
+**NaraeClaw (나래클로)** is a lightweight, Korean-first AI agent runtime optimized for messaging platforms like Telegram. It is a fork of [ZeroClaw](https://github.com/zeroclaw-labs/zeroclaw), optimized for low latency, memory safety, and Korean language environment.
 
-- **Primary Goal:** Fast, responsive AI assistant via Telegram (webhook-based, no polling latency).
-- **V1 Complete (2026-04-13):** Telegram webhook migration, lightweight feature-gating, security hardening (OnceLock, zeroize, CredentialFilter).
-- **V2 Focus:** Desktop app porting — Tauri sidecar bundling, Korean UI, native notifications.
-- **Language:** Korean-first for CLI messages, help text, and system prompts.
-- **Core Stack:** Rust (Edition 2024), Tokio (Async), Ratatui (TUI), Axum (Gateway/Webhooks), Tauri 2.0 (Desktop).
+- **Primary Goal:** To provide a fast, responsive AI assistant with a "Korean-first" experience.
+- **Key Optimization:** High-performance **Telegram Webhooks** (Axum-based) to eliminate polling latency.
+- **Security Mandate:** Multi-layered protection including unified credential filtering and in-memory zeroization.
+- **Core Stack:** Rust (Edition 2024), Tokio (Async), Ratatui (TUI), Axum (Gateway/Webhooks), ChaCha20-Poly1305 (Encryption).
 
 ## Core Architecture
-The project is a Rust workspace consisting of several specialized crates:
+The project is a modular Rust workspace:
 
-- **`naraeclaw` (Binary):** The main entry point located in `src/main.rs`.
-- **`zeroclaw-runtime`:** Contains the core agent loop (`agent/`), security policies (`security/`), and scheduling (`cron/`, `sop/`).
-- **`zeroclaw-channels`:** Handles integrations with messaging platforms (Telegram, Discord, Slack, etc.).
-- **`zeroclaw-api`:** Defines common traits for providers, channels, and tools.
-- **`zeroclaw-providers`:** Interface for various LLM backends (OpenRouter, Anthropic, OpenAI, etc.).
-- **`zeroclaw-tools`:** Implementation of tools the agent can use (shell, browser, file I/O).
-- **`zeroclaw-config`:** TOML-based configuration system with automatic schema generation.
+- **`naraeclaw` (Binary):** CLI entry point in `src/main.rs`. Handles startup, logging init, and command routing.
+- **`zeroclaw-runtime`:** The core engine.
+  - `agent/`: Main execution loop with anti-narration logic and tool-call handling.
+  - `security/`: **CredentialFilter** (unified leak detection), **SecretStore** (AEAD encryption), and sandbox policies.
+- **`zeroclaw-channels`:** Platform integrations.
+  - Optimized for **Telegram Webhooks**.
+  - Uses a **Feature-gate system** to exclude 24+ non-core channels by default, minimizing binary size.
+- **`zeroclaw-config`:** Robust configuration system.
+  - **`#[secret]` macros**: Automatically implements `Zeroize` on Drop for sensitive fields.
+  - **OnceLock/Mutex**: Thread-safe environment variable management for configuration overrides.
+- **`zeroclaw-providers`:** LLM backend factory.
+  - Centralized constants for API keys and base URLs for easy override.
 
-## Development Guide
+## Development & Security Guide
 
 ### Building and Running
-- **Build:** `cargo build --release` (optimized for size via `opt-level = "z"`).
-- **Quick Run:** `cargo run -- onboard` (Interactive setup).
-- **Start Agent:** `cargo run -- agent`.
-- **Start Daemon:** `cargo run -- daemon` (Gateway + Channels + Scheduler).
+- **Default (Lightweight):** `cargo build --release` (only core channels like Telegram/Slack).
+- **Full Build:** `cargo build --release --features channels-full` (includes all 30+ channels).
+- **Setup:** `cargo run -- onboard` (Interactive Korean wizard).
+- **Run:** `cargo run -- agent` or `cargo run -- daemon` (for webhooks).
+
+### Security Implementation
+- **Unified Filtering:** All outbound messages pass through `CredentialFilter` which detects raw, Base64, Hex, and URL-encoded secrets, even across streaming chunk boundaries.
+- **Memory Safety:** `Zeroize` is enforced on all secret fields (API keys, tokens) to prevent data recovery from memory dumps.
+- **Env Var Safety:** Production code avoids `unsafe { set_var }` during runtime, using serialized access or early-init patterns.
 
 ### Testing
-- **All Tests:** `cargo test`.
-- **Unit Tests:** `cargo test --lib`.
-- **Functional Levels:**
-  - `cargo test --test component`: Component-level validation.
-  - `cargo test --test integration`: System integration tests.
-  - `cargo test --test system`: Full end-to-end flows.
-  - `cargo test --test live -- --ignored`: Real API calls (requires keys).
+- **Security Check:** `cargo test -p zeroclaw-runtime security::leak_detector`
+- **Full Gate:** `just ci` (runs fmt, clippy, and all tests).
 
-### Automation (`just`)
-The project uses `just` for common tasks:
-- `just fmt`: Format code.
-- `just lint`: Run clippy with strict warnings.
-- `just ci`: Run full quality gate (fmt + lint + test).
-- `just dev <args>`: Run with development arguments.
+## Localization Status (100% Complete)
+1. **CLI Help:** Fully translated to Korean in `src/main.rs`.
+2. **System Prompts:** Optimized for Korean natural language, including anti-narration and hardware control instructions.
+3. **User Docs:** `README.md` and `Plan.md` are maintained in Korean.
 
-## Development Conventions
-- **Rust Edition:** Always use Rust 2024 features where appropriate.
-- **Error Handling:** Use `anyhow` for application-level errors and `thiserror` for library crates.
-- **Logging:** Use the `tracing` crate. Default level is `INFO`.
-- **Config:** Config keys are considered a public contract. Document changes and provide migration paths.
-- **Security:** High-risk areas like `zeroclaw-runtime/src/security/` and `zeroclaw-gateway/` require extra caution during modification.
-
-## Localization Status
-NaraeClaw is Korean-first. Current state:
-1. **CLI Help:** Translated to Korean in `src/main.rs`.
-2. **System Prompts:** `crates/zeroclaw-runtime/src/agent/system_prompt.rs` — Korean default prompt in place.
-3. **Documentation:** `README.md`, `Plan.md`, `CLAUDE.md`, `docs/` are all in Korean.
-
-## Key Files
-- `Cargo.toml`: Workspace and feature management.
-- `CLAUDE.md`: Claude-specific guidance and command reference.
-- `Plan.md`: Current development roadmap and priorities.
-- `src/main.rs`: CLI command definitions and routing.
-- `crates/zeroclaw-runtime/src/agent/loop_.rs`: The heart of the agent's execution loop.
-- `crates/zeroclaw-channels/src/telegram.rs`: Telegram webhook handler (Axum-based, polling removed).
+## Key Files & Modules
+- `src/main.rs`: CLI definitions and early-init security.
+- `crates/zeroclaw-runtime/src/security/leak_detector.rs`: The **CredentialFilter** engine.
+- `crates/zeroclaw-runtime/src/agent/loop_.rs`: Core agent loop with integrated scrub logic.
+- `crates/zeroclaw-channels/src/telegram.rs`: Telegram Webhook and polling implementations.
+- `crates/zeroclaw-config/src/schema.rs`: Main configuration schema with security macros.
+- `crates/zeroclaw-providers/src/env_keys.rs`: Centralized constants for environment variable keys.
+- `Plan.md`: Detailed history of architectural improvements and future roadmap.

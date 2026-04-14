@@ -123,6 +123,38 @@ git branch -d <브랜치명>
 - 한 작업 단위는 수정 파일이 서로 겹치지 않도록 설계한다
 - 겹치는 파일이 불가피하면 순차 진행(앞 작업 머지 후 다음 시작)
 
+## 작업 워크플로우 — Worktree 규칙
+
+**모든 작업은 worktree에서 시작한다.** master에 직접 커밋하지 않는다.
+
+```bash
+# 1. 작업 시작 — worktree + 브랜치 생성
+git worktree add ../naraeclaw-<담당자> -b <담당자>/<작업명>
+# 예) git worktree add ../naraeclaw-claude -b claude/feature-lightweight
+
+# 2. 해당 worktree 안에서만 작업·커밋
+
+# 3. 완료 후 master에 머지
+git merge <브랜치명>
+
+# 4. worktree·브랜치 정리
+git worktree remove ../naraeclaw-<담당자>
+git branch -d <브랜치명>
+```
+
+**브랜치 네이밍:**
+- `claude/<작업명>` — Claude(이 대화)가 담당
+- `codex/<작업명>` — Codex가 담당
+- `gemini/<작업명>` — Gemini가 담당
+
+**Worktree 경로 규칙:**
+- 메인: `~/opensource/naraeclaw` (master, 리뷰·머지 전용)
+- 에이전트: `~/opensource/naraeclaw-<담당자>` (작업 공간)
+
+**병렬 작업 시 파일 충돌 최소화:**
+- 한 작업 단위는 수정 파일이 서로 겹치지 않도록 설계한다
+- 겹치는 파일이 불가피하면 순차 진행(앞 작업 머지 후 다음 시작)
+
 ## 리스크 티어
 
 - **저위험**: docs, 테스트, 설정값 조정

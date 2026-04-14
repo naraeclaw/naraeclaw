@@ -82,12 +82,12 @@ Key extension points:
 - `crates/zeroclaw-api/src/runtime_traits.rs` (`RuntimeAdapter`)
 - `crates/zeroclaw-api/src/peripherals_traits.rs` (`Peripheral`) — hardware boards (STM32, RPi GPIO)
 
-## Current Priorities (V2 — Desktop App)
+## Current Priorities
 
-1. **Gateway sidecar bundling** — bundle `naraeclaw agent` as a Tauri sidecar that auto-starts with the app (`apps/tauri/`).
-2. **Window visibility + branding** — set `visible: true`, persist window size/position, replace icon and app name.
-3. **Korean UI** — translate menus, buttons, and help text in the web frontend (`/web/src/`).
-4. **Native notifications** — show a system notification when a Telegram message is received.
+1. Convert Telegram from polling to webhooks.
+2. Remove unnecessary channels from default Cargo features.
+3. Localize the default system prompt in `crates/zeroclaw-runtime/src/agent/system_prompt.rs`.
+4. Localize CLI help text.
 
 ## Stability Tiers
 
@@ -150,11 +150,11 @@ Tiers are promoted, never demoted, through deliberate team decision.
 - `tests/support/` — shared mocks such as `MockProvider`, `MockChannel`, and `EchoTool`.
 - `tests/fixtures/traces/` — JSON fixture replay data for `TraceLlmProvider`.
 
-Telegram webhook-related code:
+Telegram latency-related code:
 
-- `crates/zeroclaw-channels/src/telegram.rs` — Axum-based webhook handler (polling replaced).
+- `crates/zeroclaw-channels/src/telegram.rs:2871` — polling timeout of 30 seconds; target for webhook replacement.
 - `crates/zeroclaw-channels/src/telegram.rs:372` — draft update interval of 1000 ms.
-- `crates/zeroclaw-channels/src/orchestrator/mod.rs` — channel lifecycle, routing, and media pipeline.
+- `crates/zeroclaw-channels/src/orchestrator/mod.rs:1844` — memory recall query performed on every message.
 
 ## Risk Tiers
 
