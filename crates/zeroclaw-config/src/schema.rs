@@ -8,7 +8,7 @@ use directories::UserDirs;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::{OnceLock, RwLock};
+use std::sync::{Mutex, OnceLock, RwLock};
 #[cfg(unix)]
 use tokio::fs::File;
 use tokio::fs::{self, OpenOptions};
@@ -24,14 +24,10 @@ const SUPPORTED_PROXY_SERVICE_KEYS: &[&str] = &[
     "provider.ollama",
     "provider.openai",
     "provider.openrouter",
-    "channel.dingtalk",
     "channel.discord",
-    "channel.feishu",
-    "channel.lark",
     "channel.matrix",
     "channel.mattermost",
     "channel.nextcloud_talk",
-    "channel.qq",
     "channel.signal",
     "channel.slack",
     "channel.telegram",
@@ -4454,16 +4450,30 @@ fn validate_proxy_url(field: &str, url: &str) -> Result<()> {
     Ok(())
 }
 
+/// Global mutex serializing all process-level environment variable mutations.
+///
+/// `std::env::set_var` / `remove_var` are not thread-safe: concurrent writes,
+/// or a write racing with a read on another thread, cause undefined behaviour
+/// in the C runtime. Callers that must mutate env vars after the async runtime
+/// has started MUST hold this lock for the duration of the mutation AND ensure
+/// no other thread reads the same key without also holding the lock.
+///
+/// Callers in a blocking (non-async) context: `let _g = ENV_WRITE_MUTEX.lock();`
+/// Callers in an async context: use `tokio::task::spawn_blocking` while holding
+/// this lock inside the closure.
+pub static ENV_WRITE_MUTEX: Mutex<()> = Mutex::new(());
+
 fn set_proxy_env_pair(key: &str, value: Option<&str>) {
     let lowercase_key = key.to_ascii_lowercase();
+    let _guard = ENV_WRITE_MUTEX.lock().unwrap_or_else(|e| e.into_inner());
     if let Some(value) = value.and_then(|candidate| normalize_proxy_url_option(Some(candidate))) {
-        // SAFETY: called during single-threaded config init before async runtime starts.
+        // SAFETY: ENV_WRITE_MUTEX is held, serializing all env mutations.
         unsafe {
             std::env::set_var(key, &value);
             std::env::set_var(lowercase_key, value);
         }
     } else {
-        // SAFETY: called during single-threaded config init before async runtime starts.
+        // SAFETY: ENV_WRITE_MUTEX is held, serializing all env mutations.
         unsafe {
             std::env::remove_var(key);
             std::env::remove_var(lowercase_key);
@@ -4472,7 +4482,8 @@ fn set_proxy_env_pair(key: &str, value: Option<&str>) {
 }
 
 fn clear_proxy_env_pair(key: &str) {
-    // SAFETY: called during single-threaded config init before async runtime starts.
+    let _guard = ENV_WRITE_MUTEX.lock().unwrap_or_else(|e| e.into_inner());
+    // SAFETY: ENV_WRITE_MUTEX is held, serializing all env mutations.
     unsafe {
         std::env::remove_var(key);
         std::env::remove_var(key.to_ascii_lowercase());
@@ -6550,30 +6561,12 @@ pub struct ChannelsConfig {
     /// IRC channel configuration.
     #[nested]
     pub irc: Option<IrcConfig>,
-    /// Lark channel configuration.
-    #[nested]
-    pub lark: Option<LarkConfig>,
     /// LINE Messaging API channel configuration.
     #[nested]
     pub line: Option<LineConfig>,
-    /// Feishu channel configuration.
-    #[nested]
-    pub feishu: Option<FeishuConfig>,
-    /// DingTalk channel configuration.
-    #[nested]
-    pub dingtalk: Option<DingTalkConfig>,
-    /// WeCom (WeChat Enterprise) Bot Webhook channel configuration.
-    #[nested]
-    pub wecom: Option<WeComConfig>,
-    /// QQ Official Bot channel configuration.
-    #[nested]
-    pub qq: Option<QQConfig>,
     /// X/Twitter channel configuration.
     #[nested]
     pub twitter: Option<TwitterConfig>,
-    /// Mochat customer service channel configuration.
-    #[nested]
-    pub mochat: Option<MochatConfig>,
     #[cfg(feature = "channel-nostr")]
     #[nested]
     pub nostr: Option<NostrConfig>,
@@ -6717,26 +6710,6 @@ impl ChannelsConfig {
                 Box::new(ConfigWrapper::new(self.irc.as_ref())),
                 self.irc.is_some()
             ),
-            (
-                Box::new(ConfigWrapper::new(self.lark.as_ref())),
-                self.lark.is_some(),
-            ),
-            (
-                Box::new(ConfigWrapper::new(self.feishu.as_ref())),
-                self.feishu.is_some(),
-            ),
-            (
-                Box::new(ConfigWrapper::new(self.dingtalk.as_ref())),
-                self.dingtalk.is_some(),
-            ),
-            (
-                Box::new(ConfigWrapper::new(self.wecom.as_ref())),
-                self.wecom.is_some(),
-            ),
-            (
-                Box::new(ConfigWrapper::new(self.qq.as_ref())),
-                self.qq.is_some()
-            ),
             #[cfg(feature = "channel-nostr")]
             (
                 Box::new(ConfigWrapper::new(self.nostr.as_ref())),
@@ -6804,14 +6777,8 @@ impl Default for ChannelsConfig {
             email: None,
             gmail_push: None,
             irc: None,
-            lark: None,
             line: None,
-            feishu: None,
-            dingtalk: None,
-            wecom: None,
-            qq: None,
             twitter: None,
-            mochat: None,
             #[cfg(feature = "channel-nostr")]
             nostr: None,
             clawdtalk: None,
@@ -6859,6 +6826,14 @@ fn default_matrix_draft_update_interval_ms() -> u64 {
     1500
 }
 
+fn default_telegram_webhook_listen_addr() -> String {
+    "0.0.0.0:8443".to_string()
+}
+
+fn default_telegram_webhook_path() -> String {
+    "/telegram/webhook".to_string()
+}
+
 /// Telegram bot channel configuration.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, Configurable)]
 #[cfg_attr(feature = "schema-export", derive(schemars::JsonSchema))]
@@ -6895,6 +6870,21 @@ pub struct TelegramConfig {
     /// Overrides the global `[proxy]` setting for this channel only.
     #[serde(default)]
     pub proxy_url: Option<String>,
+    /// Public HTTPS URL registered with Telegram via `setWebhook`.
+    /// When set, Telegram receives updates in webhook mode instead of polling.
+    #[serde(default)]
+    pub webhook_url: Option<String>,
+    /// Local bind address for the embedded Telegram webhook server.
+    #[serde(default = "default_telegram_webhook_listen_addr")]
+    pub webhook_listen_addr: String,
+    /// Local HTTP path for Telegram webhook POST requests.
+    #[serde(default = "default_telegram_webhook_path")]
+    pub webhook_path: String,
+    /// Optional Telegram secret token verified from
+    /// `X-Telegram-Bot-Api-Secret-Token`.
+    #[serde(default)]
+    #[secret]
+    pub webhook_secret_token: Option<String>,
 }
 
 impl ChannelConfig for TelegramConfig {
@@ -7704,73 +7694,6 @@ fn default_irc_port() -> u16 {
     6697
 }
 
-/// How ZeroClaw receives events from Feishu / Lark.
-///
-/// - `websocket` (default) — persistent WSS long-connection; no public URL required.
-/// - `webhook`             — HTTP callback server; requires a public HTTPS endpoint.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
-#[cfg_attr(feature = "schema-export", derive(schemars::JsonSchema))]
-#[serde(rename_all = "lowercase")]
-pub enum LarkReceiveMode {
-    #[default]
-    Websocket,
-    Webhook,
-}
-
-/// Lark/Feishu configuration for messaging integration.
-/// Lark is the international version; Feishu is the Chinese version.
-#[derive(Debug, Clone, Default, Serialize, Deserialize, Configurable)]
-#[cfg_attr(feature = "schema-export", derive(schemars::JsonSchema))]
-#[prefix = "channels.lark"]
-pub struct LarkConfig {
-    /// Whether this channel is active (must be explicitly enabled). Default: false.
-    #[serde(default)]
-    pub enabled: bool,
-    /// App ID from Lark/Feishu developer console
-    pub app_id: String,
-    /// App Secret from Lark/Feishu developer console
-    #[secret]
-    pub app_secret: String,
-    /// Encrypt key for webhook message decryption (optional)
-    #[serde(default)]
-    #[secret]
-    pub encrypt_key: Option<String>,
-    /// Verification token for webhook validation (optional)
-    #[serde(default)]
-    #[secret]
-    pub verification_token: Option<String>,
-    /// Allowed user IDs or union IDs (empty = deny all, "*" = allow all)
-    #[serde(default)]
-    pub allowed_users: Vec<String>,
-    /// When true, only respond to messages that @-mention the bot in groups.
-    /// Direct messages are always processed.
-    #[serde(default)]
-    pub mention_only: bool,
-    /// Whether to use the Feishu (Chinese) endpoint instead of Lark (International)
-    #[serde(default)]
-    pub use_feishu: bool,
-    /// Event receive mode: "websocket" (default) or "webhook"
-    #[serde(default)]
-    pub receive_mode: LarkReceiveMode,
-    /// HTTP port for webhook mode only. Must be set when receive_mode = "webhook".
-    /// Not required (and ignored) for websocket mode.
-    #[serde(default)]
-    pub port: Option<u16>,
-    /// Per-channel proxy URL (http, https, socks5, socks5h).
-    /// Overrides the global `[proxy]` setting for this channel only.
-    #[serde(default)]
-    pub proxy_url: Option<String>,
-}
-
-impl ChannelConfig for LarkConfig {
-    fn name() -> &'static str {
-        "Lark"
-    }
-    fn desc() -> &'static str {
-        "Lark Bot"
-    }
-}
-
 /// DM (1:1 chat) access policy for the LINE channel.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[cfg_attr(feature = "schema-export", derive(schemars::JsonSchema))]
@@ -7857,52 +7780,6 @@ impl ChannelConfig for LineConfig {
     }
     fn desc() -> &'static str {
         "connect your LINE bot"
-    }
-}
-
-/// Feishu configuration for messaging integration.
-#[derive(Debug, Clone, Default, Serialize, Deserialize, Configurable)]
-#[cfg_attr(feature = "schema-export", derive(schemars::JsonSchema))]
-#[prefix = "channels.feishu"]
-pub struct FeishuConfig {
-    /// Whether this channel is active (must be explicitly enabled). Default: false.
-    #[serde(default)]
-    pub enabled: bool,
-    /// App ID from Feishu developer console
-    pub app_id: String,
-    /// App Secret from Feishu developer console
-    #[secret]
-    pub app_secret: String,
-    /// Encrypt key for webhook message decryption (optional)
-    #[serde(default)]
-    #[secret]
-    pub encrypt_key: Option<String>,
-    /// Verification token for webhook validation (optional)
-    #[serde(default)]
-    #[secret]
-    pub verification_token: Option<String>,
-    /// Allowed user IDs or union IDs (empty = deny all, "*" = allow all)
-    #[serde(default)]
-    pub allowed_users: Vec<String>,
-    /// Event receive mode: "websocket" (default) or "webhook"
-    #[serde(default)]
-    pub receive_mode: LarkReceiveMode,
-    /// HTTP port for webhook mode only. Must be set when receive_mode = "webhook".
-    /// Not required (and ignored) for websocket mode.
-    #[serde(default)]
-    pub port: Option<u16>,
-    /// Per-channel proxy URL (http, https, socks5, socks5h).
-    /// Overrides the global `[proxy]` setting for this channel only.
-    #[serde(default)]
-    pub proxy_url: Option<String>,
-}
-
-impl ChannelConfig for FeishuConfig {
-    fn name() -> &'static str {
-        "Feishu"
-    }
-    fn desc() -> &'static str {
-        "Feishu Bot"
     }
 }
 
@@ -8423,93 +8300,6 @@ impl Default for AuditConfig {
     }
 }
 
-/// DingTalk configuration for Stream Mode messaging
-#[derive(Debug, Clone, Default, Serialize, Deserialize, Configurable)]
-#[cfg_attr(feature = "schema-export", derive(schemars::JsonSchema))]
-#[prefix = "channels.dingtalk"]
-pub struct DingTalkConfig {
-    /// Whether this channel is active (must be explicitly enabled). Default: false.
-    #[serde(default)]
-    pub enabled: bool,
-    /// Client ID (AppKey) from DingTalk developer console
-    pub client_id: String,
-    /// Client Secret (AppSecret) from DingTalk developer console
-    #[secret]
-    pub client_secret: String,
-    /// Allowed user IDs (staff IDs). Empty = deny all, "*" = allow all
-    #[serde(default)]
-    pub allowed_users: Vec<String>,
-    /// Per-channel proxy URL (http, https, socks5, socks5h).
-    /// Overrides the global `[proxy]` setting for this channel only.
-    #[serde(default)]
-    pub proxy_url: Option<String>,
-}
-
-impl ChannelConfig for DingTalkConfig {
-    fn name() -> &'static str {
-        "DingTalk"
-    }
-    fn desc() -> &'static str {
-        "DingTalk Stream Mode"
-    }
-}
-
-/// WeCom (WeChat Enterprise) Bot Webhook configuration
-#[derive(Debug, Clone, Default, Serialize, Deserialize, Configurable)]
-#[cfg_attr(feature = "schema-export", derive(schemars::JsonSchema))]
-#[prefix = "channels.wecom"]
-pub struct WeComConfig {
-    /// Whether this channel is active (must be explicitly enabled). Default: false.
-    #[serde(default)]
-    pub enabled: bool,
-    /// Webhook key from WeCom Bot configuration
-    #[secret]
-    pub webhook_key: String,
-    /// Allowed user IDs. Empty = deny all, "*" = allow all
-    #[serde(default)]
-    pub allowed_users: Vec<String>,
-}
-
-impl ChannelConfig for WeComConfig {
-    fn name() -> &'static str {
-        "WeCom"
-    }
-    fn desc() -> &'static str {
-        "WeCom Bot Webhook"
-    }
-}
-
-/// QQ Official Bot configuration (Tencent QQ Bot SDK)
-#[derive(Debug, Clone, Default, Serialize, Deserialize, Configurable)]
-#[cfg_attr(feature = "schema-export", derive(schemars::JsonSchema))]
-#[prefix = "channels.qq"]
-pub struct QQConfig {
-    /// Whether this channel is active (must be explicitly enabled). Default: false.
-    #[serde(default)]
-    pub enabled: bool,
-    /// App ID from QQ Bot developer console
-    pub app_id: String,
-    /// App Secret from QQ Bot developer console
-    #[secret]
-    pub app_secret: String,
-    /// Allowed user IDs. Empty = deny all, "*" = allow all
-    #[serde(default)]
-    pub allowed_users: Vec<String>,
-    /// Per-channel proxy URL (http, https, socks5, socks5h).
-    /// Overrides the global `[proxy]` setting for this channel only.
-    #[serde(default)]
-    pub proxy_url: Option<String>,
-}
-
-impl ChannelConfig for QQConfig {
-    fn name() -> &'static str {
-        "QQ Official"
-    }
-    fn desc() -> &'static str {
-        "Tencent QQ Bot"
-    }
-}
-
 /// X/Twitter channel configuration (Twitter API v2)
 #[derive(Debug, Clone, Default, Serialize, Deserialize, Configurable)]
 #[cfg_attr(feature = "schema-export", derive(schemars::JsonSchema))]
@@ -8532,40 +8322,6 @@ impl ChannelConfig for TwitterConfig {
     }
     fn desc() -> &'static str {
         "X/Twitter Bot via API v2"
-    }
-}
-
-/// Mochat channel configuration (Mochat customer service API)
-#[derive(Debug, Clone, Default, Serialize, Deserialize, Configurable)]
-#[cfg_attr(feature = "schema-export", derive(schemars::JsonSchema))]
-#[prefix = "channels.mochat"]
-pub struct MochatConfig {
-    /// Whether this channel is active (must be explicitly enabled). Default: false.
-    #[serde(default)]
-    pub enabled: bool,
-    /// Mochat API base URL
-    pub api_url: String,
-    /// Mochat API token
-    #[secret]
-    pub api_token: String,
-    /// Allowed user IDs. Empty = deny all, "*" = allow all
-    #[serde(default)]
-    pub allowed_users: Vec<String>,
-    /// Poll interval in seconds for new messages. Default: 5
-    #[serde(default = "default_mochat_poll_interval")]
-    pub poll_interval_secs: u64,
-}
-
-fn default_mochat_poll_interval() -> u64 {
-    5
-}
-
-impl ChannelConfig for MochatConfig {
-    fn name() -> &'static str {
-        "Mochat"
-    }
-    fn desc() -> &'static str {
-        "Mochat Customer Service"
     }
 }
 
@@ -9768,11 +9524,11 @@ impl Config {
             );
             Ok(config)
         } else {
-            let mut config = Config {
-                config_path: config_path.clone(),
-                workspace_dir,
-                ..Config::default()
-            };
+            // Note: struct-update syntax (`..Config::default()`) is disallowed
+            // for types that implement Drop (Rust E0509). Use field assignment instead.
+            let mut config = Config::default();
+            config.config_path = config_path.clone();
+            config.workspace_dir = workspace_dir;
             config.save().await?;
 
             // Restrict permissions on newly created config file (may contain API keys)
@@ -11114,7 +10870,6 @@ impl_enum_prop_kind!(
     WhatsAppChatPolicy,
     LineDmPolicy,
     LineGroupPolicy,
-    LarkReceiveMode,
     OtpMethod,
     SandboxBackend,
     AutonomyLevel,
@@ -11304,11 +11059,9 @@ mod tests {
         let config_path = temp.path().join("config.toml");
         let workspace_dir = temp.path().join("workspace");
 
-        let config = Config {
-            config_path: config_path.clone(),
-            workspace_dir,
-            ..Default::default()
-        };
+        let mut config = Config::default();
+        config.config_path = config_path.clone();
+        config.workspace_dir = workspace_dir;
 
         config.save().await.expect("save config");
 
@@ -11603,6 +11356,10 @@ auto_save = true
                     mention_only: false,
                     ack_reactions: None,
                     proxy_url: None,
+                    webhook_url: None,
+                    webhook_listen_addr: "0.0.0.0:8443".to_string(),
+                    webhook_path: "/telegram/webhook".to_string(),
+                    webhook_secret_token: None,
                 }),
                 discord: None,
                 discord_history: None,
@@ -11619,14 +11376,8 @@ auto_save = true
                 email: None,
                 gmail_push: None,
                 irc: None,
-                lark: None,
                 line: None,
-                feishu: None,
-                dingtalk: None,
-                wecom: None,
-                qq: None,
                 twitter: None,
-                mochat: None,
                 #[cfg(feature = "channel-nostr")]
                 nostr: None,
                 clawdtalk: None,
@@ -11718,7 +11469,7 @@ auto_save = true
         assert_eq!(parsed.heartbeat.to.as_deref(), Some("123456"));
         assert!(parsed.channels_config.telegram.is_some());
         assert_eq!(
-            parsed.channels_config.telegram.unwrap().bot_token,
+            parsed.channels_config.telegram.as_ref().unwrap().bot_token,
             "123:ABC"
         );
     }
@@ -12254,125 +12005,14 @@ default_temperature = 0.7
         ));
         fs::create_dir_all(&dir).await.unwrap();
 
-        let mut config = Config {
-            workspace_dir: dir.join("workspace"),
-            config_path: dir.join("config.toml"),
-            api_key: Some("root-credential".into()),
-            ..Default::default()
-        };
+        let mut config = Config::default();
+        config.workspace_dir = dir.join("workspace");
+        config.config_path = dir.join("config.toml");
+        config.api_key = Some("root-credential".into());
         config.composio.api_key = Some("composio-credential".into());
         config.browser.computer_use.api_key = Some("browser-credential".into());
         config.web_search.brave_api_key = Some("brave-credential".into());
         config.storage.provider.config.db_url = Some("postgres://user:pw@host/db".into());
-        config.channels_config.feishu = Some(FeishuConfig {
-            enabled: true,
-            app_id: "cli_feishu_123".into(),
-            app_secret: "feishu-secret".into(),
-            encrypt_key: Some("feishu-encrypt".into()),
-            verification_token: Some("feishu-verify".into()),
-            allowed_users: vec!["*".into()],
-            receive_mode: LarkReceiveMode::Websocket,
-            port: None,
-            proxy_url: None,
-        });
-
-        config.agents.insert(
-            "worker".into(),
-            DelegateAgentConfig {
-                provider: "openrouter".into(),
-                model: "model-test".into(),
-                system_prompt: None,
-                api_key: Some("agent-credential".into()),
-                temperature: None,
-                max_depth: 3,
-                agentic: false,
-                allowed_tools: Vec::new(),
-                max_iterations: 10,
-                timeout_secs: None,
-                agentic_timeout_secs: None,
-                skills_directory: None,
-                memory_namespace: None,
-            },
-        );
-
-        config.save().await.unwrap();
-
-        let contents = tokio::fs::read_to_string(config.config_path.clone())
-            .await
-            .unwrap();
-        let stored: Config = toml::from_str(&contents).unwrap();
-        let store = crate::secrets::SecretStore::new(&dir, true);
-
-        let root_encrypted = stored.api_key.as_deref().unwrap();
-        assert!(crate::secrets::SecretStore::is_encrypted(root_encrypted));
-        assert_eq!(store.decrypt(root_encrypted).unwrap(), "root-credential");
-
-        let composio_encrypted = stored.composio.api_key.as_deref().unwrap();
-        assert!(crate::secrets::SecretStore::is_encrypted(
-            composio_encrypted
-        ));
-        assert_eq!(
-            store.decrypt(composio_encrypted).unwrap(),
-            "composio-credential"
-        );
-
-        let browser_encrypted = stored.browser.computer_use.api_key.as_deref().unwrap();
-        assert!(crate::secrets::SecretStore::is_encrypted(browser_encrypted));
-        assert_eq!(
-            store.decrypt(browser_encrypted).unwrap(),
-            "browser-credential"
-        );
-
-        let web_search_encrypted = stored.web_search.brave_api_key.as_deref().unwrap();
-        assert!(crate::secrets::SecretStore::is_encrypted(
-            web_search_encrypted
-        ));
-        assert_eq!(
-            store.decrypt(web_search_encrypted).unwrap(),
-            "brave-credential"
-        );
-
-        let worker = stored.agents.get("worker").unwrap();
-        let worker_encrypted = worker.api_key.as_deref().unwrap();
-        assert!(crate::secrets::SecretStore::is_encrypted(worker_encrypted));
-        assert_eq!(store.decrypt(worker_encrypted).unwrap(), "agent-credential");
-
-        let storage_db_url = stored.storage.provider.config.db_url.as_deref().unwrap();
-        assert!(crate::secrets::SecretStore::is_encrypted(storage_db_url));
-        assert_eq!(
-            store.decrypt(storage_db_url).unwrap(),
-            "postgres://user:pw@host/db"
-        );
-
-        let feishu = stored.channels_config.feishu.as_ref().unwrap();
-        assert!(crate::secrets::SecretStore::is_encrypted(
-            &feishu.app_secret
-        ));
-        assert_eq!(store.decrypt(&feishu.app_secret).unwrap(), "feishu-secret");
-        assert!(
-            feishu
-                .encrypt_key
-                .as_deref()
-                .is_some_and(crate::secrets::SecretStore::is_encrypted)
-        );
-        assert_eq!(
-            store
-                .decrypt(feishu.encrypt_key.as_deref().unwrap())
-                .unwrap(),
-            "feishu-encrypt"
-        );
-        assert!(
-            feishu
-                .verification_token
-                .as_deref()
-                .is_some_and(crate::secrets::SecretStore::is_encrypted)
-        );
-        assert_eq!(
-            store
-                .decrypt(feishu.verification_token.as_deref().unwrap())
-                .unwrap(),
-            "feishu-verify"
-        );
 
         let _ = fs::remove_dir_all(&dir).await;
     }
@@ -12384,12 +12024,10 @@ default_temperature = 0.7
         fs::create_dir_all(&dir).await.unwrap();
 
         let config_path = dir.join("config.toml");
-        let mut config = Config {
-            workspace_dir: dir.join("workspace"),
-            config_path: config_path.clone(),
-            default_model: Some("model-a".into()),
-            ..Default::default()
-        };
+        let mut config = Config::default();
+        config.workspace_dir = dir.join("workspace");
+        config.config_path = config_path.clone();
+        config.default_model = Some("model-a".into());
         config.save().await.unwrap();
         assert!(config_path.exists());
 
@@ -12423,6 +12061,10 @@ default_temperature = 0.7
             mention_only: false,
             ack_reactions: None,
             proxy_url: None,
+            webhook_url: Some("https://bot.example.com/telegram".into()),
+            webhook_listen_addr: "127.0.0.1:9443".to_string(),
+            webhook_path: "/telegram".to_string(),
+            webhook_secret_token: Some("secret-token".into()),
         };
         let json = serde_json::to_string(&tc).unwrap();
         let parsed: TelegramConfig = serde_json::from_str(&json).unwrap();
@@ -12431,6 +12073,13 @@ default_temperature = 0.7
         assert_eq!(parsed.stream_mode, StreamMode::Partial);
         assert_eq!(parsed.draft_update_interval_ms, 500);
         assert!(parsed.interrupt_on_new_message);
+        assert_eq!(
+            parsed.webhook_url.as_deref(),
+            Some("https://bot.example.com/telegram")
+        );
+        assert_eq!(parsed.webhook_listen_addr, "127.0.0.1:9443");
+        assert_eq!(parsed.webhook_path, "/telegram");
+        assert_eq!(parsed.webhook_secret_token.as_deref(), Some("secret-token"));
     }
 
     #[test]
@@ -12675,14 +12324,8 @@ allowed_users = ["@ops:matrix.org"]
             email: None,
             gmail_push: None,
             irc: None,
-            lark: None,
             line: None,
-            feishu: None,
-            dingtalk: None,
-            wecom: None,
-            qq: None,
             twitter: None,
-            mochat: None,
             #[cfg(feature = "channel-nostr")]
             nostr: None,
             clawdtalk: None,
@@ -13056,14 +12699,8 @@ channel_ids = ["C123", "D456"]
             email: None,
             gmail_push: None,
             irc: None,
-            lark: None,
             line: None,
-            feishu: None,
-            dingtalk: None,
-            wecom: None,
-            qq: None,
             twitter: None,
-            mochat: None,
             #[cfg(feature = "channel-nostr")]
             nostr: None,
             clawdtalk: None,
@@ -13609,10 +13246,8 @@ requires_openai_auth = true
     #[test]
     async fn env_override_provider_fallback_does_not_replace_non_default_provider() {
         let _env_guard = env_override_lock().await;
-        let mut config = Config {
-            default_provider: Some("custom:https://proxy.example.com/v1".to_string()),
-            ..Config::default()
-        };
+        let mut config = Config::default();
+        config.default_provider = Some("custom:https://proxy.example.com/v1".to_string());
 
         // SAFETY: test-only, single-threaded test runner.
         unsafe { std::env::remove_var("ZEROCLAW_PROVIDER") };
@@ -13631,10 +13266,8 @@ requires_openai_auth = true
     #[test]
     async fn env_override_zero_claw_provider_overrides_non_default_provider() {
         let _env_guard = env_override_lock().await;
-        let mut config = Config {
-            default_provider: Some("custom:https://proxy.example.com/v1".to_string()),
-            ..Config::default()
-        };
+        let mut config = Config::default();
+        config.default_provider = Some("custom:https://proxy.example.com/v1".to_string());
 
         // SAFETY: test-only, single-threaded test runner.
         unsafe { std::env::set_var("ZEROCLAW_PROVIDER", "openrouter") };
@@ -13652,10 +13285,8 @@ requires_openai_auth = true
     #[test]
     async fn env_override_glm_api_key_for_regional_aliases() {
         let _env_guard = env_override_lock().await;
-        let mut config = Config {
-            default_provider: Some("glm-cn".to_string()),
-            ..Config::default()
-        };
+        let mut config = Config::default();
+        config.default_provider = Some("glm-cn".to_string());
 
         // SAFETY: test-only, single-threaded test runner.
         unsafe { std::env::set_var("GLM_API_KEY", "glm-regional-key") };
@@ -13669,10 +13300,8 @@ requires_openai_auth = true
     #[test]
     async fn env_override_zai_api_key_for_regional_aliases() {
         let _env_guard = env_override_lock().await;
-        let mut config = Config {
-            default_provider: Some("zai-cn".to_string()),
-            ..Config::default()
-        };
+        let mut config = Config::default();
+        config.default_provider = Some("zai-cn".to_string());
 
         // SAFETY: test-only, single-threaded test runner.
         unsafe { std::env::set_var("ZAI_API_KEY", "zai-regional-key") };
@@ -13700,25 +13329,20 @@ requires_openai_auth = true
     #[test]
     async fn model_provider_profile_maps_to_custom_endpoint() {
         let _env_guard = env_override_lock().await;
-        let mut config = Config {
-            default_provider: Some("sub2api".to_string()),
-            model_providers: HashMap::from([(
-                "sub2api".to_string(),
-                ModelProviderConfig {
-                    name: Some("sub2api".to_string()),
-                    base_url: Some("https://api.tonsof.blue/v1".to_string()),
-                    wire_api: None,
-                    requires_openai_auth: false,
-                    azure_openai_resource: None,
-                    azure_openai_deployment: None,
-                    azure_openai_api_version: None,
-                    api_path: None,
-                    max_tokens: None,
-                    ..Default::default()
-                },
-            )]),
-            ..Config::default()
-        };
+        let mut profile = ModelProviderConfig::default();
+        profile.name = Some("sub2api".to_string());
+        profile.base_url = Some("https://api.tonsof.blue/v1".to_string());
+        profile.wire_api = None;
+        profile.requires_openai_auth = false;
+        profile.azure_openai_resource = None;
+        profile.azure_openai_deployment = None;
+        profile.azure_openai_api_version = None;
+        profile.api_path = None;
+        profile.max_tokens = None;
+
+        let mut config = Config::default();
+        config.default_provider = Some("sub2api".to_string());
+        config.model_providers = HashMap::from([("sub2api".to_string(), profile)]);
 
         config.apply_env_overrides();
         assert_eq!(
@@ -13734,26 +13358,21 @@ requires_openai_auth = true
     #[test]
     async fn model_provider_profile_responses_uses_openai_codex_and_openai_key() {
         let _env_guard = env_override_lock().await;
-        let mut config = Config {
-            default_provider: Some("sub2api".to_string()),
-            model_providers: HashMap::from([(
-                "sub2api".to_string(),
-                ModelProviderConfig {
-                    name: Some("sub2api".to_string()),
-                    base_url: Some("https://api.tonsof.blue".to_string()),
-                    wire_api: Some("responses".to_string()),
-                    requires_openai_auth: true,
-                    azure_openai_resource: None,
-                    azure_openai_deployment: None,
-                    azure_openai_api_version: None,
-                    api_path: None,
-                    max_tokens: None,
-                    ..Default::default()
-                },
-            )]),
-            api_key: None,
-            ..Config::default()
-        };
+        let mut profile = ModelProviderConfig::default();
+        profile.name = Some("sub2api".to_string());
+        profile.base_url = Some("https://api.tonsof.blue".to_string());
+        profile.wire_api = Some("responses".to_string());
+        profile.requires_openai_auth = true;
+        profile.azure_openai_resource = None;
+        profile.azure_openai_deployment = None;
+        profile.azure_openai_api_version = None;
+        profile.api_path = None;
+        profile.max_tokens = None;
+
+        let mut config = Config::default();
+        config.default_provider = Some("sub2api".to_string());
+        config.model_providers = HashMap::from([("sub2api".to_string(), profile)]);
+        config.api_key = None;
 
         // SAFETY: test-only, single-threaded test runner.
         unsafe { std::env::set_var("OPENAI_API_KEY", "sk-test-codex-key") };
@@ -13780,12 +13399,10 @@ requires_openai_auth = true
         // SAFETY: test-only, single-threaded test runner.
         unsafe { std::env::set_var("ZEROCLAW_WORKSPACE", &workspace_dir) };
 
-        let config = Config {
-            workspace_dir,
-            config_path: PathBuf::from("config.toml"),
-            default_temperature: 0.5,
-            ..Default::default()
-        };
+        let mut config = Config::default();
+        config.workspace_dir = workspace_dir;
+        config.config_path = PathBuf::from("config.toml");
+        config.default_temperature = 0.5;
         config.save().await.unwrap();
 
         assert!(resolved_config_path.exists());
@@ -13810,13 +13427,11 @@ requires_openai_auth = true
     #[test]
     async fn validate_ollama_cloud_model_requires_remote_api_url() {
         let _env_guard = env_override_lock().await;
-        let config = Config {
-            default_provider: Some("ollama".to_string()),
-            default_model: Some("glm-5:cloud".to_string()),
-            api_url: None,
-            api_key: Some("ollama-key".to_string()),
-            ..Config::default()
-        };
+        let mut config = Config::default();
+        config.default_provider = Some("ollama".to_string());
+        config.default_model = Some("glm-5:cloud".to_string());
+        config.api_url = None;
+        config.api_key = Some("ollama-key".to_string());
 
         let error = config.validate().expect_err("expected validation to fail");
         assert!(error.to_string().contains(
@@ -13827,13 +13442,11 @@ requires_openai_auth = true
     #[test]
     async fn validate_ollama_cloud_model_accepts_remote_endpoint_and_env_key() {
         let _env_guard = env_override_lock().await;
-        let config = Config {
-            default_provider: Some("ollama".to_string()),
-            default_model: Some("glm-5:cloud".to_string()),
-            api_url: Some("https://ollama.com/api".to_string()),
-            api_key: None,
-            ..Config::default()
-        };
+        let mut config = Config::default();
+        config.default_provider = Some("ollama".to_string());
+        config.default_model = Some("glm-5:cloud".to_string());
+        config.api_url = Some("https://ollama.com/api".to_string());
+        config.api_key = None;
 
         // SAFETY: test-only, single-threaded test runner.
         unsafe { std::env::set_var("OLLAMA_API_KEY", "ollama-env-key") };
@@ -13847,25 +13460,20 @@ requires_openai_auth = true
     #[test]
     async fn validate_rejects_unknown_model_provider_wire_api() {
         let _env_guard = env_override_lock().await;
-        let config = Config {
-            default_provider: Some("sub2api".to_string()),
-            model_providers: HashMap::from([(
-                "sub2api".to_string(),
-                ModelProviderConfig {
-                    name: Some("sub2api".to_string()),
-                    base_url: Some("https://api.tonsof.blue/v1".to_string()),
-                    wire_api: Some("ws".to_string()),
-                    requires_openai_auth: false,
-                    azure_openai_resource: None,
-                    azure_openai_deployment: None,
-                    azure_openai_api_version: None,
-                    api_path: None,
-                    max_tokens: None,
-                    ..Default::default()
-                },
-            )]),
-            ..Config::default()
-        };
+        let mut profile = ModelProviderConfig::default();
+        profile.name = Some("sub2api".to_string());
+        profile.base_url = Some("https://api.tonsof.blue/v1".to_string());
+        profile.wire_api = Some("ws".to_string());
+        profile.requires_openai_auth = false;
+        profile.azure_openai_resource = None;
+        profile.azure_openai_deployment = None;
+        profile.azure_openai_api_version = None;
+        profile.api_path = None;
+        profile.max_tokens = None;
+
+        let mut config = Config::default();
+        config.default_provider = Some("sub2api".to_string());
+        config.model_providers = HashMap::from([("sub2api".to_string(), profile)]);
 
         let error = config.validate().expect_err("expected validation failure");
         assert!(
@@ -14116,57 +13724,6 @@ default_model = "legacy-model"
 
         // SAFETY: test-only, single-threaded test runner.
         unsafe { std::env::remove_var("ZEROCLAW_WORKSPACE") };
-        if let Some(home) = original_home {
-            // SAFETY: test-only, single-threaded test runner.
-            unsafe { std::env::set_var("HOME", home) };
-        } else {
-            // SAFETY: test-only, single-threaded test runner.
-            unsafe { std::env::remove_var("HOME") };
-        }
-        let _ = fs::remove_dir_all(temp_home).await;
-    }
-
-    #[test]
-    async fn load_or_init_decrypts_feishu_channel_secrets() {
-        let _env_guard = env_override_lock().await;
-        let temp_home =
-            std::env::temp_dir().join(format!("zeroclaw_test_home_{}", uuid::Uuid::new_v4()));
-        let config_dir = temp_home.join(".zeroclaw");
-        let config_path = config_dir.join("config.toml");
-
-        fs::create_dir_all(&config_dir).await.unwrap();
-
-        let original_home = std::env::var("HOME").ok();
-        // SAFETY: test-only, single-threaded test runner.
-        unsafe { std::env::set_var("HOME", &temp_home) };
-        // SAFETY: test-only, single-threaded test runner.
-        unsafe { std::env::remove_var("ZEROCLAW_WORKSPACE") };
-
-        let mut config = Config {
-            config_path: config_path.clone(),
-            workspace_dir: config_dir.join("workspace"),
-            ..Default::default()
-        };
-        config.secrets.encrypt = true;
-        config.channels_config.feishu = Some(FeishuConfig {
-            enabled: true,
-            app_id: "cli_feishu_123".into(),
-            app_secret: "feishu-secret".into(),
-            encrypt_key: Some("feishu-encrypt".into()),
-            verification_token: Some("feishu-verify".into()),
-            allowed_users: vec!["*".into()],
-            receive_mode: LarkReceiveMode::Websocket,
-            port: None,
-            proxy_url: None,
-        });
-        config.save().await.unwrap();
-
-        let loaded = Box::pin(Config::load_or_init()).await.unwrap();
-        let feishu = loaded.channels_config.feishu.as_ref().unwrap();
-        assert_eq!(feishu.app_secret, "feishu-secret");
-        assert_eq!(feishu.encrypt_key.as_deref(), Some("feishu-encrypt"));
-        assert_eq!(feishu.verification_token.as_deref(), Some("feishu-verify"));
-
         if let Some(home) = original_home {
             // SAFETY: test-only, single-threaded test runner.
             unsafe { std::env::set_var("HOME", home) };
@@ -14958,135 +14515,6 @@ default_model = "persisted-profile"
         assert_eq!(parsed.boards[0].path.as_deref(), Some("/dev/ttyACM0"));
     }
 
-    #[test]
-    async fn lark_config_serde() {
-        let lc = LarkConfig {
-            enabled: true,
-            app_id: "cli_123456".into(),
-            app_secret: "secret_abc".into(),
-            encrypt_key: Some("encrypt_key".into()),
-            verification_token: Some("verify_token".into()),
-            allowed_users: vec!["user_123".into(), "user_456".into()],
-            mention_only: false,
-            use_feishu: true,
-            receive_mode: LarkReceiveMode::Websocket,
-            port: None,
-            proxy_url: None,
-        };
-        let json = serde_json::to_string(&lc).unwrap();
-        let parsed: LarkConfig = serde_json::from_str(&json).unwrap();
-        assert_eq!(parsed.app_id, "cli_123456");
-        assert_eq!(parsed.app_secret, "secret_abc");
-        assert_eq!(parsed.encrypt_key.as_deref(), Some("encrypt_key"));
-        assert_eq!(parsed.verification_token.as_deref(), Some("verify_token"));
-        assert_eq!(parsed.allowed_users.len(), 2);
-        assert!(parsed.use_feishu);
-    }
-
-    #[test]
-    async fn lark_config_toml_roundtrip() {
-        let lc = LarkConfig {
-            enabled: true,
-            app_id: "cli_123456".into(),
-            app_secret: "secret_abc".into(),
-            encrypt_key: Some("encrypt_key".into()),
-            verification_token: Some("verify_token".into()),
-            allowed_users: vec!["*".into()],
-            mention_only: false,
-            use_feishu: false,
-            receive_mode: LarkReceiveMode::Webhook,
-            port: Some(9898),
-            proxy_url: None,
-        };
-        let toml_str = toml::to_string(&lc).unwrap();
-        let parsed: LarkConfig = toml::from_str(&toml_str).unwrap();
-        assert_eq!(parsed.app_id, "cli_123456");
-        assert_eq!(parsed.app_secret, "secret_abc");
-        assert!(!parsed.use_feishu);
-    }
-
-    #[test]
-    async fn lark_config_deserializes_without_optional_fields() {
-        let json = r#"{"app_id":"cli_123","app_secret":"secret"}"#;
-        let parsed: LarkConfig = serde_json::from_str(json).unwrap();
-        assert!(parsed.encrypt_key.is_none());
-        assert!(parsed.verification_token.is_none());
-        assert!(parsed.allowed_users.is_empty());
-        assert!(!parsed.mention_only);
-        assert!(!parsed.use_feishu);
-    }
-
-    #[test]
-    async fn lark_config_defaults_to_lark_endpoint() {
-        let json = r#"{"app_id":"cli_123","app_secret":"secret"}"#;
-        let parsed: LarkConfig = serde_json::from_str(json).unwrap();
-        assert!(
-            !parsed.use_feishu,
-            "use_feishu should default to false (Lark)"
-        );
-    }
-
-    #[test]
-    async fn lark_config_with_wildcard_allowed_users() {
-        let json = r#"{"app_id":"cli_123","app_secret":"secret","allowed_users":["*"]}"#;
-        let parsed: LarkConfig = serde_json::from_str(json).unwrap();
-        assert_eq!(parsed.allowed_users, vec!["*"]);
-    }
-
-    #[test]
-    async fn feishu_config_serde() {
-        let fc = FeishuConfig {
-            enabled: true,
-            app_id: "cli_feishu_123".into(),
-            app_secret: "secret_abc".into(),
-            encrypt_key: Some("encrypt_key".into()),
-            verification_token: Some("verify_token".into()),
-            allowed_users: vec!["user_123".into(), "user_456".into()],
-            receive_mode: LarkReceiveMode::Websocket,
-            port: None,
-            proxy_url: None,
-        };
-        let json = serde_json::to_string(&fc).unwrap();
-        let parsed: FeishuConfig = serde_json::from_str(&json).unwrap();
-        assert_eq!(parsed.app_id, "cli_feishu_123");
-        assert_eq!(parsed.app_secret, "secret_abc");
-        assert_eq!(parsed.encrypt_key.as_deref(), Some("encrypt_key"));
-        assert_eq!(parsed.verification_token.as_deref(), Some("verify_token"));
-        assert_eq!(parsed.allowed_users.len(), 2);
-    }
-
-    #[test]
-    async fn feishu_config_toml_roundtrip() {
-        let fc = FeishuConfig {
-            enabled: true,
-            app_id: "cli_feishu_123".into(),
-            app_secret: "secret_abc".into(),
-            encrypt_key: Some("encrypt_key".into()),
-            verification_token: Some("verify_token".into()),
-            allowed_users: vec!["*".into()],
-            receive_mode: LarkReceiveMode::Webhook,
-            port: Some(9898),
-            proxy_url: None,
-        };
-        let toml_str = toml::to_string(&fc).unwrap();
-        let parsed: FeishuConfig = toml::from_str(&toml_str).unwrap();
-        assert_eq!(parsed.app_id, "cli_feishu_123");
-        assert_eq!(parsed.app_secret, "secret_abc");
-        assert_eq!(parsed.receive_mode, LarkReceiveMode::Webhook);
-        assert_eq!(parsed.port, Some(9898));
-    }
-
-    #[test]
-    async fn feishu_config_deserializes_without_optional_fields() {
-        let json = r#"{"app_id":"cli_123","app_secret":"secret"}"#;
-        let parsed: FeishuConfig = serde_json::from_str(json).unwrap();
-        assert!(parsed.encrypt_key.is_none());
-        assert!(parsed.verification_token.is_none());
-        assert!(parsed.allowed_users.is_empty());
-        assert_eq!(parsed.receive_mode, LarkReceiveMode::Websocket);
-        assert!(parsed.port.is_none());
-    }
-
     // ── LINE ──────────────────────────────────────────────────
 
     #[test]
@@ -15227,10 +14655,8 @@ group_policy = "disabled"
         let config_path = tmp.path().join("config.toml");
 
         // Create a config and save it
-        let config = Config {
-            config_path: config_path.clone(),
-            ..Default::default()
-        };
+        let mut config = Config::default();
+        config.config_path = config_path.clone();
         config.save().await.unwrap();
 
         let meta = fs::metadata(&config_path).await.unwrap();
@@ -15247,10 +14673,8 @@ group_policy = "disabled"
         let tmp = tempfile::TempDir::new().unwrap();
         let config_path = tmp.path().join("config.toml");
 
-        let mut config = Config {
-            config_path: config_path.clone(),
-            ..Default::default()
-        };
+        let mut config = Config::default();
+        config.config_path = config_path.clone();
         config.save().await.unwrap();
 
         // Simulate the regression state observed in issue #1345.
@@ -15426,11 +14850,9 @@ require_otp_to_resume = true
 
         let plaintext_token = "123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11";
 
-        let mut config = Config {
-            workspace_dir: dir.join("workspace"),
-            config_path: dir.join("config.toml"),
-            ..Default::default()
-        };
+        let mut config = Config::default();
+        config.workspace_dir = dir.join("workspace");
+        config.config_path = dir.join("config.toml");
         config.channels_config.telegram = Some(TelegramConfig {
             enabled: true,
             bot_token: plaintext_token.into(),
@@ -15441,6 +14863,10 @@ require_otp_to_resume = true
             mention_only: false,
             ack_reactions: None,
             proxy_url: None,
+            webhook_url: None,
+            webhook_listen_addr: "0.0.0.0:8443".to_string(),
+            webhook_path: "/telegram/webhook".to_string(),
+            webhook_secret_token: None,
         });
 
         // Save (triggers encryption)
@@ -15506,30 +14932,27 @@ require_otp_to_resume = true
     // ── MCP config validation ─────────────────────────────────────────────
 
     fn stdio_server(name: &str, command: &str) -> McpServerConfig {
-        McpServerConfig {
-            name: name.to_string(),
-            transport: McpTransport::Stdio,
-            command: command.to_string(),
-            ..Default::default()
-        }
+        let mut config = McpServerConfig::default();
+        config.name = name.to_string();
+        config.transport = McpTransport::Stdio;
+        config.command = command.to_string();
+        config
     }
 
     fn http_server(name: &str, url: &str) -> McpServerConfig {
-        McpServerConfig {
-            name: name.to_string(),
-            transport: McpTransport::Http,
-            url: Some(url.to_string()),
-            ..Default::default()
-        }
+        let mut config = McpServerConfig::default();
+        config.name = name.to_string();
+        config.transport = McpTransport::Http;
+        config.url = Some(url.to_string());
+        config
     }
 
     fn sse_server(name: &str, url: &str) -> McpServerConfig {
-        McpServerConfig {
-            name: name.to_string(),
-            transport: McpTransport::Sse,
-            url: Some(url.to_string()),
-            ..Default::default()
-        }
+        let mut config = McpServerConfig::default();
+        config.name = name.to_string();
+        config.transport = McpTransport::Sse;
+        config.url = Some(url.to_string());
+        config
     }
 
     #[test]
@@ -15540,41 +14963,33 @@ require_otp_to_resume = true
 
     #[test]
     async fn validate_mcp_config_valid_stdio_ok() {
-        let cfg = McpConfig {
-            enabled: true,
-            servers: vec![stdio_server("fs", "/usr/bin/mcp-fs")],
-            ..Default::default()
-        };
+        let mut cfg = McpConfig::default();
+        cfg.enabled = true;
+        cfg.servers = vec![stdio_server("fs", "/usr/bin/mcp-fs")];
         assert!(validate_mcp_config(&cfg).is_ok());
     }
 
     #[test]
     async fn validate_mcp_config_valid_http_ok() {
-        let cfg = McpConfig {
-            enabled: true,
-            servers: vec![http_server("svc", "http://localhost:8080/mcp")],
-            ..Default::default()
-        };
+        let mut cfg = McpConfig::default();
+        cfg.enabled = true;
+        cfg.servers = vec![http_server("svc", "http://localhost:8080/mcp")];
         assert!(validate_mcp_config(&cfg).is_ok());
     }
 
     #[test]
     async fn validate_mcp_config_valid_sse_ok() {
-        let cfg = McpConfig {
-            enabled: true,
-            servers: vec![sse_server("svc", "https://example.com/events")],
-            ..Default::default()
-        };
+        let mut cfg = McpConfig::default();
+        cfg.enabled = true;
+        cfg.servers = vec![sse_server("svc", "https://example.com/events")];
         assert!(validate_mcp_config(&cfg).is_ok());
     }
 
     #[test]
     async fn validate_mcp_config_rejects_empty_name() {
-        let cfg = McpConfig {
-            enabled: true,
-            servers: vec![stdio_server("", "/usr/bin/tool")],
-            ..Default::default()
-        };
+        let mut cfg = McpConfig::default();
+        cfg.enabled = true;
+        cfg.servers = vec![stdio_server("", "/usr/bin/tool")];
         let err = validate_mcp_config(&cfg).expect_err("empty name should fail");
         assert!(
             err.to_string().contains("name must not be empty"),
@@ -15584,11 +14999,9 @@ require_otp_to_resume = true
 
     #[test]
     async fn validate_mcp_config_rejects_whitespace_name() {
-        let cfg = McpConfig {
-            enabled: true,
-            servers: vec![stdio_server("   ", "/usr/bin/tool")],
-            ..Default::default()
-        };
+        let mut cfg = McpConfig::default();
+        cfg.enabled = true;
+        cfg.servers = vec![stdio_server("   ", "/usr/bin/tool")];
         let err = validate_mcp_config(&cfg).expect_err("whitespace name should fail");
         assert!(
             err.to_string().contains("name must not be empty"),
@@ -15598,14 +15011,12 @@ require_otp_to_resume = true
 
     #[test]
     async fn validate_mcp_config_rejects_duplicate_names() {
-        let cfg = McpConfig {
-            enabled: true,
-            servers: vec![
-                stdio_server("fs", "/usr/bin/mcp-a"),
-                stdio_server("fs", "/usr/bin/mcp-b"),
-            ],
-            ..Default::default()
-        };
+        let mut cfg = McpConfig::default();
+        cfg.enabled = true;
+        cfg.servers = vec![
+            stdio_server("fs", "/usr/bin/mcp-a"),
+            stdio_server("fs", "/usr/bin/mcp-b"),
+        ];
         let err = validate_mcp_config(&cfg).expect_err("duplicate name should fail");
         assert!(err.to_string().contains("duplicate name"), "got: {err}");
     }
@@ -15614,11 +15025,9 @@ require_otp_to_resume = true
     async fn validate_mcp_config_rejects_zero_timeout() {
         let mut server = stdio_server("fs", "/usr/bin/mcp-fs");
         server.tool_timeout_secs = Some(0);
-        let cfg = McpConfig {
-            enabled: true,
-            servers: vec![server],
-            ..Default::default()
-        };
+        let mut cfg = McpConfig::default();
+        cfg.enabled = true;
+        cfg.servers = vec![server];
         let err = validate_mcp_config(&cfg).expect_err("zero timeout should fail");
         assert!(err.to_string().contains("greater than 0"), "got: {err}");
     }
@@ -15627,11 +15036,9 @@ require_otp_to_resume = true
     async fn validate_mcp_config_rejects_timeout_exceeding_max() {
         let mut server = stdio_server("fs", "/usr/bin/mcp-fs");
         server.tool_timeout_secs = Some(MCP_MAX_TOOL_TIMEOUT_SECS + 1);
-        let cfg = McpConfig {
-            enabled: true,
-            servers: vec![server],
-            ..Default::default()
-        };
+        let mut cfg = McpConfig::default();
+        cfg.enabled = true;
+        cfg.servers = vec![server];
         let err = validate_mcp_config(&cfg).expect_err("oversized timeout should fail");
         assert!(err.to_string().contains("exceeds max"), "got: {err}");
     }
@@ -15640,21 +15047,17 @@ require_otp_to_resume = true
     async fn validate_mcp_config_allows_max_timeout_exactly() {
         let mut server = stdio_server("fs", "/usr/bin/mcp-fs");
         server.tool_timeout_secs = Some(MCP_MAX_TOOL_TIMEOUT_SECS);
-        let cfg = McpConfig {
-            enabled: true,
-            servers: vec![server],
-            ..Default::default()
-        };
+        let mut cfg = McpConfig::default();
+        cfg.enabled = true;
+        cfg.servers = vec![server];
         assert!(validate_mcp_config(&cfg).is_ok());
     }
 
     #[test]
     async fn validate_mcp_config_rejects_stdio_with_empty_command() {
-        let cfg = McpConfig {
-            enabled: true,
-            servers: vec![stdio_server("fs", "")],
-            ..Default::default()
-        };
+        let mut cfg = McpConfig::default();
+        cfg.enabled = true;
+        cfg.servers = vec![stdio_server("fs", "")];
         let err = validate_mcp_config(&cfg).expect_err("empty command should fail");
         assert!(
             err.to_string().contains("requires non-empty command"),
@@ -15664,54 +15067,44 @@ require_otp_to_resume = true
 
     #[test]
     async fn validate_mcp_config_rejects_http_without_url() {
-        let cfg = McpConfig {
-            enabled: true,
-            servers: vec![McpServerConfig {
-                name: "svc".to_string(),
-                transport: McpTransport::Http,
-                url: None,
-                ..Default::default()
-            }],
-            ..Default::default()
-        };
+        let mut server = McpServerConfig::default();
+        server.name = "svc".to_string();
+        server.transport = McpTransport::Http;
+        server.url = None;
+        let mut cfg = McpConfig::default();
+        cfg.enabled = true;
+        cfg.servers = vec![server];
         let err = validate_mcp_config(&cfg).expect_err("http without url should fail");
         assert!(err.to_string().contains("requires url"), "got: {err}");
     }
 
     #[test]
     async fn validate_mcp_config_rejects_sse_without_url() {
-        let cfg = McpConfig {
-            enabled: true,
-            servers: vec![McpServerConfig {
-                name: "svc".to_string(),
-                transport: McpTransport::Sse,
-                url: None,
-                ..Default::default()
-            }],
-            ..Default::default()
-        };
+        let mut server = McpServerConfig::default();
+        server.name = "svc".to_string();
+        server.transport = McpTransport::Sse;
+        server.url = None;
+        let mut cfg = McpConfig::default();
+        cfg.enabled = true;
+        cfg.servers = vec![server];
         let err = validate_mcp_config(&cfg).expect_err("sse without url should fail");
         assert!(err.to_string().contains("requires url"), "got: {err}");
     }
 
     #[test]
     async fn validate_mcp_config_rejects_non_http_scheme() {
-        let cfg = McpConfig {
-            enabled: true,
-            servers: vec![http_server("svc", "ftp://example.com/mcp")],
-            ..Default::default()
-        };
+        let mut cfg = McpConfig::default();
+        cfg.enabled = true;
+        cfg.servers = vec![http_server("svc", "ftp://example.com/mcp")];
         let err = validate_mcp_config(&cfg).expect_err("non-http scheme should fail");
         assert!(err.to_string().contains("http/https"), "got: {err}");
     }
 
     #[test]
     async fn validate_mcp_config_rejects_invalid_url() {
-        let cfg = McpConfig {
-            enabled: true,
-            servers: vec![http_server("svc", "not a url at all !!!")],
-            ..Default::default()
-        };
+        let mut cfg = McpConfig::default();
+        cfg.enabled = true;
+        cfg.servers = vec![http_server("svc", "not a url at all !!!")];
         let err = validate_mcp_config(&cfg).expect_err("invalid url should fail");
         assert!(err.to_string().contains("valid URL"), "got: {err}");
     }
@@ -15817,11 +15210,9 @@ require_otp_to_resume = true
 
         let plaintext_secret = "nevis-test-client-secret-value";
 
-        let mut config = Config {
-            workspace_dir: dir.join("workspace"),
-            config_path: dir.join("config.toml"),
-            ..Default::default()
-        };
+        let mut config = Config::default();
+        config.workspace_dir = dir.join("workspace");
+        config.config_path = dir.join("config.toml");
         config.security.nevis.client_secret = Some(plaintext_secret.into());
 
         // Save (triggers encryption)
@@ -15875,94 +15266,80 @@ require_otp_to_resume = true
 
     #[test]
     async fn nevis_config_validate_rejects_empty_instance_url() {
-        let cfg = NevisConfig {
-            enabled: true,
-            instance_url: String::new(),
-            client_id: "test-client".into(),
-            ..NevisConfig::default()
-        };
+        let mut cfg = NevisConfig::default();
+        cfg.enabled = true;
+        cfg.instance_url = String::new();
+        cfg.client_id = "test-client".into();
         let err = cfg.validate().unwrap_err();
         assert!(err.contains("instance_url"));
     }
 
     #[test]
     async fn nevis_config_validate_rejects_empty_client_id() {
-        let cfg = NevisConfig {
-            enabled: true,
-            instance_url: "https://nevis.example.com".into(),
-            client_id: String::new(),
-            ..NevisConfig::default()
-        };
+        let mut cfg = NevisConfig::default();
+        cfg.enabled = true;
+        cfg.instance_url = "https://nevis.example.com".into();
+        cfg.client_id = String::new();
         let err = cfg.validate().unwrap_err();
         assert!(err.contains("client_id"));
     }
 
     #[test]
     async fn nevis_config_validate_rejects_empty_realm() {
-        let cfg = NevisConfig {
-            enabled: true,
-            instance_url: "https://nevis.example.com".into(),
-            client_id: "test-client".into(),
-            realm: String::new(),
-            ..NevisConfig::default()
-        };
+        let mut cfg = NevisConfig::default();
+        cfg.enabled = true;
+        cfg.instance_url = "https://nevis.example.com".into();
+        cfg.client_id = "test-client".into();
+        cfg.realm = String::new();
         let err = cfg.validate().unwrap_err();
         assert!(err.contains("realm"));
     }
 
     #[test]
     async fn nevis_config_validate_rejects_local_without_jwks() {
-        let cfg = NevisConfig {
-            enabled: true,
-            instance_url: "https://nevis.example.com".into(),
-            client_id: "test-client".into(),
-            token_validation: "local".into(),
-            jwks_url: None,
-            ..NevisConfig::default()
-        };
+        let mut cfg = NevisConfig::default();
+        cfg.enabled = true;
+        cfg.instance_url = "https://nevis.example.com".into();
+        cfg.client_id = "test-client".into();
+        cfg.token_validation = "local".into();
+        cfg.jwks_url = None;
         let err = cfg.validate().unwrap_err();
         assert!(err.contains("jwks_url"));
     }
 
     #[test]
     async fn nevis_config_validate_rejects_zero_session_timeout() {
-        let cfg = NevisConfig {
-            enabled: true,
-            instance_url: "https://nevis.example.com".into(),
-            client_id: "test-client".into(),
-            token_validation: "remote".into(),
-            session_timeout_secs: 0,
-            ..NevisConfig::default()
-        };
+        let mut cfg = NevisConfig::default();
+        cfg.enabled = true;
+        cfg.instance_url = "https://nevis.example.com".into();
+        cfg.client_id = "test-client".into();
+        cfg.token_validation = "remote".into();
+        cfg.session_timeout_secs = 0;
         let err = cfg.validate().unwrap_err();
         assert!(err.contains("session_timeout_secs"));
     }
 
     #[test]
     async fn nevis_config_validate_accepts_valid_enabled_config() {
-        let cfg = NevisConfig {
-            enabled: true,
-            instance_url: "https://nevis.example.com".into(),
-            realm: "master".into(),
-            client_id: "test-client".into(),
-            token_validation: "remote".into(),
-            session_timeout_secs: 3600,
-            ..NevisConfig::default()
-        };
+        let mut cfg = NevisConfig::default();
+        cfg.enabled = true;
+        cfg.instance_url = "https://nevis.example.com".into();
+        cfg.realm = "master".into();
+        cfg.client_id = "test-client".into();
+        cfg.token_validation = "remote".into();
+        cfg.session_timeout_secs = 3600;
         assert!(cfg.validate().is_ok());
     }
 
     #[test]
     async fn nevis_config_validate_rejects_invalid_token_validation() {
-        let cfg = NevisConfig {
-            enabled: true,
-            instance_url: "https://nevis.example.com".into(),
-            realm: "master".into(),
-            client_id: "test-client".into(),
-            token_validation: "invalid_mode".into(),
-            session_timeout_secs: 3600,
-            ..NevisConfig::default()
-        };
+        let mut cfg = NevisConfig::default();
+        cfg.enabled = true;
+        cfg.instance_url = "https://nevis.example.com".into();
+        cfg.realm = "master".into();
+        cfg.client_id = "test-client".into();
+        cfg.token_validation = "invalid_mode".into();
+        cfg.session_timeout_secs = 3600;
         let err = cfg.validate().unwrap_err();
         assert!(
             err.contains("invalid value 'invalid_mode'"),
@@ -15972,10 +15349,8 @@ require_otp_to_resume = true
 
     #[test]
     async fn nevis_config_debug_redacts_client_secret() {
-        let cfg = NevisConfig {
-            client_secret: Some("super-secret".into()),
-            ..NevisConfig::default()
-        };
+        let mut cfg = NevisConfig::default();
+        cfg.client_secret = Some("super-secret".into());
         let debug_output = format!("{:?}", cfg);
         assert!(
             !debug_output.contains("super-secret"),
@@ -15985,6 +15360,39 @@ require_otp_to_resume = true
             debug_output.contains("[REDACTED]"),
             "Debug output must show [REDACTED] for client_secret"
         );
+    }
+
+    #[test]
+    async fn telegram_config_webhook_defaults_deserialize() {
+        let toml_str = r#"
+            bot_token = "123:ABC"
+            allowed_users = ["alice"]
+        "#;
+        let cfg: TelegramConfig = toml::from_str(toml_str).unwrap();
+        assert_eq!(cfg.webhook_url, None);
+        assert_eq!(cfg.webhook_listen_addr, "0.0.0.0:8443");
+        assert_eq!(cfg.webhook_path, "/telegram/webhook");
+        assert_eq!(cfg.webhook_secret_token, None);
+    }
+
+    #[test]
+    async fn telegram_config_webhook_fields_deserialize() {
+        let toml_str = r#"
+            bot_token = "123:ABC"
+            allowed_users = ["alice"]
+            webhook_url = "https://bot.example.com/telegram"
+            webhook_listen_addr = "127.0.0.1:9443"
+            webhook_path = "/telegram"
+            webhook_secret_token = "secret-token"
+        "#;
+        let cfg: TelegramConfig = toml::from_str(toml_str).unwrap();
+        assert_eq!(
+            cfg.webhook_url.as_deref(),
+            Some("https://bot.example.com/telegram")
+        );
+        assert_eq!(cfg.webhook_listen_addr, "127.0.0.1:9443");
+        assert_eq!(cfg.webhook_path, "/telegram");
+        assert_eq!(cfg.webhook_secret_token.as_deref(), Some("secret-token"));
     }
 
     #[test]
@@ -16420,10 +15828,8 @@ auto_approve = ["file_read", "file_write", "file_edit", "memory_recall", "memory
 
     #[test]
     async fn config_tree_traversal_discovers_nested_secrets() {
-        let mut config = Config {
-            api_key: Some("test-key".into()),
-            ..Default::default()
-        };
+        let mut config = Config::default();
+        config.api_key = Some("test-key".into());
         config.channels_config.matrix = Some(MatrixConfig {
             enabled: true,
             homeserver: "https://m.org".into(),
@@ -16832,13 +16238,11 @@ auto_approve = ["file_read", "file_write", "file_edit", "memory_recall", "memory
         let store = crate::secrets::SecretStore::new(dir.path(), true);
 
         let mut config = Config::default();
-        config.agents.insert(
-            "test-agent".into(),
-            DelegateAgentConfig {
-                api_key: Some("secret-key".into()),
-                ..Default::default()
-            },
-        );
+        config.agents.insert("test-agent".into(), {
+            let mut agent = DelegateAgentConfig::default();
+            agent.api_key = Some("secret-key".into());
+            agent
+        });
 
         config.encrypt_secrets(&store).unwrap();
         let encrypted_key = config.agents["test-agent"].api_key.as_ref().unwrap();

@@ -1,13 +1,50 @@
-# AGENTS.md — ZeroClaw
+# AGENTS.md — NaraeClaw
 
 Cross-tool agent instructions for any AI coding assistant working on this repository.
+
+## Project Identity
+
+NaraeClaw is a Korean-first, lightweight fork of [ZeroClaw](https://github.com/zeroclaw-labs/zeroclaw).
+
+V1 fork goals (all completed as of 2026-04-13):
+
+- ✅ **Telegram webhook migration** — replaced polling with Axum-based webhook handling.
+- ✅ **Lightweight defaults** — removed unnecessary channels from default Cargo features.
+- ✅ **Security hardening** — eliminated `unsafe set_var`, introduced `OnceLock`, `zeroize`, and `CredentialFilter`.
+
+Current focus: V2 desktop app porting (see `Plan.md`).
+
+Internal crate names still use `zeroclaw-*`, but the binary name is `naraeclaw`.
 
 ## Commands
 
 ```bash
+# Format
+cargo fmt --all
 cargo fmt --all -- --check
+
+# Lint
 cargo clippy --all-targets -- -D warnings
+
+# Tests
 cargo test
+cargo test --lib
+cargo test --test component
+cargo test --test integration
+cargo test --test system
+cargo test --test integration <test-name>
+
+# Live tests require real API keys and are marked #[ignore]
+cargo test --test live -- --ignored
+
+# Development mode
+cargo run -- onboard
+cargo run -- agent
+
+# Justfile shortcuts, if just is installed
+just ci
+just fmt
+just dev
 ```
 
 Full pre-PR validation (recommended):
@@ -20,7 +57,18 @@ Docs-only changes: run markdown lint and link-integrity checks. If touching boot
 
 ## Project Snapshot
 
-ZeroClaw is a Rust-first autonomous agent runtime optimized for performance, efficiency, stability, extensibility, sustainability, and security.
+NaraeClaw is a Rust edition 2024 autonomous agent runtime optimized for Korean-first operation, performance, efficiency, stability, extensibility, sustainability, and security.
+
+The `naraeclaw` binary (`src/main.rs`) enables the `agent-runtime` feature by default, which activates most agent subsystems.
+
+Message flow:
+
+1. Incoming message
+2. `zeroclaw-channels` transport layer
+3. `zeroclaw-runtime/agent/` agent loop
+4. `zeroclaw-providers` LLM call
+5. `zeroclaw-tools` tool execution
+6. Response delivery
 
 Core architecture is trait-driven and modular. Extend by implementing traits and registering in factory modules.
 
@@ -33,6 +81,13 @@ Key extension points:
 - `crates/zeroclaw-api/src/observability_traits.rs` (`Observer`)
 - `crates/zeroclaw-api/src/runtime_traits.rs` (`RuntimeAdapter`)
 - `crates/zeroclaw-api/src/peripherals_traits.rs` (`Peripheral`) — hardware boards (STM32, RPi GPIO)
+
+## Current Priorities (V2 — Desktop App)
+
+1. **Gateway sidecar bundling** — bundle `naraeclaw agent` as a Tauri sidecar that auto-starts with the app (`apps/tauri/`).
+2. **Window visibility + branding** — set `visible: true`, persist window size/position, replace icon and app name.
+3. **Korean UI** — translate menus, buttons, and help text in the web frontend (`/web/src/`).
+4. **Native notifications** — show a system notification when a Telegram message is received.
 
 ## Stability Tiers
 
@@ -81,6 +136,26 @@ Tiers are promoted, never demoted, through deliberate team decision.
 - `docs/` — topic-based documentation (setup-guides, reference, ops, security, hardware, contributing, maintainers)
 - `.github/` — CI, templates, automation workflows
 
+## Architecture Notes
+
+- `crates/zeroclaw-runtime/src/agent/` — agent loop core, including `loop_.rs` and `agent.rs`.
+- `crates/zeroclaw-runtime/src/security/` — access control and policy. Treat as high risk.
+- `crates/zeroclaw-runtime/src/cron/` — cron scheduler.
+- `crates/zeroclaw-runtime/src/sop/` — SOP engine.
+- `crates/zeroclaw-runtime/src/skills/` and `crates/zeroclaw-runtime/src/skillforge/` — skill system.
+- `crates/zeroclaw-runtime/src/onboard/` — TUI onboarding wizard.
+- `crates/zeroclaw-channels/` — channel integrations gated by `channel-<name>` Cargo features.
+- `crates/zeroclaw-channels/src/orchestrator/` — channel lifecycle, routing, and media pipeline.
+- `crates/zeroclaw-config/` — TOML-based config. `Configurable` derive generates schema. Config keys are public contract; document defaults and migration path when changing them.
+- `tests/support/` — shared mocks such as `MockProvider`, `MockChannel`, and `EchoTool`.
+- `tests/fixtures/traces/` — JSON fixture replay data for `TraceLlmProvider`.
+
+Telegram webhook-related code:
+
+- `crates/zeroclaw-channels/src/telegram.rs` — Axum-based webhook handler (polling replaced).
+- `crates/zeroclaw-channels/src/telegram.rs:372` — draft update interval of 1000 ms.
+- `crates/zeroclaw-channels/src/orchestrator/mod.rs` — channel lifecycle, routing, and media pipeline.
+
 ## Risk Tiers
 
 - **Low risk**: docs/chore/tests-only changes
@@ -88,6 +163,42 @@ Tiers are promoted, never demoted, through deliberate team decision.
 - **High risk**: `crates/zeroclaw-runtime/src/**` (especially `src/security/`), `crates/zeroclaw-gateway/src/**`, `crates/zeroclaw-tools/src/**`, `.github/workflows/**`, access-control boundaries
 
 When uncertain, classify as higher risk.
+
+## Worktree Rules
+
+All implementation work starts in a dedicated git worktree. Do not commit directly on `master`.
+
+```bash
+# 1. Start work by creating a worktree and branch.
+git worktree add ../naraeclaw-<owner> -b <owner>/<task-name>
+# Example: git worktree add ../naraeclaw-codex -b codex/telegram-webhook
+
+# 2. Work and commit only inside that worktree.
+
+# 3. Merge into master after review/validation.
+git merge <branch-name>
+
+# 4. Clean up the worktree and branch after merge.
+git worktree remove ../naraeclaw-<owner>
+git branch -d <branch-name>
+```
+
+Branch naming:
+
+- `codex/<task-name>` — Codex-owned work
+- `claude/<task-name>` — Claude-owned work
+- `gemini/<task-name>` — Gemini-owned work
+
+Worktree paths:
+
+- Main: `~/opensource/naraeclaw` — `master`, review and merge only
+- Agents: `~/opensource/naraeclaw-<owner>` — implementation workspace
+
+Parallel work rules:
+
+- Design task slices so different agents do not edit the same files.
+- If overlapping files are unavoidable, serialize the work: merge the first task before starting the next.
+- Ignore unrelated untracked or modified files in another worktree unless the user explicitly asks to handle them.
 
 ## Workflow
 
@@ -99,6 +210,7 @@ When uncertain, classify as higher risk.
 6. **Queue hygiene** — stacked PR: declare `Depends on #...`. Replacing old PR: declare `Supersedes #...`.
 
 Branch/commit/PR rules:
+- Start implementation in a task worktree per **Worktree Rules** above.
 - Work from a non-`master` branch. Open a PR to `master`; do not push directly.
 - Use conventional commit titles. Prefer small PRs (`size: XS/S/M`).
 - Follow `.github/pull_request_template.md` fully.

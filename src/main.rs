@@ -50,8 +50,8 @@ fn parse_temperature(s: &str) -> std::result::Result<f64, String> {
 }
 
 fn print_no_command_help() -> Result<()> {
-    println!("No command provided.");
-    println!("Try `zeroclaw onboard` to initialize your workspace.");
+    println!("명령어를 입력해주세요.");
+    println!("`naraeclaw onboard` 로 작업 환경을 초기화할 수 있습니다.");
     println!();
 
     let mut cmd = Cli::command();
@@ -186,12 +186,12 @@ enum EstopLevelArg {
     ToolFreeze,
 }
 
-/// `ZeroClaw` - Zero overhead. Zero compromise. 100% Rust.
+/// NaraeClaw — 빠르고 가벼운 한국어 AI 에이전트
 #[derive(Parser, Debug)]
-#[command(name = "zeroclaw")]
+#[command(name = "naraeclaw")]
 #[command(author = "theonlyhennygod")]
 #[command(version)]
-#[command(about = "The fastest, smallest AI assistant.", long_about = None)]
+#[command(about = "빠르고 가벼운 한국어 AI 에이전트", long_about = None)]
 struct Cli {
     #[arg(long, global = true)]
     config_dir: Option<String>,
@@ -202,149 +202,147 @@ struct Cli {
 
 #[derive(Subcommand, Debug)]
 enum Commands {
-    /// Initialize your workspace and configuration
+    /// 작업 환경 초기화 및 설정
     Onboard {
-        /// Overwrite existing config without confirmation
+        /// 기존 설정을 확인 없이 덮어씁니다
         #[arg(long)]
         force: bool,
 
-        /// Reinitialize from scratch (backup and reset all configuration)
+        /// 처음부터 재초기화합니다 (기존 설정 백업 후 초기화)
         #[arg(long)]
         reinit: bool,
 
-        /// Reconfigure channels only (fast repair flow)
+        /// 채널 설정만 다시 구성합니다 (빠른 복구)
         #[arg(long)]
         channels_only: bool,
 
-        /// API key for provider configuration
+        /// Provider 설정에 사용할 API 키
         #[arg(long)]
         api_key: Option<String>,
 
-        /// Provider name (used in quick mode, default: openrouter)
+        /// Provider 이름 (빠른 설정 모드, 기본값: openrouter)
         #[arg(long)]
         provider: Option<String>,
-        /// Model ID override (used in quick mode)
+        /// 모델 ID (빠른 설정 모드에서 사용)
         #[arg(long)]
         model: Option<String>,
-        /// Memory backend (sqlite, lucid, markdown, none) - used in quick mode, default: sqlite
+        /// 메모리 백엔드 (sqlite, lucid, markdown, none) — 빠른 설정 모드, 기본값: sqlite
         #[arg(long)]
         memory: Option<String>,
 
-        /// Skip interactive prompts and use quick setup with defaults
+        /// 대화형 입력 없이 기본값으로 빠르게 설정합니다
         #[arg(long)]
         quick: bool,
 
-        /// Use the ratatui-based TUI onboarding wizard
+        /// ratatui 기반 TUI 온보딩 마법사를 사용합니다
         #[arg(long)]
         tui: bool,
     },
 
-    /// Start the AI agent loop
+    /// AI 에이전트 루프 시작
     #[command(long_about = "\
-Start the AI agent loop.
+AI 에이전트 루프를 시작합니다.
 
-Launches an interactive chat session with the configured AI provider. \
-Use --message for single-shot queries without entering interactive mode.
+설정된 AI provider와 대화형 세션을 시작합니다.
+--message 옵션으로 단일 메시지를 보내고 바로 종료할 수 있습니다.
 
-Examples:
-  zeroclaw agent                              # interactive session
-  zeroclaw agent -m \"Summarize today's logs\"  # single message
-  zeroclaw agent -p anthropic --model claude-sonnet-4-20250514
-  zeroclaw agent --peripheral nucleo-f401re:/dev/ttyACM0")]
+사용 예:
+  naraeclaw agent                              # 대화형 세션
+  naraeclaw agent -m \"오늘 로그 요약해줘\"       # 단일 메시지
+  naraeclaw agent -p anthropic --model claude-sonnet-4-20250514
+  naraeclaw agent --peripheral nucleo-f401re:/dev/ttyACM0")]
     Agent {
-        /// Single message mode (don't enter interactive mode)
+        /// 단일 메시지 모드 (대화형 세션 없이 메시지 하나만 전송)
         #[arg(short, long)]
         message: Option<String>,
 
-        /// Load and save interactive session state in this JSON file
+        /// 세션 상태를 저장/불러올 JSON 파일 경로
         #[arg(long)]
         session_state_file: Option<PathBuf>,
 
-        /// Provider to use (openrouter, anthropic, openai, openai-codex)
+        /// 사용할 Provider (openrouter, anthropic, openai, openai-codex)
         #[arg(short, long)]
         provider: Option<String>,
 
-        /// Model to use
+        /// 사용할 모델
         #[arg(long)]
         model: Option<String>,
 
-        /// Temperature (0.0 - 2.0, defaults to config default_temperature)
+        /// Temperature (0.0 - 2.0, 기본값: 설정파일의 default_temperature)
         #[arg(short, long, value_parser = parse_temperature)]
         temperature: Option<f64>,
 
-        /// Attach a peripheral (board:path, e.g. nucleo-f401re:/dev/ttyACM0)
+        /// 연결할 하드웨어 (board:path 형식, 예: nucleo-f401re:/dev/ttyACM0)
         #[arg(long)]
         peripheral: Vec<String>,
     },
 
-    /// Start/manage the gateway server (webhooks, websockets)
+    /// 게이트웨이 서버 시작/관리 (webhook, websocket)
     #[command(long_about = "\
-Manage the gateway server (webhooks, websockets).
+게이트웨이 서버를 관리합니다 (webhook, websocket).
 
-Start, restart, or inspect the HTTP/WebSocket gateway that accepts \
-incoming webhook events and WebSocket connections.
+외부 webhook 이벤트와 WebSocket 연결을 받는 HTTP 게이트웨이를
+시작, 재시작, 또는 상태 확인합니다.
 
-Examples:
-  zeroclaw gateway start              # start gateway
-  zeroclaw gateway restart            # restart gateway
-  zeroclaw gateway get-paircode       # show pairing code")]
+사용 예:
+  naraeclaw gateway start              # 게이트웨이 시작
+  naraeclaw gateway restart            # 게이트웨이 재시작
+  naraeclaw gateway get-paircode       # 페어링 코드 확인")]
     Gateway {
         #[command(subcommand)]
         gateway_command: Option<zeroclaw::GatewayCommands>,
     },
 
-    /// Start ACP (Agent Control Protocol) server over stdio
+    /// ACP (Agent Control Protocol) 서버 시작 (stdio)
     #[command(long_about = "\
-Start the ACP server (JSON-RPC 2.0 over stdio).
+ACP 서버를 시작합니다 (JSON-RPC 2.0 over stdio).
 
-Launches a JSON-RPC 2.0 server on stdin/stdout for IDE and tool \
-integration. Supports session management and streaming agent \
-responses as notifications.
+IDE 및 도구 통합을 위한 JSON-RPC 2.0 서버를 stdin/stdout으로 실행합니다.
+세션 관리 및 에이전트 응답 스트리밍을 지원합니다.
 
-Methods: initialize, session/new, session/prompt, session/stop.
+메서드: initialize, session/new, session/prompt, session/stop.
 
-Examples:
-  zeroclaw acp                        # start ACP server
-  zeroclaw acp --max-sessions 5       # limit concurrent sessions")]
+사용 예:
+  naraeclaw acp                        # ACP 서버 시작
+  naraeclaw acp --max-sessions 5       # 최대 동시 세션 수 제한")]
     Acp {
-        /// Maximum concurrent sessions (default: 10)
+        /// 최대 동시 세션 수 (기본값: 10)
         #[arg(long)]
         max_sessions: Option<usize>,
 
-        /// Session inactivity timeout in seconds (default: 3600)
+        /// 세션 비활성 타임아웃 (초, 기본값: 3600)
         #[arg(long)]
         session_timeout: Option<u64>,
     },
 
-    /// Start long-running autonomous runtime (gateway + channels + heartbeat + scheduler)
+    /// 장시간 실행 자율 런타임 시작 (gateway + 채널 + heartbeat + 스케줄러)
     #[command(long_about = "\
-Start the long-running autonomous daemon.
+장시간 실행 자율 데몬을 시작합니다.
 
-Launches the full ZeroClaw runtime: gateway server, all configured \
-channels (Telegram, Discord, Slack, etc.), heartbeat monitor, and \
-the cron scheduler. This is the recommended way to run ZeroClaw in \
-production or as an always-on assistant.
+게이트웨이 서버, 설정된 모든 채널(Telegram, Discord, Slack 등),
+heartbeat 모니터, cron 스케줄러를 포함한 전체 런타임을 실행합니다.
+상시 실행 환경에 권장되는 방식입니다.
 
-Use 'zeroclaw service install' to register the daemon as an OS \
-service (systemd/launchd) for auto-start on boot.
+'naraeclaw service install' 로 OS 서비스(systemd/launchd)로 등록해
+부팅 시 자동 시작할 수 있습니다.
 
-Examples:
-  zeroclaw daemon                   # use config defaults
-  zeroclaw daemon -p 9090           # gateway on port 9090
-  zeroclaw daemon --host 127.0.0.1  # localhost only")]
+사용 예:
+  naraeclaw daemon                   # 설정 기본값 사용
+  naraeclaw daemon -p 9090           # 게이트웨이 포트 9090
+  naraeclaw daemon --host 127.0.0.1  # localhost만 바인딩")]
     Daemon {
-        /// Port to listen on (use 0 for random available port); defaults to config gateway.port
+        /// 바인딩할 포트 (0이면 임의 포트, 기본값: 설정파일의 gateway.port)
         #[arg(short, long)]
         port: Option<u16>,
 
-        /// Host to bind to; defaults to config gateway.host
+        /// 바인딩할 호스트 (기본값: 설정파일의 gateway.host)
         #[arg(long)]
         host: Option<String>,
     },
 
-    /// Manage OS service lifecycle (launchd/systemd user service)
+    /// OS 서비스 생명주기 관리 (launchd/systemd user service)
     Service {
-        /// Init system to use: auto (detect), systemd, or openrc
+        /// 초기화 시스템 선택: auto (자동 감지), systemd, openrc
         #[arg(long, default_value = "auto", value_parser = ["auto", "systemd", "openrc"])]
         service_init: String,
 
@@ -352,303 +350,292 @@ Examples:
         service_command: ServiceCommands,
     },
 
-    /// Run diagnostics for daemon/scheduler/channel freshness
+    /// 데몬/스케줄러/채널 진단 실행
     Doctor {
         #[command(subcommand)]
         doctor_command: Option<DoctorCommands>,
     },
 
-    /// Show system status (full details)
+    /// 시스템 상태 확인 (전체 상세 정보)
     Status {
-        /// Output format: "exit-code" exits 0 if healthy, 1 otherwise (for Docker HEALTHCHECK)
+        /// 출력 형식: "exit-code" — 정상이면 0, 비정상이면 1로 종료 (Docker HEALTHCHECK용)
         #[arg(long)]
         format: Option<String>,
     },
 
-    /// Engage, inspect, and resume emergency-stop states.
+    /// 긴급 정지 상태 실행, 확인, 재개
     ///
-    /// Examples:
-    /// - `zeroclaw estop`
-    /// - `zeroclaw estop --level network-kill`
-    /// - `zeroclaw estop --level domain-block --domain "*.chase.com"`
-    /// - `zeroclaw estop --level tool-freeze --tool shell --tool browser`
-    /// - `zeroclaw estop status`
-    /// - `zeroclaw estop resume --network`
-    /// - `zeroclaw estop resume --domain "*.chase.com"`
-    /// - `zeroclaw estop resume --tool shell`
+    /// 사용 예:
+    /// - `naraeclaw estop`
+    /// - `naraeclaw estop --level network-kill`
+    /// - `naraeclaw estop --level domain-block --domain "*.chase.com"`
+    /// - `naraeclaw estop --level tool-freeze --tool shell --tool browser`
+    /// - `naraeclaw estop status`
+    /// - `naraeclaw estop resume --network`
+    /// - `naraeclaw estop resume --domain "*.chase.com"`
+    /// - `naraeclaw estop resume --tool shell`
     Estop {
         #[command(subcommand)]
         estop_command: Option<EstopSubcommands>,
 
-        /// Level used when engaging estop from `zeroclaw estop`.
+        /// 긴급 정지 레벨
         #[arg(long, value_enum)]
         level: Option<EstopLevelArg>,
 
-        /// Domain pattern(s) for `domain-block` (repeatable).
+        /// `domain-block` 용 도메인 패턴 (반복 가능)
         #[arg(long = "domain")]
         domains: Vec<String>,
 
-        /// Tool name(s) for `tool-freeze` (repeatable).
+        /// `tool-freeze` 용 tool 이름 (반복 가능)
         #[arg(long = "tool")]
         tools: Vec<String>,
     },
 
-    /// Configure and manage scheduled tasks
+    /// 예약 작업 설정 및 관리
     #[command(long_about = "\
-Configure and manage scheduled tasks.
+예약 작업을 설정하고 관리합니다.
 
-Schedule recurring, one-shot, or interval-based tasks using cron \
-expressions, RFC 3339 timestamps, durations, or fixed intervals.
+cron 표현식, RFC 3339 타임스탬프, 지속 시간, 고정 간격으로
+반복·일회성·간격 기반 작업을 스케줄링할 수 있습니다.
 
-Cron expressions use the standard 5-field format: \
-'min hour day month weekday'. Timezones default to UTC; \
-override with --tz and an IANA timezone name.
+cron 표현식은 표준 5필드 형식을 사용합니다: 'min hour day month weekday'.
+타임존 기본값은 UTC이며 --tz와 IANA 타임존명으로 변경 가능합니다.
 
-Examples:
-  zeroclaw cron list
-  zeroclaw cron add '0 9 * * 1-5' 'Good morning' --tz America/New_York --agent
-  zeroclaw cron add '*/30 * * * *' 'Check system health' --agent
-  zeroclaw cron add '*/5 * * * *' 'echo ok'
-  zeroclaw cron add-at 2025-01-15T14:00:00Z 'Send reminder' --agent
-  zeroclaw cron add-every 60000 'Ping heartbeat'
-  zeroclaw cron once 30m 'Run backup in 30 minutes' --agent
-  zeroclaw cron pause <task-id>
-  zeroclaw cron update <task-id> --expression '0 8 * * *' --tz Europe/London")]
+사용 예:
+  naraeclaw cron list
+  naraeclaw cron add '0 9 * * 1-5' '좋은 아침' --tz Asia/Seoul --agent
+  naraeclaw cron add '*/30 * * * *' '시스템 상태 확인' --agent
+  naraeclaw cron add '*/5 * * * *' 'echo ok'
+  naraeclaw cron add-at 2025-01-15T14:00:00Z '리마인더 전송' --agent
+  naraeclaw cron add-every 60000 'Ping heartbeat'
+  naraeclaw cron once 30m '30분 후 백업 실행' --agent
+  naraeclaw cron pause <task-id>
+  naraeclaw cron update <task-id> --expression '0 8 * * *' --tz Asia/Seoul")]
     Cron {
         #[command(subcommand)]
         cron_command: CronCommands,
     },
 
-    /// Manage provider model catalogs
+    /// Provider 모델 카탈로그 관리
     Models {
         #[command(subcommand)]
         model_command: ModelCommands,
     },
 
-    /// List supported AI providers
+    /// 지원하는 AI Provider 목록
     Providers,
 
-    /// Manage channels (telegram, discord, slack)
+    /// 채널 관리 (telegram, discord, slack)
     #[command(long_about = "\
-Manage communication channels.
+통신 채널을 관리합니다.
 
-Add, remove, list, send, and health-check channels that connect ZeroClaw \
-to messaging platforms. Supported channel types: telegram, discord, \
-slack, whatsapp, matrix, imessage, email.
+메시징 플랫폼에 연결하는 채널을 추가, 제거, 목록 확인, 전송,
+상태 진단합니다. 지원 채널: telegram, discord, slack, whatsapp, email.
 
-Examples:
-  zeroclaw channel list
-  zeroclaw channel doctor
-  zeroclaw channel add telegram '{\"bot_token\":\"...\",\"name\":\"my-bot\"}'
-  zeroclaw channel remove my-bot
-  zeroclaw channel bind-telegram zeroclaw_user
-  zeroclaw channel send 'Alert!' --channel-id telegram --recipient 123456789")]
+사용 예:
+  naraeclaw channel list
+  naraeclaw channel doctor
+  naraeclaw channel add telegram '{\"bot_token\":\"...\",\"name\":\"my-bot\"}'
+  naraeclaw channel remove my-bot
+  naraeclaw channel bind-telegram naraeclaw_user
+  naraeclaw channel send '알림!' --channel-id telegram --recipient 123456789")]
     Channel {
         #[command(subcommand)]
         channel_command: ChannelCommands,
     },
 
-    /// Browse 50+ integrations
+    /// 50개 이상의 통합 서비스 탐색
     Integrations {
         #[command(subcommand)]
         integration_command: IntegrationCommands,
     },
 
-    /// Manage skills (user-defined capabilities)
+    /// 스킬 관리 (사용자 정의 기능)
     Skills {
         #[command(subcommand)]
         skill_command: SkillCommands,
     },
 
-    /// Manage standard operating procedures (SOPs)
+    /// SOP (표준 운영 절차) 관리
     Sop {
         #[command(subcommand)]
         sop_command: SopCommands,
     },
 
-    /// Migrate data from other agent runtimes
+    /// 다른 에이전트 런타임에서 데이터 마이그레이션
     Migrate {
         #[command(subcommand)]
         migrate_command: MigrateCommands,
     },
 
-    /// Manage provider subscription authentication profiles
+    /// Provider 인증 프로파일 관리
     Auth {
         #[command(subcommand)]
         auth_command: AuthCommands,
     },
 
-    /// Discover and introspect USB hardware
+    /// USB 하드웨어 탐색 및 정보 조회
     #[command(long_about = "\
-Discover and introspect USB hardware.
+USB 하드웨어를 탐색하고 정보를 조회합니다.
 
-Enumerate connected USB devices, identify known development boards \
-(STM32 Nucleo, Arduino, ESP32), and retrieve chip information via \
-probe-rs / ST-Link.
+연결된 USB 장치를 열거하고, 알려진 개발 보드(STM32 Nucleo, Arduino, ESP32)를
+식별하며, probe-rs / ST-Link를 통해 칩 정보를 조회합니다.
 
-Examples:
-  zeroclaw hardware discover
-  zeroclaw hardware introspect /dev/ttyACM0
-  zeroclaw hardware info --chip STM32F401RETx")]
+사용 예:
+  naraeclaw hardware discover
+  naraeclaw hardware introspect /dev/ttyACM0
+  naraeclaw hardware info --chip STM32F401RETx")]
     Hardware {
         #[command(subcommand)]
         hardware_command: zeroclaw::HardwareCommands,
     },
 
-    /// Manage hardware peripherals (STM32, RPi GPIO, etc.)
+    /// 하드웨어 주변기기 관리 (STM32, RPi GPIO 등)
     #[command(long_about = "\
-Manage hardware peripherals.
+하드웨어 주변기기를 관리합니다.
 
-Add, list, flash, and configure hardware boards that expose tools \
-to the agent (GPIO, sensors, actuators). Supported boards: \
-nucleo-f401re, rpi-gpio, esp32, arduino-uno.
+에이전트에 도구(GPIO, 센서, 액추에이터)를 노출하는 하드웨어 보드를
+추가, 목록 확인, 플래시, 설정합니다.
+지원 보드: nucleo-f401re, rpi-gpio, esp32, arduino-uno.
 
-Examples:
-  zeroclaw peripheral list
-  zeroclaw peripheral add nucleo-f401re /dev/ttyACM0
-  zeroclaw peripheral add rpi-gpio native
-  zeroclaw peripheral flash --port /dev/cu.usbmodem12345
-  zeroclaw peripheral flash-nucleo")]
+사용 예:
+  naraeclaw peripheral list
+  naraeclaw peripheral add nucleo-f401re /dev/ttyACM0
+  naraeclaw peripheral add rpi-gpio native
+  naraeclaw peripheral flash --port /dev/cu.usbmodem12345
+  naraeclaw peripheral flash-nucleo")]
     Peripheral {
         #[command(subcommand)]
         peripheral_command: zeroclaw::PeripheralCommands,
     },
 
-    /// Manage agent memory (list, get, stats, clear)
+    /// 에이전트 메모리 관리 (목록, 조회, 통계, 삭제)
     #[command(long_about = "\
-Manage agent memory entries.
+에이전트 메모리 항목을 관리합니다.
 
-List, inspect, and clear memory entries stored by the agent. \
-Supports filtering by category and session, pagination, and \
-batch clearing with confirmation.
+에이전트가 저장한 메모리 항목을 목록 확인, 조회, 삭제합니다.
+카테고리·세션 필터링, 페이지네이션, 일괄 삭제를 지원합니다.
 
-Examples:
-  zeroclaw memory stats
-  zeroclaw memory list
-  zeroclaw memory list --category core --limit 10
-  zeroclaw memory get <key>
-  zeroclaw memory clear --category conversation --yes")]
+사용 예:
+  naraeclaw memory stats
+  naraeclaw memory list
+  naraeclaw memory list --category core --limit 10
+  naraeclaw memory get <key>
+  naraeclaw memory clear --category conversation --yes")]
     Memory {
         #[command(subcommand)]
         memory_command: MemoryCommands,
     },
 
-    /// Manage configuration
+    /// 설정 관리
     #[command(long_about = "\
-Manage ZeroClaw configuration.
+NaraeClaw 설정을 관리합니다.
 
-Inspect and export configuration settings. Use 'schema' to dump \
-the full JSON Schema for the config file, which documents every \
-available key, type, and default value.
+설정 항목을 조회하고 내보냅니다. 'schema' 명령으로 설정 파일의
+전체 JSON Schema(모든 키, 타입, 기본값 포함)를 출력합니다.
 
-Examples:
-  zeroclaw config schema              # print JSON Schema to stdout
-  zeroclaw config schema > schema.json")]
+사용 예:
+  naraeclaw config schema              # JSON Schema를 stdout으로 출력
+  naraeclaw config schema > schema.json")]
     Config {
         #[command(subcommand)]
         config_command: ConfigCommands,
     },
 
-    /// Check for and apply updates
+    /// 업데이트 확인 및 적용
     #[command(long_about = "\
-Check for and apply ZeroClaw updates.
+NaraeClaw 업데이트를 확인하고 적용합니다.
 
-By default, downloads and installs the latest release with a \
-6-phase pipeline: preflight, download, backup, validate, swap, \
-and smoke test. Automatic rollback on failure.
+기본적으로 최신 릴리즈를 6단계 파이프라인으로 다운로드·설치합니다:
+preflight → 다운로드 → 백업 → 검증 → 교체 → 스모크 테스트.
+실패 시 자동 롤백됩니다.
 
-Use --check to only check for updates without installing.
-Use --force to skip the confirmation prompt.
-Use --version to target a specific release instead of latest.
-
-Examples:
-  zeroclaw update                      # download and install latest
-  zeroclaw update --check              # check only, don't install
-  zeroclaw update --force              # install without confirmation
-  zeroclaw update --version 0.6.0      # install specific version")]
+사용 예:
+  naraeclaw update                      # 최신 버전 다운로드 및 설치
+  naraeclaw update --check              # 확인만 (설치 안 함)
+  naraeclaw update --force              # 확인 없이 설치
+  naraeclaw update --version 0.6.0      # 특정 버전 설치")]
     Update {
-        /// Only check for updates, don't install
+        /// 업데이트 확인만 (설치 안 함)
         #[arg(long)]
         check: bool,
-        /// Skip confirmation prompt
+        /// 확인 없이 설치
         #[arg(long)]
         force: bool,
-        /// Target version (default: latest)
+        /// 대상 버전 (기본값: 최신)
         #[arg(long)]
         version: Option<String>,
     },
 
-    /// Run diagnostic self-tests
+    /// 진단 자가 테스트 실행
     #[command(long_about = "\
-Run diagnostic self-tests to verify the ZeroClaw installation.
+NaraeClaw 설치를 검증하는 진단 자가 테스트를 실행합니다.
 
-By default, runs the full test suite including network checks \
-(gateway health, memory round-trip). Use --quick to skip network \
-checks for faster offline validation.
+기본적으로 네트워크 확인(게이트웨이 상태, 메모리 라운드트립)을 포함한
+전체 테스트를 실행합니다. --quick으로 네트워크 확인을 건너뛸 수 있습니다.
 
-Examples:
-  zeroclaw self-test             # full suite
-  zeroclaw self-test --quick     # quick checks only (no network)")]
+사용 예:
+  naraeclaw self-test             # 전체 테스트
+  naraeclaw self-test --quick     # 빠른 확인 (네트워크 제외)")]
     SelfTest {
-        /// Run quick checks only (no network)
+        /// 빠른 확인만 실행 (네트워크 제외)
         #[arg(long)]
         quick: bool,
     },
 
-    /// Generate shell completion script to stdout
+    /// 쉘 자동완성 스크립트 생성 (stdout 출력)
     #[command(long_about = "\
-Generate shell completion scripts for `zeroclaw`.
+naraeclaw의 쉘 자동완성 스크립트를 생성합니다.
 
-The script is printed to stdout so it can be sourced directly:
+스크립트는 stdout으로 출력되므로 직접 source 하거나 파일로 저장하세요.
 
-Examples:
-  source <(zeroclaw completions bash)
-  zeroclaw completions zsh > ~/.zfunc/_zeroclaw
-  zeroclaw completions fish > ~/.config/fish/completions/zeroclaw.fish")]
+사용 예:
+  source <(naraeclaw completions bash)
+  naraeclaw completions zsh > ~/.zfunc/_naraeclaw
+  naraeclaw completions fish > ~/.config/fish/completions/naraeclaw.fish")]
     Completions {
-        /// Target shell
+        /// 대상 쉘
         #[arg(value_enum)]
         shell: CompletionShell,
     },
 
-    /// Launch or install the companion desktop app
+    /// 컴패니언 데스크톱 앱 실행 또는 설치
     #[command(long_about = "\
-Launch the ZeroClaw companion desktop app.
+NaraeClaw 컴패니언 데스크톱 앱을 실행합니다.
 
-The companion app is a lightweight menu bar / system tray application \
-that connects to the same gateway as the CLI. It provides quick access \
-to the dashboard, status monitoring, and device pairing.
+컴패니언 앱은 CLI와 동일한 게이트웨이에 연결하는 경량 메뉴바/시스템 트레이
+애플리케이션입니다. 대시보드 접근, 상태 모니터링, 기기 페어링을 제공합니다.
 
-Use --install to download the pre-built companion app for your platform.
+--install 옵션으로 플랫폼에 맞는 컴패니언 앱을 다운로드·설치합니다.
 
-Examples:
-  zeroclaw desktop              # launch the companion app
-  zeroclaw desktop --install    # download and install it")]
+사용 예:
+  naraeclaw desktop              # 컴패니언 앱 실행
+  naraeclaw desktop --install    # 다운로드 및 설치")]
     Desktop {
-        /// Download and install the companion app
+        /// 컴패니언 앱 다운로드 및 설치
         #[arg(long)]
         install: bool,
     },
 
-    /// View or change config properties by dotted path
+    /// 점(.) 경로로 설정 속성 조회/변경
     #[command(long_about = "\
-View, set, or initialize config properties.
+설정 속성을 조회, 설정, 초기화합니다.
 
-Properties are addressed by dotted path (e.g. channels.matrix.mention-only).
-Secret fields (API keys, tokens) automatically use masked input.
-Enum fields offer interactive selection when value is omitted.
+속성은 점 경로(예: channels.telegram.mention-only)로 지정합니다.
+비밀 필드(API 키, 토큰)는 자동으로 마스킹 입력을 사용합니다.
+Enum 필드는 값 생략 시 대화형 선택을 제공합니다.
 
-Examples:
-  zeroclaw props list                                  # list all properties
-  zeroclaw props list --secrets                        # list only secrets
-  zeroclaw props list --filter channels.matrix         # filter by prefix
-  zeroclaw props get channels.matrix.mention-only      # get a value
-  zeroclaw props set channels.matrix.mention-only true # set a value
-  zeroclaw props set channels.matrix.access-token      # secret: masked input
-  zeroclaw props set channels.matrix.stream-mode       # enum: interactive select
-  zeroclaw props init channels.matrix                  # init section with defaults
+사용 예:
+  naraeclaw props list                                       # 모든 속성 목록
+  naraeclaw props list --secrets                             # 비밀 필드만
+  naraeclaw props list --filter channels.telegram            # 접두사 필터
+  naraeclaw props get channels.telegram.mention-only         # 값 조회
+  naraeclaw props set channels.telegram.mention-only true    # 값 설정
+  naraeclaw props set channels.telegram.bot-token            # 비밀: 마스킹 입력
+  naraeclaw props set channels.telegram.stream-mode          # enum: 대화형 선택
+  naraeclaw props init channels.telegram                     # 기본값으로 섹션 초기화
 
-Property path tab completion is included automatically in `zeroclaw completions <shell>`.")]
+속성 경로 탭 자동완성은 'naraeclaw completions <shell>' 에 자동 포함됩니다.")]
     Props {
         #[command(subcommand)]
         props_command: PropsCommands,
@@ -948,7 +935,9 @@ async fn main() -> Result<()> {
         if config_dir.trim().is_empty() {
             bail!("--config-dir cannot be empty");
         }
-        // SAFETY: called early in main before any threads are spawned.
+        // SAFETY: called before Tokio runtime and any threads are spawned.
+        // No concurrent readers exist at this point in the process lifecycle.
+        // Do NOT move this call into an async context or after runtime::block_on.
         unsafe { std::env::set_var("ZEROCLAW_CONFIG_DIR", config_dir) };
     }
 

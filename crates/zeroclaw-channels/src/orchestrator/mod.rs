@@ -21,41 +21,53 @@ pub mod media_pipeline;
 pub mod mqtt;
 
 // Channel types imported directly from source crates (no shim files)
+#[cfg(feature = "channel-bluesky")]
 pub use crate::bluesky::BlueskyChannel;
+#[cfg(feature = "channel-clawdtalk")]
 pub use crate::clawdtalk::ClawdTalkChannel;
-pub use crate::dingtalk::DingTalkChannel;
+#[cfg(feature = "channel-discord")]
 pub use crate::discord::DiscordChannel;
+#[cfg(feature = "channel-discord")]
 pub use crate::discord_history::DiscordHistoryChannel;
 #[cfg(feature = "channel-email")]
 pub use crate::email_channel::EmailChannel;
 #[cfg(feature = "channel-email")]
 pub use crate::gmail_push::GmailPushChannel;
+#[cfg(feature = "channel-imessage")]
 pub use crate::imessage::IMessageChannel;
+#[cfg(feature = "channel-irc")]
 pub use crate::irc::IrcChannel;
-#[cfg(feature = "channel-lark")]
-pub use crate::lark::LarkChannel;
 #[cfg(feature = "channel-line")]
 pub use crate::line::LineChannel;
+#[cfg(feature = "channel-linq")]
 pub use crate::linq::LinqChannel;
+#[cfg(feature = "channel-mattermost")]
 pub use crate::mattermost::MattermostChannel;
-pub use crate::mochat::MochatChannel;
+#[cfg(feature = "channel-nextcloud")]
 pub use crate::nextcloud_talk::NextcloudTalkChannel;
 #[cfg(feature = "channel-nostr")]
 pub use crate::nostr::NostrChannel;
+#[cfg(feature = "channel-notion")]
 pub use crate::notion::NotionChannel;
-pub use crate::qq::QQChannel;
+#[cfg(feature = "channel-reddit")]
 pub use crate::reddit::RedditChannel;
+#[cfg(feature = "channel-signal")]
 pub use crate::signal::SignalChannel;
+#[cfg(feature = "channel-slack")]
 pub use crate::slack::SlackChannel;
 pub use crate::transcription;
 pub use crate::tts::{TtsManager, TtsProvider};
+#[cfg(feature = "channel-twitter")]
 pub use crate::twitter::TwitterChannel;
+#[cfg(feature = "channel-voice-call")]
 pub use crate::voice_call::VoiceCallChannel;
 #[cfg(feature = "voice-wake")]
 pub use crate::voice_wake::VoiceWakeChannel;
+#[cfg(feature = "channel-wati")]
 pub use crate::wati::WatiChannel;
+#[cfg(feature = "channel-webhook")]
 pub use crate::webhook::WebhookChannel;
-pub use crate::wecom::WeComChannel;
+#[cfg(feature = "channel-whatsapp-cloud")]
 pub use crate::whatsapp::WhatsAppChannel;
 pub use zeroclaw_api::channel::{Channel, ChannelMessage, SendMessage};
 // Local channel types (in misc, not zeroclaw-channels)
@@ -593,15 +605,6 @@ fn channel_delivery_instructions(channel_name: &str) -> Option<&'static str> {
              - For media attachments use markers: [IMAGE:<path-or-url>], [DOCUMENT:<path-or-url>], [VIDEO:<path-or-url>], [AUDIO:<path-or-url>], or [VOICE:<path-or-url>]\n\
              - Keep normal text outside markers and never wrap markers in code fences.\n\
              - Use tool results silently: answer the latest user message directly, and do not narrate delayed/internal tool execution bookkeeping.",
-        ),
-        "qq" => Some(
-            "When responding on QQ:\n\
-             - Use Markdown formatting\n\
-             - Be concise and direct\n\
-             - For media attachments use markers: [IMAGE:<path-or-url>], [DOCUMENT:<path-or-url>], \
-               [VIDEO:<path-or-url>], [VOICE:<path-or-url>]\n\
-             - Voice supports .wav, .mp3, .silk formats only. Other audio formats use [DOCUMENT:]\n\
-             - Keep normal text outside markers and never wrap markers in code fences.\n",
         ),
         _ => None,
     }
@@ -3898,6 +3901,12 @@ fn build_channel_by_id(config: &Config, channel_id: &str) -> Result<Arc<dyn Chan
                 )
                 .with_ack_reactions(ack)
                 .with_streaming(tg.stream_mode, tg.draft_update_interval_ms)
+                .with_webhook(
+                    tg.webhook_url.clone(),
+                    tg.webhook_listen_addr.clone(),
+                    tg.webhook_path.clone(),
+                    tg.webhook_secret_token.clone(),
+                )
                 .with_transcription(config.transcription.clone())
                 .with_tts(config.tts.clone())
                 .with_workspace_dir(config.workspace_dir.clone()),
@@ -4027,78 +4036,6 @@ fn build_channel_by_id(config: &Config, channel_id: &str) -> Result<Arc<dyn Chan
                 anyhow::bail!("WhatsApp channel requires the `whatsapp-web` feature");
             }
         }
-        "qq" => {
-            let qq = config
-                .channels_config
-                .qq
-                .as_ref()
-                .context("QQ channel is not configured")?;
-            Ok(Arc::new(QQChannel::new(
-                qq.app_id.clone(),
-                qq.app_secret.clone(),
-                qq.allowed_users.clone(),
-            )))
-        }
-        "lark" => {
-            #[cfg(feature = "channel-lark")]
-            {
-                let lk = config
-                    .channels_config
-                    .lark
-                    .as_ref()
-                    .context("Lark channel is not configured")?;
-                Ok(Arc::new(LarkChannel::from_lark_config(lk)))
-            }
-            #[cfg(not(feature = "channel-lark"))]
-            {
-                anyhow::bail!("Lark channel requires the `channel-lark` feature");
-            }
-        }
-        "feishu" => {
-            #[cfg(feature = "channel-lark")]
-            {
-                if let Some(ref fs) = config.channels_config.feishu {
-                    return Ok(Arc::new(LarkChannel::from_feishu_config(fs)));
-                }
-                // Legacy: [channels_config.lark] with use_feishu = true
-                let lk = config
-                    .channels_config
-                    .lark
-                    .as_ref()
-                    .context("Feishu channel is not configured")?;
-                Ok(Arc::new(LarkChannel::from_config(lk)))
-            }
-            #[cfg(not(feature = "channel-lark"))]
-            {
-                anyhow::bail!("Feishu channel requires the `channel-lark` feature");
-            }
-        }
-        "dingtalk" => {
-            let dt = config
-                .channels_config
-                .dingtalk
-                .as_ref()
-                .context("DingTalk channel is not configured")?;
-            Ok(Arc::new(
-                DingTalkChannel::new(
-                    dt.client_id.clone(),
-                    dt.client_secret.clone(),
-                    dt.allowed_users.clone(),
-                )
-                .with_proxy_url(dt.proxy_url.clone()),
-            ))
-        }
-        "wecom" => {
-            let wc = config
-                .channels_config
-                .wecom
-                .as_ref()
-                .context("WeCom channel is not configured")?;
-            Ok(Arc::new(WeComChannel::new(
-                wc.webhook_key.clone(),
-                wc.allowed_users.clone(),
-            )))
-        }
         "nextcloud_talk" | "nextcloud-talk" => {
             let nc = config
                 .channels_config
@@ -4113,6 +4050,7 @@ fn build_channel_by_id(config: &Config, channel_id: &str) -> Result<Arc<dyn Chan
                 nc.proxy_url.clone(),
             )))
         }
+        #[cfg(feature = "channel-wati")]
         "wati" => {
             let wati_cfg = config
                 .channels_config
@@ -4127,6 +4065,7 @@ fn build_channel_by_id(config: &Config, channel_id: &str) -> Result<Arc<dyn Chan
                 wati_cfg.proxy_url.clone(),
             )))
         }
+        #[cfg(feature = "channel-linq")]
         "linq" => {
             let lq = config
                 .channels_config
@@ -4157,6 +4096,7 @@ fn build_channel_by_id(config: &Config, channel_id: &str) -> Result<Arc<dyn Chan
                 .context("Gmail Push channel is not configured")?;
             Ok(Arc::new(GmailPushChannel::new(gp.clone())))
         }
+        #[cfg(feature = "channel-irc")]
         "irc" => {
             let irc_cfg = config
                 .channels_config
@@ -4176,6 +4116,7 @@ fn build_channel_by_id(config: &Config, channel_id: &str) -> Result<Arc<dyn Chan
                 verify_tls: irc_cfg.verify_tls.unwrap_or(true),
             })))
         }
+        #[cfg(feature = "channel-twitter")]
         "twitter" => {
             let tw = config
                 .channels_config
@@ -4185,19 +4126,6 @@ fn build_channel_by_id(config: &Config, channel_id: &str) -> Result<Arc<dyn Chan
             Ok(Arc::new(TwitterChannel::new(
                 tw.bearer_token.clone(),
                 tw.allowed_users.clone(),
-            )))
-        }
-        "mochat" => {
-            let mc = config
-                .channels_config
-                .mochat
-                .as_ref()
-                .context("Mochat channel is not configured")?;
-            Ok(Arc::new(MochatChannel::new(
-                mc.api_url.clone(),
-                mc.api_token.clone(),
-                mc.allowed_users.clone(),
-                mc.poll_interval_secs,
             )))
         }
         "discord_history" | "discord-history" => {
@@ -4219,6 +4147,7 @@ fn build_channel_by_id(config: &Config, channel_id: &str) -> Result<Arc<dyn Chan
                 dh.respond_to_dms,
             )))
         }
+        #[cfg(feature = "channel-imessage")]
         "imessage" => {
             let im = config
                 .channels_config
@@ -4244,8 +4173,8 @@ fn build_channel_by_id(config: &Config, channel_id: &str) -> Result<Arc<dyn Chan
         }
         other => anyhow::bail!(
             "Unknown channel '{other}'. Supported: telegram, discord, slack, mattermost, signal, \
-            matrix, whatsapp, qq, lark, feishu, dingtalk, wecom, nextcloud_talk, wati, linq, \
-            email, gmail_push, irc, twitter, mochat, discord_history, imessage, line"
+            matrix, whatsapp, nextcloud_talk, wati, linq, \
+            email, gmail_push, irc, twitter, discord_history, imessage, line"
         ),
     }
 }
@@ -4312,6 +4241,12 @@ fn collect_configured_channels(
                     )
                     .with_ack_reactions(ack)
                     .with_streaming(tg.stream_mode, tg.draft_update_interval_ms)
+                    .with_webhook(
+                        tg.webhook_url.clone(),
+                        tg.webhook_listen_addr.clone(),
+                        tg.webhook_path.clone(),
+                        tg.webhook_secret_token.clone(),
+                    )
                     .with_transcription(config.transcription.clone())
                     .with_tts(config.tts.clone())
                     .with_workspace_dir(config.workspace_dir.clone())
@@ -4428,6 +4363,7 @@ fn collect_configured_channels(
         }
     }
 
+    #[cfg(feature = "channel-imessage")]
     if let Some(ref im) = config.channels_config.imessage {
         if im.enabled {
             channels.push(ConfiguredChannel {
@@ -4579,6 +4515,7 @@ fn collect_configured_channels(
         }
     }
 
+    #[cfg(feature = "channel-linq")]
     if let Some(ref lq) = config.channels_config.linq {
         if lq.enabled {
             channels.push(ConfiguredChannel {
@@ -4594,6 +4531,7 @@ fn collect_configured_channels(
         }
     }
 
+    #[cfg(feature = "channel-wati")]
     if let Some(ref wati_cfg) = config.channels_config.wati {
         if wati_cfg.enabled {
             let wati_channel = WatiChannel::new_with_proxy(
@@ -4649,6 +4587,7 @@ fn collect_configured_channels(
         });
     }
 
+    #[cfg(feature = "channel-irc")]
     if let Some(ref irc) = config.channels_config.irc {
         if irc.enabled {
             channels.push(ConfiguredChannel {
@@ -4669,62 +4608,6 @@ fn collect_configured_channels(
         } else {
             tracing::info!("IRC channel configured but disabled (enabled = false)");
         }
-    }
-
-    #[cfg(feature = "channel-lark")]
-    if let Some(ref lk) = config.channels_config.lark {
-        if lk.enabled {
-            if lk.use_feishu {
-                if config.channels_config.feishu.is_some() {
-                    tracing::warn!(
-                        "Both [channels_config.feishu] and legacy [channels_config.lark].use_feishu=true are configured; ignoring legacy Feishu fallback in lark."
-                    );
-                } else {
-                    tracing::warn!(
-                        "Using legacy [channels_config.lark].use_feishu=true compatibility path; prefer [channels_config.feishu]."
-                    );
-                    channels.push(ConfiguredChannel {
-                        display_name: "Feishu",
-                        channel: Arc::new(
-                            LarkChannel::from_config(lk)
-                                .with_transcription(config.transcription.clone()),
-                        ),
-                    });
-                }
-            } else {
-                channels.push(ConfiguredChannel {
-                    display_name: "Lark",
-                    channel: Arc::new(
-                        LarkChannel::from_lark_config(lk)
-                            .with_transcription(config.transcription.clone()),
-                    ),
-                });
-            }
-        } else {
-            tracing::info!("Lark channel configured but disabled (enabled = false)");
-        }
-    }
-
-    #[cfg(feature = "channel-lark")]
-    if let Some(ref fs) = config.channels_config.feishu {
-        if fs.enabled {
-            channels.push(ConfiguredChannel {
-                display_name: "Feishu",
-                channel: Arc::new(
-                    LarkChannel::from_feishu_config(fs)
-                        .with_transcription(config.transcription.clone()),
-                ),
-            });
-        } else {
-            tracing::info!("Feishu channel configured but disabled (enabled = false)");
-        }
-    }
-
-    #[cfg(not(feature = "channel-lark"))]
-    if config.channels_config.lark.is_some() || config.channels_config.feishu.is_some() {
-        tracing::warn!(
-            "Lark/Feishu channel is configured but this build was compiled without `channel-lark`; skipping Lark/Feishu health check."
-        );
     }
 
     #[cfg(feature = "channel-line")]
@@ -4748,43 +4631,7 @@ fn collect_configured_channels(
         );
     }
 
-    if let Some(ref dt) = config.channels_config.dingtalk {
-        if dt.enabled {
-            channels.push(ConfiguredChannel {
-                display_name: "DingTalk",
-                channel: Arc::new(
-                    DingTalkChannel::new(
-                        dt.client_id.clone(),
-                        dt.client_secret.clone(),
-                        dt.allowed_users.clone(),
-                    )
-                    .with_proxy_url(dt.proxy_url.clone()),
-                ),
-            });
-        } else {
-            tracing::info!("DingTalk channel configured but disabled (enabled = false)");
-        }
-    }
-
-    if let Some(ref qq) = config.channels_config.qq {
-        if qq.enabled {
-            channels.push(ConfiguredChannel {
-                display_name: "QQ",
-                channel: Arc::new(
-                    QQChannel::new(
-                        qq.app_id.clone(),
-                        qq.app_secret.clone(),
-                        qq.allowed_users.clone(),
-                    )
-                    .with_workspace_dir(config.workspace_dir.clone())
-                    .with_proxy_url(qq.proxy_url.clone()),
-                ),
-            });
-        } else {
-            tracing::info!("QQ channel configured but disabled (enabled = false)");
-        }
-    }
-
+    #[cfg(feature = "channel-twitter")]
     if let Some(ref tw) = config.channels_config.twitter {
         channels.push(ConfiguredChannel {
             display_name: "X/Twitter",
@@ -4795,32 +4642,7 @@ fn collect_configured_channels(
         });
     }
 
-    if let Some(ref mc) = config.channels_config.mochat {
-        channels.push(ConfiguredChannel {
-            display_name: "Mochat",
-            channel: Arc::new(MochatChannel::new(
-                mc.api_url.clone(),
-                mc.api_token.clone(),
-                mc.allowed_users.clone(),
-                mc.poll_interval_secs,
-            )),
-        });
-    }
-
-    if let Some(ref wc) = config.channels_config.wecom {
-        if wc.enabled {
-            channels.push(ConfiguredChannel {
-                display_name: "WeCom",
-                channel: Arc::new(WeComChannel::new(
-                    wc.webhook_key.clone(),
-                    wc.allowed_users.clone(),
-                )),
-            });
-        } else {
-            tracing::info!("WeCom channel configured but disabled (enabled = false)");
-        }
-    }
-
+    #[cfg(feature = "channel-clawdtalk")]
     if let Some(ref ct) = config.channels_config.clawdtalk {
         if ct.enabled {
             channels.push(ConfiguredChannel {
@@ -4860,6 +4682,7 @@ fn collect_configured_channels(
         }
     }
 
+    #[cfg(feature = "channel-reddit")]
     if let Some(ref rd) = config.channels_config.reddit {
         channels.push(ConfiguredChannel {
             display_name: "Reddit",
@@ -4873,6 +4696,7 @@ fn collect_configured_channels(
         });
     }
 
+    #[cfg(feature = "channel-bluesky")]
     if let Some(ref bs) = config.channels_config.bluesky {
         channels.push(ConfiguredChannel {
             display_name: "Bluesky",
@@ -11411,6 +11235,10 @@ This is an example JSON object for profile settings."#;
             mention_only: false,
             ack_reactions: None,
             proxy_url: None,
+            webhook_url: None,
+            webhook_listen_addr: "0.0.0.0:8443".to_string(),
+            webhook_path: "/telegram/webhook".to_string(),
+            webhook_secret_token: None,
         });
         match build_channel_by_id(&config, "telegram") {
             Ok(channel) => assert_eq!(channel.name(), "telegram"),

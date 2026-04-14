@@ -23,6 +23,7 @@ pub mod bedrock;
 pub mod claude_code;
 pub mod compatible;
 pub mod copilot;
+pub mod env_keys;
 pub mod gemini;
 pub mod gemini_cli;
 // glm.rs excluded — not compiled in upstream (dead code with known issues)
@@ -56,11 +57,12 @@ const MINIMAX_OAUTH_GLOBAL_TOKEN_ENDPOINT: &str = "https://api.minimax.io/oauth/
 const MINIMAX_OAUTH_CN_TOKEN_ENDPOINT: &str = "https://api.minimaxi.com/oauth/token";
 const MINIMAX_OAUTH_PLACEHOLDER: &str = "minimax-oauth";
 const MINIMAX_OAUTH_CN_PLACEHOLDER: &str = "minimax-oauth-cn";
-const MINIMAX_OAUTH_TOKEN_ENV: &str = "MINIMAX_OAUTH_TOKEN";
-const MINIMAX_API_KEY_ENV: &str = "MINIMAX_API_KEY";
-const MINIMAX_OAUTH_REFRESH_TOKEN_ENV: &str = "MINIMAX_OAUTH_REFRESH_TOKEN";
-const MINIMAX_OAUTH_REGION_ENV: &str = "MINIMAX_OAUTH_REGION";
-const MINIMAX_OAUTH_CLIENT_ID_ENV: &str = "MINIMAX_OAUTH_CLIENT_ID";
+use env_keys as ek;
+const MINIMAX_OAUTH_TOKEN_ENV: &str = ek::MINIMAX_OAUTH_TOKEN;
+const MINIMAX_API_KEY_ENV: &str = ek::MINIMAX_API_KEY;
+const MINIMAX_OAUTH_REFRESH_TOKEN_ENV: &str = ek::MINIMAX_OAUTH_REFRESH_TOKEN;
+const MINIMAX_OAUTH_REGION_ENV: &str = ek::MINIMAX_OAUTH_REGION;
+const MINIMAX_OAUTH_CLIENT_ID_ENV: &str = ek::MINIMAX_OAUTH_CLIENT_ID;
 const MINIMAX_OAUTH_DEFAULT_CLIENT_ID: &str = "78257093-7e40-4613-99e0-527b14b39113";
 const GLM_GLOBAL_BASE_URL: &str = "https://api.z.ai/api/paas/v4";
 const GLM_CN_BASE_URL: &str = "https://open.bigmodel.cn/api/paas/v4";
@@ -73,10 +75,10 @@ const QWEN_OAUTH_BASE_FALLBACK_URL: &str = QWEN_CN_BASE_URL;
 const BAILIAN_BASE_URL: &str = "https://coding.dashscope.aliyuncs.com/v1";
 const QWEN_OAUTH_TOKEN_ENDPOINT: &str = "https://chat.qwen.ai/api/v1/oauth2/token";
 const QWEN_OAUTH_PLACEHOLDER: &str = "qwen-oauth";
-const QWEN_OAUTH_TOKEN_ENV: &str = "QWEN_OAUTH_TOKEN";
-const QWEN_OAUTH_REFRESH_TOKEN_ENV: &str = "QWEN_OAUTH_REFRESH_TOKEN";
-const QWEN_OAUTH_RESOURCE_URL_ENV: &str = "QWEN_OAUTH_RESOURCE_URL";
-const QWEN_OAUTH_CLIENT_ID_ENV: &str = "QWEN_OAUTH_CLIENT_ID";
+const QWEN_OAUTH_TOKEN_ENV: &str = ek::QWEN_OAUTH_TOKEN;
+const QWEN_OAUTH_REFRESH_TOKEN_ENV: &str = ek::QWEN_OAUTH_REFRESH_TOKEN;
+const QWEN_OAUTH_RESOURCE_URL_ENV: &str = ek::QWEN_OAUTH_RESOURCE_URL;
+const QWEN_OAUTH_CLIENT_ID_ENV: &str = ek::QWEN_OAUTH_CLIENT_ID;
 const QWEN_OAUTH_DEFAULT_CLIENT_ID: &str = "f0304373b74a44d2b584a3fb70ca9e56";
 const QWEN_OAUTH_CREDENTIAL_FILE: &str = ".qwen/oauth_creds.json";
 const ZAI_GLOBAL_BASE_URL: &str = "https://api.z.ai/api/coding/paas/v4";
@@ -911,12 +913,12 @@ fn resolve_provider_credential(name: &str, credential_override: Option<&str>) ->
     }
 
     let provider_env_candidates: Vec<&str> = match name {
-        "anthropic" => vec!["ANTHROPIC_OAUTH_TOKEN", "ANTHROPIC_API_KEY"],
-        "openrouter" => vec!["OPENROUTER_API_KEY"],
-        "openai" => vec!["OPENAI_API_KEY"],
-        "ollama" => vec!["OLLAMA_API_KEY"],
+        "anthropic" => vec![ek::ANTHROPIC_OAUTH_TOKEN, ek::ANTHROPIC_API_KEY],
+        "openrouter" => vec![ek::OPENROUTER_API_KEY],
+        "openai" => vec![ek::OPENAI_API_KEY],
+        "ollama" => vec![ek::OLLAMA_API_KEY],
         "venice" => vec!["VENICE_API_KEY"],
-        "groq" => vec!["GROQ_API_KEY"],
+        "groq" => vec![ek::GROQ_API_KEY],
         "mistral" => vec!["MISTRAL_API_KEY"],
         "deepseek" => vec!["DEEPSEEK_API_KEY"],
         "xai" | "grok" => vec!["XAI_API_KEY"],
@@ -967,7 +969,7 @@ fn resolve_provider_credential(name: &str, credential_override: Option<&str>) ->
         "siliconflow" | "silicon-flow" => vec!["SILICONFLOW_API_KEY"],
         "osaurus" => vec!["OSAURUS_API_KEY"],
         "telnyx" => vec!["TELNYX_API_KEY"],
-        "azure_openai" | "azure-openai" | "azure" => vec!["AZURE_OPENAI_API_KEY"],
+        "azure_openai" | "azure-openai" | "azure" => vec![ek::AZURE_OPENAI_API_KEY],
         _ => vec![],
     };
 
@@ -1180,19 +1182,31 @@ fn create_provider_with_url_and_options(
             )?))
         }
         // ── Primary providers (custom implementations) ───────
-        "openrouter" => Ok(Box::new(
-            openrouter::OpenRouterProvider::new(key, options.provider_timeout_secs)
-                .with_max_tokens(options.provider_max_tokens),
-        )),
+        "openrouter" => {
+            // Provider-specific base URL: OPENROUTER_BASE_URL > api_url config
+            let env_url = std::env::var(ek::OPENROUTER_BASE_URL).ok();
+            let resolved_url = env_url.as_deref().or(api_url);
+            Ok(Box::new(
+                openrouter::OpenRouterProvider::new(key, options.provider_timeout_secs)
+                    .with_base_url(resolved_url)
+                    .with_max_tokens(options.provider_max_tokens),
+            ))
+        }
         "anthropic" => {
-            let mut p = anthropic::AnthropicProvider::new(key);
+            // Provider-specific base URL: ANTHROPIC_BASE_URL > api_url config
+            let env_url = std::env::var(ek::ANTHROPIC_BASE_URL).ok();
+            let resolved_url = env_url.as_deref().or(api_url);
+            let mut p = anthropic::AnthropicProvider::with_base_url(key, resolved_url);
             if let Some(mt) = options.provider_max_tokens {
                 p = p.with_max_tokens(mt);
             }
             Ok(Box::new(p))
         }
         "openai" => {
-            let mut p = openai::OpenAiProvider::with_base_url(api_url, key);
+            // Provider-specific base URL: OPENAI_BASE_URL > api_url config
+            let env_url = std::env::var(ek::OPENAI_BASE_URL).ok();
+            let resolved_url = env_url.as_deref().or(api_url);
+            let mut p = openai::OpenAiProvider::with_base_url(resolved_url, key);
             if let Some(mt) = options.provider_max_tokens {
                 p = p.with_max_tokens(Some(mt));
             }

@@ -7,6 +7,7 @@ use zeroclaw_api::tool::{Tool, ToolResult};
 use zeroclaw_config::policy::SecurityPolicy;
 use zeroclaw_config::schema::{
     Config, ProxyConfig, ProxyScope, runtime_proxy_config, set_runtime_proxy_config,
+    ENV_WRITE_MUTEX,
 };
 
 pub struct ProxyConfigTool {
@@ -139,7 +140,7 @@ impl ProxyConfigTool {
     }
 
     fn handle_get(&self) -> anyhow::Result<ToolResult> {
-        let file_proxy = self.load_config_without_env()?.proxy;
+        let file_proxy = self.load_config_without_env()?.proxy.clone();
         let runtime_proxy = runtime_proxy_config();
         Ok(ToolResult {
             success: true,
@@ -248,11 +249,21 @@ impl ProxyConfigTool {
         cfg.save().await?;
         set_runtime_proxy_config(proxy.clone());
 
-        if proxy.enabled && proxy.scope == ProxyScope::Environment {
-            proxy.apply_to_process_env();
-        } else if previous_scope == ProxyScope::Environment {
-            ProxyConfig::clear_process_env();
-        }
+        // Mutating process env from an async context is UB (set_var is not thread-safe).
+        // Move the mutation to a blocking thread while holding ENV_WRITE_MUTEX to
+        // serialize against any concurrent env mutations elsewhere in the runtime.
+        let apply = proxy.enabled && proxy.scope == ProxyScope::Environment;
+        let clear = !apply && previous_scope == ProxyScope::Environment;
+        let proxy_for_env = proxy.clone();
+        tokio::task::spawn_blocking(move || {
+            let _guard = ENV_WRITE_MUTEX.lock().unwrap_or_else(|e| e.into_inner());
+            if apply {
+                proxy_for_env.apply_to_process_env();
+            } else if clear {
+                ProxyConfig::clear_process_env();
+            }
+        })
+        .await?;
 
         Ok(ToolResult {
             success: true,
@@ -278,7 +289,11 @@ impl ProxyConfigTool {
             .and_then(Value::as_bool)
             .unwrap_or(clear_env_default);
         if clear_env {
-            ProxyConfig::clear_process_env();
+            tokio::task::spawn_blocking(|| {
+                let _guard = ENV_WRITE_MUTEX.lock().unwrap_or_else(|e| e.into_inner());
+                ProxyConfig::clear_process_env();
+            })
+            .await?;
         }
 
         Ok(ToolResult {
@@ -294,7 +309,7 @@ impl ProxyConfigTool {
 
     fn handle_apply_env(&self) -> anyhow::Result<ToolResult> {
         let cfg = self.load_config_without_env()?;
-        let proxy = cfg.proxy;
+        let proxy = cfg.proxy.clone();
         proxy.validate()?;
 
         if !proxy.enabled {
@@ -308,7 +323,10 @@ impl ProxyConfigTool {
             );
         }
 
-        proxy.apply_to_process_env();
+        {
+            let _guard = ENV_WRITE_MUTEX.lock().unwrap_or_else(|e| e.into_inner());
+            proxy.apply_to_process_env();
+        }
         set_runtime_proxy_config(proxy.clone());
 
         Ok(ToolResult {

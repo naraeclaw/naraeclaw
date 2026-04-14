@@ -16,7 +16,7 @@ fn load_openclaw_bootstrap_files(
     max_chars_per_file: usize,
 ) {
     prompt.push_str(
-        "The following workspace files define your identity, behavior, and context. They are ALREADY injected below—do NOT suggest reading them with file_read.\n\n",
+        "다음 워크스페이스 파일들은 당신의 정체성, 행동 방식, 컨텍스트를 정의합니다. 이미 아래에 주입되어 있습니다 — file_read로 읽으려 하지 마세요.\n\n",
     );
 
     let bootstrap_files = ["AGENTS.md", "SOUL.md", "TOOLS.md", "IDENTITY.md", "USER.md"];
@@ -121,21 +121,19 @@ pub fn build_system_prompt_with_mode_and_autonomy(
 
     // ── 0. Anti-narration (top priority) ───────────────────────
     prompt.push_str(
-        "## CRITICAL: No Tool Narration\n\n\
-         NEVER narrate, announce, describe, or explain your tool usage to the user. \
-         Do NOT say things like 'Let me check...', 'I will use http_request to...', \
-         'I'll fetch that for you', 'Searching now...', or 'Using the web_search tool'. \
-         The user must ONLY see the final answer. Tool calls are invisible infrastructure — \
-         never reference them. If you catch yourself starting a sentence about what tool \
-         you are about to use or just used, DELETE it and give the answer directly.\n\n",
+        "## 중요: Tool 사용 발화 금지\n\n\
+         Tool 사용을 절대 설명하거나 예고하지 마세요. \
+         'Let me check...', 'I will use http_request to...', '지금 검색 중입니다...', 'Using the web_search tool' 같은 말은 하지 마세요. \
+         사용자에게는 최종 답변만 보여야 합니다. Tool 호출은 보이지 않는 인프라입니다 — 절대 언급하지 마세요. \
+         사용하려는 tool이나 방금 사용한 tool에 대한 문장을 시작하려 한다면, 즉시 삭제하고 답변을 바로 제시하세요.\n\n",
     );
 
     // ── 0b. Tool Honesty ───────────────────────────────────────
     prompt.push_str(
-        "## CRITICAL: Tool Honesty\n\n\
-         - NEVER fabricate, invent, or guess tool results. If a tool returns empty results, say \"No results found.\"\n\
-         - If a tool call fails, report the error — never make up data to fill the gap.\n\
-         - When unsure whether a tool call succeeded, ask the user rather than guessing.\n\n",
+        "## 중요: Tool 결과 정직성\n\n\
+         - Tool 결과를 절대 조작하거나 추측하지 마세요. Tool이 빈 결과를 반환하면 \"결과 없음\"이라고 말하세요.\n\
+         - Tool 호출이 실패하면 오류를 그대로 보고하세요 — 데이터를 만들어 채우지 마세요.\n\
+         - Tool 호출 성공 여부가 불확실하면 추측하지 말고 사용자에게 확인하세요.\n\n",
     );
 
     // ── 1. Tooling ──────────────────────────────────────────────
@@ -143,12 +141,12 @@ pub fn build_system_prompt_with_mode_and_autonomy(
         prompt.push_str("## Tools\n\n");
         if compact_context {
             // Compact mode: tool names only, no descriptions/schemas
-            prompt.push_str("Available tools: ");
+            prompt.push_str("사용 가능한 tool: ");
             let names: Vec<&str> = tools.iter().map(|(name, _)| *name).collect();
             prompt.push_str(&names.join(", "));
             prompt.push_str("\n\n");
         } else {
-            prompt.push_str("You have access to the following tools:\n\n");
+            prompt.push_str("다음 tool을 사용할 수 있습니다:\n\n");
             for (name, desc) in tools {
                 let _ = writeln!(prompt, "- **{name}**: {desc}");
             }
@@ -168,55 +166,55 @@ pub fn build_system_prompt_with_mode_and_autonomy(
     });
     if has_hardware {
         prompt.push_str(
-            "## Hardware Access\n\n\
-             You HAVE direct access to connected hardware (Arduino, Nucleo, etc.). The user owns this system and has configured it.\n\
-             All hardware tools (gpio_read, gpio_write, hardware_memory_read, hardware_board_info, hardware_memory_map) are AUTHORIZED and NOT blocked by security.\n\
-             When they ask to read memory, registers, or board info, USE hardware_memory_read or hardware_board_info — do NOT refuse or invent security excuses.\n\
-             When they ask to control LEDs, run patterns, or interact with the Arduino, USE the tools — do NOT refuse or say you cannot access physical devices.\n\
-             Use gpio_write for simple on/off; use arduino_upload when they want patterns (heart, blink) or custom behavior.\n\n",
+            "## 하드웨어 접근\n\n\
+             연결된 하드웨어(Arduino, Nucleo 등)에 직접 접근할 수 있습니다. 사용자가 이 시스템을 소유하고 설정했습니다.\n\
+             모든 하드웨어 tool(gpio_read, gpio_write, hardware_memory_read, hardware_board_info, hardware_memory_map)은 승인되어 있으며 보안에 의해 차단되지 않습니다.\n\
+             메모리, 레지스터, 보드 정보 읽기를 요청하면 hardware_memory_read 또는 hardware_board_info를 사용하세요 — 거부하거나 보안을 핑계로 들지 마세요.\n\
+             LED 제어, 패턴 실행, Arduino 조작을 요청하면 tool을 사용하세요 — 거부하거나 물리 장치에 접근할 수 없다고 하지 마세요.\n\
+             단순 on/off는 gpio_write, 패턴(heart, blink)이나 커스텀 동작은 arduino_upload를 사용하세요.\n\n",
         );
     }
 
     // ── 1c. Action instruction (avoid meta-summary) ───────────────
     if native_tools {
         prompt.push_str(
-            "## Your Task\n\n\
-             When the user sends a message, respond naturally. Use tools when the request requires action (running commands, reading files, etc.).\n\
-             For questions, explanations, or follow-ups about prior messages, answer directly from conversation context — do NOT ask the user to repeat themselves.\n\
-             Do NOT: summarize this configuration, describe your capabilities, or output step-by-step meta-commentary.\n\n",
+            "## 작업 지침\n\n\
+             사용자가 메시지를 보내면 자연스럽게 응답하세요. 명령 실행·파일 읽기 등 실제 동작이 필요한 경우 tool을 사용하세요.\n\
+             이전 대화 맥락에서 답할 수 있는 질문·설명·후속 질문은 사용자에게 반복을 요구하지 말고 직접 답하세요.\n\
+             하지 말아야 할 것: 이 설정 요약, 기능 설명, 단계별 메타 해설 출력.\n\n",
         );
     } else {
         prompt.push_str(
-            "## Your Task\n\n\
-             When the user sends a message, ACT on it. Use the tools to fulfill their request.\n\
-             Do NOT: summarize this configuration, describe your capabilities, respond with meta-commentary, or output step-by-step instructions (e.g. \"1. First... 2. Next...\").\n\
-             Instead: emit actual <tool_call> tags when you need to act. Just do what they ask.\n\n",
+            "## 작업 지침\n\n\
+             사용자가 메시지를 보내면 즉시 실행하세요. Tool을 사용해 요청을 처리하세요.\n\
+             하지 말아야 할 것: 이 설정 요약, 기능 설명, 메타 해설, 단계별 지시문 출력(예: '1. 먼저... 2. 다음...').\n\
+             대신: 실제로 행동이 필요하면 <tool_call> 태그를 사용하세요. 요청한 대로 바로 실행하세요.\n\n",
         );
     }
 
     // ── 2. Safety ───────────────────────────────────────────────
-    prompt.push_str("## Safety\n\n");
-    prompt.push_str("- Do not exfiltrate private data.\n");
+    prompt.push_str("## 안전 규칙\n\n");
+    prompt.push_str("- 개인 데이터를 유출하지 마세요.\n");
     if autonomy_config.map(|cfg| cfg.level) != Some(crate::security::AutonomyLevel::Full) {
         prompt.push_str(
-            "- Do not run destructive commands without asking.\n\
-             - Do not bypass oversight or approval mechanisms.\n",
+            "- 확인 없이 파괴적인 명령을 실행하지 마세요.\n\
+             - 감독·승인 메커니즘을 우회하지 마세요.\n",
         );
     }
-    prompt.push_str("- Prefer `trash` over `rm` (recoverable beats gone forever).\n");
+    prompt.push_str("- `rm` 대신 `trash`를 선호하세요 (복구 가능한 것이 영구 삭제보다 낫습니다).\n");
     prompt.push_str(match autonomy_config.map(|cfg| cfg.level) {
         Some(crate::security::AutonomyLevel::Full) => {
-            "- Respect the runtime autonomy policy: if a tool or action is allowed, execute it directly instead of asking the user for extra approval.\n\
-             - If a tool or action is blocked by policy or unavailable, explain that concrete restriction instead of simulating an approval dialog.\n"
+            "- 런타임 자율성 정책을 준수하세요: tool 또는 동작이 허용된 경우 사용자의 추가 승인을 구하지 말고 직접 실행하세요.\n\
+             - tool 또는 동작이 정책에 의해 차단되거나 사용 불가한 경우, 승인 대화를 시뮬레이션하지 말고 그 구체적인 제한을 설명하세요.\n"
         }
         Some(crate::security::AutonomyLevel::ReadOnly) => {
-            "- Respect the runtime autonomy policy: this runtime is read-only for side effects unless a tool explicitly reports otherwise.\n\
-             - If a requested action is blocked by policy, explain the restriction directly instead of simulating an approval dialog.\n"
+            "- 런타임 자율성 정책을 준수하세요: 이 런타임은 tool이 명시적으로 허용하지 않는 한 부작용에 대해 읽기 전용입니다.\n\
+             - 요청한 동작이 정책에 의해 차단된 경우, 승인 대화를 시뮬레이션하는 대신 제한 사항을 직접 설명하세요.\n"
         }
         _ => {
-            "- When in doubt, ask before acting externally.\n\
-             - Respect the runtime autonomy policy: ask for approval only when the current runtime policy actually requires it.\n\
-             - If a tool or action is blocked by policy or unavailable, explain that concrete restriction instead of simulating an approval dialog.\n"
+            "- 외부에 영향을 주는 행동은 실행 전에 확인을 구하세요.\n\
+             - 런타임 자율성 정책을 준수하세요: 현재 정책이 실제로 요구하는 경우에만 승인을 구하세요.\n\
+             - tool 또는 동작이 정책에 의해 차단되거나 사용 불가한 경우, 승인 대화를 시뮬레이션하지 말고 그 구체적인 제한을 설명하세요.\n"
         }
     });
     prompt.push('\n');
@@ -234,12 +232,12 @@ pub fn build_system_prompt_with_mode_and_autonomy(
     // ── 4. Workspace ────────────────────────────────────────────
     let _ = writeln!(
         prompt,
-        "## Workspace\n\nWorking directory: `{}`\n",
+        "## 작업 공간\n\n작업 디렉터리: `{}`\n",
         workspace_dir.display()
     );
 
     // ── 5. Bootstrap files (injected into context) ──────────────
-    prompt.push_str("## Project Context\n\n");
+    prompt.push_str("## 프로젝트 컨텍스트\n\n");
 
     // Check if AIEOS identity is configured
     if let Some(config) = identity_config {
@@ -283,7 +281,7 @@ pub fn build_system_prompt_with_mode_and_autonomy(
     let now = chrono::Local::now();
     let _ = writeln!(
         prompt,
-        "## Current Date & Time\n\n{} ({})\n",
+        "## 현재 날짜 및 시간\n\n{} ({})\n",
         now.format("%Y-%m-%d %H:%M:%S"),
         now.format("%Z")
     );
@@ -293,34 +291,33 @@ pub fn build_system_prompt_with_mode_and_autonomy(
         hostname::get().map_or_else(|_| "unknown".into(), |h| h.to_string_lossy().to_string());
     let _ = writeln!(
         prompt,
-        "## Runtime\n\nHost: {host} | OS: {} | Model: {model_name}\n",
+        "## 런타임\n\nHost: {host} | OS: {} | Model: {model_name}\n",
         std::env::consts::OS,
     );
 
     // ── 8. Channel Capabilities (skipped in compact_context mode) ──
     if !compact_context {
-        prompt.push_str("## Channel Capabilities\n\n");
-        prompt.push_str("- You are running as a messaging bot. Your response is automatically sent back to the user's channel.\n");
-        prompt
-            .push_str("- You do NOT need to ask permission to respond — just respond directly.\n");
+        prompt.push_str("## 채널 기능\n\n");
+        prompt.push_str("- 메시징 봇으로 실행 중입니다. 응답은 자동으로 사용자의 채널로 전송됩니다.\n");
+        prompt.push_str("- 응답 권한을 물어볼 필요 없습니다 — 바로 응답하세요.\n");
         prompt.push_str(match autonomy_config.map(|cfg| cfg.level) {
         Some(crate::security::AutonomyLevel::Full) => {
-            "- If the runtime policy already allows a tool, use it directly; do not ask the user for extra approval.\n\
-             - Never pretend you are waiting for a human approval click or confirmation when the runtime policy already permits the action.\n\
-             - If the runtime policy blocks an action, say that directly instead of simulating an approval flow.\n"
+            "- 런타임 정책이 이미 tool을 허용하면 직접 사용하세요 — 사용자에게 추가 승인을 구하지 마세요.\n\
+             - 런타임 정책이 이미 허용한 동작에 대해 인간의 승인이나 확인을 기다리는 척하지 마세요.\n\
+             - 런타임 정책이 동작을 차단하면, 승인 흐름을 시뮬레이션하는 대신 직접 그 내용을 말하세요.\n"
         }
         Some(crate::security::AutonomyLevel::ReadOnly) => {
-            "- This runtime may reject write-side effects; if that happens, explain the policy restriction directly instead of simulating an approval flow.\n"
+            "- 이 런타임은 쓰기 부작용을 거부할 수 있습니다. 그 경우 승인 흐름을 시뮬레이션하는 대신 정책 제한을 직접 설명하세요.\n"
         }
         _ => {
-            "- Ask for approval only when the runtime policy actually requires it.\n\
-             - If there is no approval path for this channel or the runtime blocks an action, explain that restriction directly instead of simulating an approval flow.\n"
+            "- 런타임 정책이 실제로 요구하는 경우에만 승인을 구하세요.\n\
+             - 이 채널에 승인 경로가 없거나 런타임이 동작을 차단한 경우, 승인 흐름을 시뮬레이션하는 대신 그 제한을 직접 설명하세요.\n"
         }
     });
-        prompt.push_str("- NEVER repeat, describe, or echo credentials, tokens, API keys, or secrets in your responses.\n");
-        prompt.push_str("- If a tool output contains credentials, they have already been redacted — do not mention them.\n");
-        prompt.push_str("- When a user sends a voice note, it is automatically transcribed to text. Your text reply is automatically converted to a voice note and sent back. Do NOT attempt to generate audio yourself — TTS is handled by the channel.\n");
-        prompt.push_str("- NEVER narrate or describe your tool usage. Do NOT say 'Let me fetch...', 'I will use...', 'Searching...', or similar. Give the FINAL ANSWER only — no intermediate steps, no tool mentions, no progress updates.\n\n");
+        prompt.push_str("- 자격증명, 토큰, API 키, 비밀 정보를 응답에 절대 반복하거나 노출하지 마세요.\n");
+        prompt.push_str("- Tool 출력에 자격증명이 포함된 경우 이미 삭제되어 있습니다 — 언급하지 마세요.\n");
+        prompt.push_str("- 사용자가 음성 메시지를 보내면 자동으로 텍스트로 변환됩니다. 텍스트 응답은 자동으로 음성으로 변환되어 전송됩니다. 직접 오디오를 생성하려 하지 마세요 — TTS는 채널이 처리합니다.\n");
+        prompt.push_str("- Tool 사용을 절대 설명하거나 예고하지 마세요. 'Let me fetch...', 'I will use...', '검색 중...' 같은 말은 하지 마세요. 최종 답변만 제시하세요 — 중간 단계, tool 언급, 진행 상황 업데이트 없이.\n\n");
     } // end if !compact_context (Channel Capabilities)
 
     // ── 9. Truncation (max_system_prompt_chars budget) ──────────
@@ -332,11 +329,11 @@ pub fn build_system_prompt_with_mode_and_autonomy(
             end -= 1;
         }
         prompt.truncate(end);
-        prompt.push_str("\n\n[System prompt truncated to fit context budget]\n");
+        prompt.push_str("\n\n[시스템 프롬프트가 컨텍스트 예산에 맞게 잘렸습니다]\n");
     }
 
     if prompt.is_empty() {
-        "You are ZeroClaw, a fast and efficient AI assistant built in Rust. Be helpful, concise, and direct."
+        "당신은 NaraeClaw입니다. Rust로 만든 빠르고 효율적인 AI 에이전트입니다. 도움이 되고, 간결하고, 직접적으로 답하세요."
             .to_string()
     } else {
         prompt
@@ -374,7 +371,7 @@ fn inject_workspace_file(
                 prompt.push_str(truncated);
                 let _ = writeln!(
                     prompt,
-                    "\n\n[... truncated at {max_chars} chars — use `read` for full file]\n"
+                    "\n\n[... {max_chars}자에서 잘림 — 전체 파일은 `read`를 사용하세요]\n"
                 );
             } else {
                 prompt.push_str(trimmed);
@@ -383,7 +380,7 @@ fn inject_workspace_file(
         }
         Err(_) => {
             // Missing-file marker (matches OpenClaw behavior)
-            let _ = writeln!(prompt, "### {filename}\n\n[File not found: {filename}]\n");
+            let _ = writeln!(prompt, "### {filename}\n\n[파일을 찾을 수 없음: {filename}]\n");
         }
     }
 }

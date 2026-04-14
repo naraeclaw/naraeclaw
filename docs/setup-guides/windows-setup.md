@@ -19,7 +19,7 @@ You can also pass flags to skip the interactive menu:
 |------|-------------|
 | `--prebuilt` | Download pre-compiled binary (fastest) |
 | `--minimal` | Build with default features only |
-| `--standard` | Build with Matrix + Lark/Feishu + Postgres |
+| `--standard` | Build with Matrix + Postgres |
 | `--full` | Build with all features |
 
 ### Option B: Scoop (package manager)
@@ -33,7 +33,7 @@ scoop install zeroclaw
 
 ```cmd
 rustup target add x86_64-pc-windows-msvc
-cargo build --release --locked --features channel-matrix,channel-lark --target x86_64-pc-windows-msvc
+cargo build --release --locked --features channel-matrix --target x86_64-pc-windows-msvc
 copy target\x86_64-pc-windows-msvc\release\zeroclaw.exe %USERPROFILE%\.zeroclaw\bin\
 ```
 
@@ -62,7 +62,6 @@ ZeroClaw uses Cargo feature flags to control which integrations are compiled in:
 
 | Feature | Description | Default? |
 |---------|-------------|----------|
-| `channel-lark` | Lark/Feishu messaging | Yes |
 | `channel-nostr` | Nostr protocol | Yes |
 | `observability-prometheus` | Prometheus metrics | Yes |
 | `skill-creation` | Auto skill creation | Yes |
@@ -75,7 +74,7 @@ ZeroClaw uses Cargo feature flags to control which integrations are compiled in:
 To build with specific features:
 
 ```cmd
-cargo build --release --locked --features channel-matrix,channel-lark --target x86_64-pc-windows-msvc
+cargo build --release --locked --features channel-matrix --target x86_64-pc-windows-msvc
 ```
 
 ## Post-Installation
@@ -96,14 +95,6 @@ Install Visual Studio Build Tools with the C++ workload. The MSVC linker is requ
 ### `cargo build` runs out of memory
 
 Source builds need at least 2 GB free RAM. Use `setup.bat --prebuilt` to download a pre-compiled binary instead.
-
-### Feishu/Lark not available
-
-Feishu and Lark are the same platform. Build with the `channel-lark` feature:
-
-```cmd
-cargo build --release --locked --features channel-lark --target x86_64-pc-windows-msvc
-```
 
 ### Web dashboard missing
 

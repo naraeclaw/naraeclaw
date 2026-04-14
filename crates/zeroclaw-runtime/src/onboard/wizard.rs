@@ -11,14 +11,13 @@ use std::time::Duration;
 use tokio::fs;
 use zeroclaw_config::schema::{
     AutonomyConfig, BrowserConfig, ChannelsConfig, ComposioConfig, Config, DiscordConfig,
-    HeartbeatConfig, IMessageConfig, LarkConfig, MatrixConfig, MemoryConfig, ObservabilityConfig,
+    HeartbeatConfig, IMessageConfig, MatrixConfig, MemoryConfig, ObservabilityConfig,
     RuntimeConfig, SecretsConfig, SlackConfig, StorageConfig, TelegramConfig, WebhookConfig,
 };
-use zeroclaw_config::schema::{
-    DingTalkConfig, IrcConfig, LarkReceiveMode, LinqConfig, NextcloudTalkConfig, QQConfig,
-    SignalConfig, StreamMode, WhatsAppConfig,
-};
 use zeroclaw_config::schema::{HardwareConfig, HardwareTransport};
+use zeroclaw_config::schema::{
+    IrcConfig, LinqConfig, NextcloudTalkConfig, SignalConfig, StreamMode, WhatsAppConfig,
+};
 #[cfg(feature = "channel-nostr")]
 use zeroclaw_config::schema::{NostrConfig, default_nostr_relays};
 use zeroclaw_memory::{
@@ -3189,10 +3188,11 @@ fn setup_tool_mode() -> Result<(ComposioConfig, SecretsConfig)> {
                 style("✓").green().bold(),
                 style("enabled").green()
             );
-            ComposioConfig {
-                enabled: true,
-                api_key: Some(api_key),
-                ..ComposioConfig::default()
+            {
+                let mut c = ComposioConfig::default();
+                c.enabled = true;
+                c.api_key = Some(api_key);
+                c
             }
         }
     } else {
@@ -3385,10 +3385,6 @@ enum ChannelMenuChoice {
     Irc,
     Webhook,
     NextcloudTalk,
-    DingTalk,
-    QqOfficial,
-    Lark,
-    Feishu,
     #[cfg(feature = "channel-nostr")]
     Nostr,
     Done,
@@ -3406,10 +3402,6 @@ const CHANNEL_MENU_CHOICES: &[ChannelMenuChoice] = &[
     ChannelMenuChoice::Irc,
     ChannelMenuChoice::Webhook,
     ChannelMenuChoice::NextcloudTalk,
-    ChannelMenuChoice::DingTalk,
-    ChannelMenuChoice::QqOfficial,
-    ChannelMenuChoice::Lark,
-    ChannelMenuChoice::Feishu,
     #[cfg(feature = "channel-nostr")]
     ChannelMenuChoice::Nostr,
     ChannelMenuChoice::Done,
@@ -3521,40 +3513,6 @@ fn setup_channels(
                         "✅ connected"
                     } else {
                         "— Talk webhook + OCS API"
-                    }
-                ),
-                ChannelMenuChoice::DingTalk => format!(
-                    "DingTalk   {}",
-                    if config.dingtalk.is_some() {
-                        "✅ connected"
-                    } else {
-                        "— DingTalk Stream Mode"
-                    }
-                ),
-                ChannelMenuChoice::QqOfficial => format!(
-                    "QQ Official {}",
-                    if config.qq.is_some() {
-                        "✅ connected"
-                    } else {
-                        "— Tencent QQ Bot"
-                    }
-                ),
-                ChannelMenuChoice::Lark => format!(
-                    "Lark       {}",
-                    if config.lark.as_ref().is_some_and(|cfg| !cfg.use_feishu) {
-                        "✅ connected"
-                    } else {
-                        "— Lark Bot"
-                    }
-                ),
-                ChannelMenuChoice::Feishu => format!(
-                    "Feishu     {}",
-                    if config.feishu.is_some()
-                        || config.lark.as_ref().is_some_and(|cfg| cfg.use_feishu)
-                    {
-                        "✅ connected"
-                    } else {
-                        "— Feishu Bot"
                     }
                 ),
                 #[cfg(feature = "channel-nostr")]
@@ -3704,6 +3662,14 @@ fn setup_channels(
                     mention_only: existing_tg.map(|t| t.mention_only).unwrap_or(false),
                     ack_reactions: existing_tg.and_then(|t| t.ack_reactions),
                     proxy_url: existing_tg.and_then(|t| t.proxy_url.clone()),
+                    webhook_url: existing_tg.and_then(|t| t.webhook_url.clone()),
+                    webhook_listen_addr: existing_tg
+                        .map(|t| t.webhook_listen_addr.clone())
+                        .unwrap_or_else(|| "0.0.0.0:8443".to_string()),
+                    webhook_path: existing_tg
+                        .map(|t| t.webhook_path.clone())
+                        .unwrap_or_else(|| "/telegram/webhook".to_string()),
+                    webhook_secret_token: existing_tg.and_then(|t| t.webhook_secret_token.clone()),
                 });
             }
             ChannelMenuChoice::Discord => {
@@ -4914,361 +4880,6 @@ fn setup_channels(
                 });
 
                 println!("  {} Nextcloud Talk configured", style("✅").green().bold());
-            }
-            ChannelMenuChoice::DingTalk => {
-                // ── DingTalk ──
-                println!();
-                println!(
-                    "  {} {}",
-                    style("DingTalk Setup").white().bold(),
-                    style("— DingTalk Stream Mode").dim()
-                );
-                print_bullet("1. Go to DingTalk developer console (open.dingtalk.com)");
-                print_bullet("2. Create an app and enable the Stream Mode bot");
-                print_bullet("3. Copy the Client ID (AppKey) and Client Secret (AppSecret)");
-                println!();
-
-                let client_id: String = Input::new()
-                    .with_prompt("  Client ID (AppKey)")
-                    .interact_text()?;
-
-                if client_id.trim().is_empty() {
-                    println!("  {} Skipped", style("→").dim());
-                    continue;
-                }
-
-                let client_secret: String = Input::new()
-                    .with_prompt("  Client Secret (AppSecret)")
-                    .interact_text()?;
-
-                // Test connection
-                print!("  {} Testing connection... ", style("⏳").dim());
-                let client = reqwest::blocking::Client::new();
-                let body = serde_json::json!({
-                    "clientId": client_id,
-                    "clientSecret": client_secret,
-                });
-                match client
-                    .post("https://api.dingtalk.com/v1.0/gateway/connections/open")
-                    .json(&body)
-                    .send()
-                {
-                    Ok(resp) if resp.status().is_success() => {
-                        println!(
-                            "\r  {} DingTalk credentials verified        ",
-                            style("✅").green().bold()
-                        );
-                    }
-                    _ => {
-                        println!(
-                            "\r  {} Connection failed — check your credentials",
-                            style("❌").red().bold()
-                        );
-                        continue;
-                    }
-                }
-
-                let users_str: String = Input::new()
-                    .with_prompt("  Allowed staff IDs (comma-separated, '*' for all)")
-                    .allow_empty(true)
-                    .interact_text()?;
-
-                let allowed_users: Vec<String> = users_str
-                    .split(',')
-                    .map(|s| s.trim().to_string())
-                    .filter(|s| !s.is_empty())
-                    .collect();
-
-                config.dingtalk = Some(DingTalkConfig {
-                    enabled: true,
-                    client_id,
-                    client_secret,
-                    allowed_users,
-                    proxy_url: config.dingtalk.as_ref().and_then(|d| d.proxy_url.clone()),
-                });
-            }
-            ChannelMenuChoice::QqOfficial => {
-                // ── QQ Official ──
-                println!();
-                println!(
-                    "  {} {}",
-                    style("QQ Official Setup").white().bold(),
-                    style("— Tencent QQ Bot SDK").dim()
-                );
-                print_bullet("1. Go to QQ Bot developer console (q.qq.com)");
-                print_bullet("2. Create a bot application");
-                print_bullet("3. Copy the App ID and App Secret");
-                println!();
-
-                let app_id: String = Input::new().with_prompt("  App ID").interact_text()?;
-
-                if app_id.trim().is_empty() {
-                    println!("  {} Skipped", style("→").dim());
-                    continue;
-                }
-
-                let app_secret: String =
-                    Input::new().with_prompt("  App Secret").interact_text()?;
-
-                // Test connection
-                print!("  {} Testing connection... ", style("⏳").dim());
-                let client = reqwest::blocking::Client::new();
-                let body = serde_json::json!({
-                    "appId": app_id,
-                    "clientSecret": app_secret,
-                });
-                match client
-                    .post("https://bots.qq.com/app/getAppAccessToken")
-                    .json(&body)
-                    .send()
-                {
-                    Ok(resp) if resp.status().is_success() => {
-                        let data: serde_json::Value = resp.json().unwrap_or_default();
-                        if data.get("access_token").is_some() {
-                            println!(
-                                "\r  {} QQ Bot credentials verified        ",
-                                style("✅").green().bold()
-                            );
-                        } else {
-                            println!(
-                                "\r  {} Auth error — check your credentials",
-                                style("❌").red().bold()
-                            );
-                            continue;
-                        }
-                    }
-                    _ => {
-                        println!(
-                            "\r  {} Connection failed — check your credentials",
-                            style("❌").red().bold()
-                        );
-                        continue;
-                    }
-                }
-
-                let users_str: String = Input::new()
-                    .with_prompt("  Allowed user IDs (comma-separated, '*' for all)")
-                    .allow_empty(true)
-                    .interact_text()?;
-
-                let allowed_users: Vec<String> = users_str
-                    .split(',')
-                    .map(|s| s.trim().to_string())
-                    .filter(|s| !s.is_empty())
-                    .collect();
-
-                config.qq = Some(QQConfig {
-                    enabled: true,
-                    app_id,
-                    app_secret,
-                    allowed_users,
-                    proxy_url: config.qq.as_ref().and_then(|q| q.proxy_url.clone()),
-                });
-            }
-            ChannelMenuChoice::Lark | ChannelMenuChoice::Feishu => {
-                let is_feishu = matches!(choice, ChannelMenuChoice::Feishu);
-                let provider_label = if is_feishu { "Feishu" } else { "Lark" };
-                let provider_host = if is_feishu {
-                    "open.feishu.cn"
-                } else {
-                    "open.larksuite.com"
-                };
-                let base_url = if is_feishu {
-                    "https://open.feishu.cn/open-apis"
-                } else {
-                    "https://open.larksuite.com/open-apis"
-                };
-
-                // ── Lark / Feishu ──
-                println!();
-                println!(
-                    "  {} {}",
-                    style(format!("{provider_label} Setup")).white().bold(),
-                    style(format!("— talk to ZeroClaw from {provider_label}")).dim()
-                );
-                print_bullet(&format!(
-                    "1. Go to {provider_label} Open Platform ({provider_host})"
-                ));
-                print_bullet("2. Create an app and enable 'Bot' capability");
-                print_bullet("3. Copy the App ID and App Secret");
-                println!();
-
-                let app_id: String = Input::new().with_prompt("  App ID").interact_text()?;
-                let app_id = app_id.trim().to_string();
-
-                if app_id.trim().is_empty() {
-                    println!("  {} Skipped", style("→").dim());
-                    continue;
-                }
-
-                let app_secret: String =
-                    Input::new().with_prompt("  App Secret").interact_text()?;
-                let app_secret = app_secret.trim().to_string();
-
-                if app_secret.is_empty() {
-                    println!("  {} App Secret is required", style("❌").red().bold());
-                    continue;
-                }
-
-                // Test connection (run entirely in separate thread — Response must be used/dropped there)
-                print!("  {} Testing connection... ", style("⏳").dim());
-                let app_id_clone = app_id.clone();
-                let app_secret_clone = app_secret.clone();
-                let endpoint = format!("{base_url}/auth/v3/tenant_access_token/internal");
-
-                let thread_result = std::thread::spawn(move || {
-                    let client = reqwest::blocking::Client::builder()
-                        .timeout(Duration::from_secs(8))
-                        .connect_timeout(Duration::from_secs(4))
-                        .build()
-                        .map_err(|err| format!("failed to build HTTP client: {err}"))?;
-                    let body = serde_json::json!({
-                        "app_id": app_id_clone,
-                        "app_secret": app_secret_clone,
-                    });
-
-                    let response = client
-                        .post(endpoint)
-                        .json(&body)
-                        .send()
-                        .map_err(|err| format!("request error: {err}"))?;
-
-                    let status = response.status();
-                    let payload: Value = response.json().unwrap_or_default();
-                    let has_token = payload
-                        .get("tenant_access_token")
-                        .and_then(Value::as_str)
-                        .is_some_and(|token| !token.trim().is_empty());
-
-                    if status.is_success() && has_token {
-                        return Ok::<(), String>(());
-                    }
-
-                    let detail = payload
-                        .get("msg")
-                        .or_else(|| payload.get("message"))
-                        .and_then(Value::as_str)
-                        .unwrap_or("unknown error");
-
-                    Err(format!("auth rejected ({status}): {detail}"))
-                })
-                .join();
-
-                match thread_result {
-                    Ok(Ok(())) => {
-                        println!(
-                            "\r  {} {provider_label} credentials verified        ",
-                            style("✅").green().bold()
-                        );
-                    }
-                    Ok(Err(reason)) => {
-                        println!(
-                            "\r  {} Connection failed — check your credentials",
-                            style("❌").red().bold()
-                        );
-                        println!("    {}", style(reason).dim());
-                        continue;
-                    }
-                    Err(_) => {
-                        println!(
-                            "\r  {} Connection failed — check your credentials",
-                            style("❌").red().bold()
-                        );
-                        continue;
-                    }
-                }
-
-                let receive_mode_choice = Select::new()
-                    .with_prompt("  Receive Mode")
-                    .items([
-                        "WebSocket (recommended, no public IP needed)",
-                        "Webhook (requires public HTTPS endpoint)",
-                    ])
-                    .default(0)
-                    .interact()?;
-
-                let receive_mode = if receive_mode_choice == 0 {
-                    LarkReceiveMode::Websocket
-                } else {
-                    LarkReceiveMode::Webhook
-                };
-
-                let existing_lk = config.lark.as_ref();
-
-                let encrypt_key = {
-                    let existing_ek = existing_lk.and_then(|l| l.encrypt_key.clone());
-                    let prompt_default = existing_ek.clone().unwrap_or_default();
-                    let ek: String = Input::new()
-                        .with_prompt("  Encrypt Key (optional, from Event Subscriptions page)")
-                        .default(prompt_default)
-                        .allow_empty(true)
-                        .interact_text()?;
-                    let ek = ek.trim().to_string();
-                    if ek.is_empty() { existing_ek } else { Some(ek) }
-                };
-
-                let verification_token = {
-                    let existing_vt = existing_lk.and_then(|l| l.verification_token.clone());
-                    let prompt_default = existing_vt.clone().unwrap_or_default();
-                    let vt: String = Input::new()
-                        .with_prompt(
-                            "  Verification Token (optional, from Event Subscriptions page)",
-                        )
-                        .default(prompt_default)
-                        .allow_empty(true)
-                        .interact_text()?;
-                    let vt = vt.trim().to_string();
-                    if vt.is_empty() { existing_vt } else { Some(vt) }
-                };
-
-                if receive_mode == LarkReceiveMode::Webhook && verification_token.is_none() {
-                    println!(
-                        "  {} Verification Token is empty — webhook authenticity checks are reduced.",
-                        style("⚠").yellow().bold()
-                    );
-                }
-
-                let port = if receive_mode == LarkReceiveMode::Webhook {
-                    let p: String = Input::new()
-                        .with_prompt("  Webhook Port")
-                        .default("8080")
-                        .interact_text()?;
-                    Some(p.parse().unwrap_or(8080))
-                } else {
-                    None
-                };
-
-                let users_str: String = Input::new()
-                    .with_prompt("  Allowed user Open IDs (comma-separated, '*' for all)")
-                    .allow_empty(true)
-                    .interact_text()?;
-
-                let allowed_users: Vec<String> = users_str
-                    .split(',')
-                    .map(|s| s.trim().to_string())
-                    .filter(|s| !s.is_empty())
-                    .collect();
-
-                if allowed_users.is_empty() {
-                    println!(
-                        "  {} No users allowlisted — {provider_label} inbound messages will be denied until you add Open IDs or '*'.",
-                        style("⚠").yellow().bold()
-                    );
-                }
-
-                config.lark = Some(LarkConfig {
-                    enabled: true,
-                    app_id,
-                    app_secret,
-                    verification_token,
-                    encrypt_key,
-                    allowed_users,
-                    mention_only: existing_lk.map(|l| l.mention_only).unwrap_or(false),
-                    use_feishu: is_feishu,
-                    receive_mode,
-                    port,
-                    proxy_url: existing_lk.and_then(|l| l.proxy_url.clone()),
-                });
             }
             #[cfg(feature = "channel-nostr")]
             ChannelMenuChoice::Nostr => {
@@ -7627,82 +7238,6 @@ mod tests {
         assert_eq!(config.archive_after_days, 0);
         assert_eq!(config.purge_after_days, 0);
         assert_eq!(config.embedding_cache_size, 0);
-    }
-
-    #[test]
-    fn channel_menu_choices_include_signal_nextcloud_lark_and_feishu() {
-        assert!(channel_menu_choices().contains(&ChannelMenuChoice::Signal));
-        assert!(channel_menu_choices().contains(&ChannelMenuChoice::NextcloudTalk));
-        assert!(channel_menu_choices().contains(&ChannelMenuChoice::Lark));
-        assert!(channel_menu_choices().contains(&ChannelMenuChoice::Feishu));
-    }
-
-    #[test]
-    fn launchable_channels_include_signal_mattermost_qq_nextcloud_and_feishu() {
-        let mut channels = ChannelsConfig::default();
-        assert!(!has_launchable_channels(&channels));
-
-        channels.signal = Some(zeroclaw_config::schema::SignalConfig {
-            enabled: true,
-            http_url: "http://127.0.0.1:8686".into(),
-            account: "+1234567890".into(),
-            group_id: None,
-            allowed_from: vec!["*".into()],
-            ignore_attachments: false,
-            ignore_stories: true,
-            proxy_url: None,
-        });
-        assert!(has_launchable_channels(&channels));
-
-        channels.signal = None;
-        channels.mattermost = Some(zeroclaw_config::schema::MattermostConfig {
-            enabled: true,
-            url: "https://mattermost.example.com".into(),
-            bot_token: "token".into(),
-            channel_id: Some("channel".into()),
-            allowed_users: vec!["*".into()],
-            thread_replies: Some(true),
-            mention_only: Some(false),
-            interrupt_on_new_message: false,
-            proxy_url: None,
-        });
-        assert!(has_launchable_channels(&channels));
-
-        channels.mattermost = None;
-        channels.qq = Some(zeroclaw_config::schema::QQConfig {
-            enabled: true,
-            app_id: "app-id".into(),
-            app_secret: "app-secret".into(),
-            allowed_users: vec!["*".into()],
-            proxy_url: None,
-        });
-        assert!(has_launchable_channels(&channels));
-
-        channels.qq = None;
-        channels.nextcloud_talk = Some(zeroclaw_config::schema::NextcloudTalkConfig {
-            enabled: true,
-            base_url: "https://cloud.example.com".into(),
-            app_token: "token".into(),
-            webhook_secret: Some("secret".into()),
-            allowed_users: vec!["*".into()],
-            proxy_url: None,
-            bot_name: None,
-        });
-        assert!(has_launchable_channels(&channels));
-
-        channels.nextcloud_talk = None;
-        channels.feishu = Some(zeroclaw_config::schema::FeishuConfig {
-            enabled: true,
-            app_id: "cli_123".into(),
-            app_secret: "secret".into(),
-            encrypt_key: None,
-            verification_token: None,
-            allowed_users: vec!["*".into()],
-            receive_mode: zeroclaw_config::schema::LarkReceiveMode::Websocket,
-            port: None,
-            proxy_url: None,
-        });
-        assert!(has_launchable_channels(&channels));
     }
 
     #[test]
