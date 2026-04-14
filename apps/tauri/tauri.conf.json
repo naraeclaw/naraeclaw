@@ -32,7 +32,7 @@
       "icons/icon.ico"
     ],
     "externalBin": [
-      "../../../target/release/naraeclaw"
+      "../../target/release/naraeclaw"
     ]
   }
 }
