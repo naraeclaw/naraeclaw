@@ -7,6 +7,9 @@ pub fn handle_menu_event<R: Runtime>(app: &AppHandle<R>, event: MenuEvent) {
         "show" => show_main_window(app, None),
         "chat" => show_main_window(app, Some("/agent")),
         "quit" => {
+            // Shut down the gateway sidecar before exiting so it doesn't
+            // outlive the app. This is the primary shutdown path.
+            tauri::async_runtime::block_on(crate::sidecar::shutdown_agent());
             app.exit(0);
         }
         _ => {}
