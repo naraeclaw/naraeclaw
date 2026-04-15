@@ -107,8 +107,6 @@ pub struct Config {
     #[nested]
     pub cloud_ops: CloudOpsConfig,
 
-    /// Conversational AI agent builder configuration (`[conversational_ai]`).
-    ///
     /// Managed cybersecurity service configuration (`[security_ops]`).
     #[serde(default)]
     #[nested]
