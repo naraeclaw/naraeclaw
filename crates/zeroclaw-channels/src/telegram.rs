@@ -2557,7 +2557,12 @@ Allowlist Telegram username (without '@') or numeric user ID.",
                 let received = headers
                     .get("x-telegram-bot-api-secret-token")
                     .and_then(|value| value.to_str().ok());
-                if received != Some(expected) {
+                // Use constant-time comparison to prevent timing attacks.
+                let valid = received.map_or(false, |r| {
+                    use subtle::ConstantTimeEq;
+                    bool::from(r.as_bytes().ct_eq(expected.as_bytes()))
+                });
+                if !valid {
                     tracing::warn!("Telegram webhook: invalid secret token");
                     return StatusCode::UNAUTHORIZED;
                 }
