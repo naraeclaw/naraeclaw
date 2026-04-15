@@ -101,8 +101,12 @@ const WIN_MAX_H: u32 = 4320; // 8K height
 /// Position is only restored when both x and y are non-negative to avoid
 /// placing the window off-screen on single-monitor setups.
 fn restore_window_state<R: tauri::Runtime>(app: &tauri::App<R>) {
-    let Ok(store) = app.store("naraeclaw.json") else { return };
-    let Some(window) = app.get_webview_window("main") else { return };
+    let Ok(store) = app.store("naraeclaw.json") else {
+        return;
+    };
+    let Some(window) = app.get_webview_window("main") else {
+        return;
+    };
     if let (Some(w), Some(h)) = (
         store.get("window_width").and_then(|v| v.as_u64()),
         store.get("window_height").and_then(|v| v.as_u64()),
@@ -132,8 +136,12 @@ fn restore_window_state<R: tauri::Runtime>(app: &tauri::App<R>) {
 /// Called from the tray "Quit" handler (primary path) and from
 /// `RunEvent::Exit` as a fallback.
 pub fn save_window_state<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
-    let Some(window) = app.get_webview_window("main") else { return };
-    let Ok(store) = app.store("naraeclaw.json") else { return };
+    let Some(window) = app.get_webview_window("main") else {
+        return;
+    };
+    let Ok(store) = app.store("naraeclaw.json") else {
+        return;
+    };
     if let Ok(size) = window.outer_size() {
         store.set("window_width", size.width);
         store.set("window_height", size.height);
