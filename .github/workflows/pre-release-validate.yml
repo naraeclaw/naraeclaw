@@ -57,7 +57,6 @@ jobs:
           CHECK_PAT: ${{ secrets.PAT }}
           HOMEBREW_CORE_BOT_TOKEN: ${{ secrets.HOMEBREW_CORE_BOT_TOKEN }}
           HOMEBREW_UPSTREAM_PR_TOKEN: ${{ secrets.HOMEBREW_UPSTREAM_PR_TOKEN }}
-          AUR_SSH_KEY: ${{ secrets.AUR_SSH_KEY }}
           HOMEBREW_CORE_BOT_FORK_REPO: ${{ vars.HOMEBREW_CORE_BOT_FORK_REPO }}
         run: |
           failed=0
@@ -79,7 +78,6 @@ jobs:
           echo "=== Required Secrets ==="
           check_secret "CARGO_REGISTRY_TOKEN" "$CARGO_REGISTRY_TOKEN"
           check_secret "PAT" "$CHECK_PAT"
-          check_secret "AUR_SSH_KEY" "$AUR_SSH_KEY"
 
           echo ""
           echo "=== Homebrew Secrets (at least one required) ==="
@@ -122,9 +120,6 @@ jobs:
 
           echo "=== Downstream Repository Access ==="
           check_repo_access "zeroclaw-labs/zeroclaw-website"
-          check_repo_access "zeroclaw-labs/dokploy"
-          check_repo_access "zeroclaw-labs/easypanel"
-          check_repo_access "zeroclaw-labs/coolify"
 
           echo ""
           echo "=== Homebrew Fork Access ==="
@@ -166,7 +161,6 @@ jobs:
           check_version "Cargo.toml" "version = \"$VERSION\"" "Cargo.toml"
           check_version "Cargo.lock" "version = \"$VERSION\"" "Cargo.lock"
           check_version "apps/tauri/tauri.conf.json" "\"version\": \"$VERSION\"" "Tauri config"
-          check_version "marketplace/dokploy/meta-entry.json" "\"version\": \"$VERSION\"" "Dokploy meta"
 
           if [[ $failed -ne 0 ]]; then
             echo ""
