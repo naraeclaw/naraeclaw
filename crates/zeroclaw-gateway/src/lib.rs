@@ -453,14 +453,7 @@ pub async fn run_gateway(
         &config.workspace_dir,
     ));
 
-    let (composio_key, composio_entity_id) = if config.composio.enabled {
-        (
-            config.composio.api_key.as_deref(),
-            Some(config.composio.entity_id.as_str()),
-        )
-    } else {
-        (None, None)
-    };
+    let (composio_key, composio_entity_id): (Option<&str>, Option<&str>) = (None, None);
 
     let canvas_store = tools::CanvasStore::new();
 

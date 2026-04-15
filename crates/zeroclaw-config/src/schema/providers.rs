@@ -51,31 +51,31 @@ pub struct ModelProviderConfig {
 
 // ── Transcription ────────────────────────────────────────────────
 
-fn default_transcription_api_url() -> String {
+pub fn default_transcription_api_url() -> String {
     "https://api.groq.com/openai/v1/audio/transcriptions".into()
 }
 
-fn default_transcription_model() -> String {
+pub fn default_transcription_model() -> String {
     "whisper-large-v3-turbo".into()
 }
 
-fn default_transcription_max_duration_secs() -> u64 {
+pub fn default_transcription_max_duration_secs() -> u64 {
     120
 }
 
-fn default_transcription_provider() -> String {
+pub fn default_transcription_provider() -> String {
     "groq".into()
 }
 
-fn default_openai_stt_model() -> String {
+pub fn default_openai_stt_model() -> String {
     "whisper-1".into()
 }
 
-fn default_deepgram_stt_model() -> String {
+pub fn default_deepgram_stt_model() -> String {
     "nova-2".into()
 }
 
-fn default_google_stt_language_code() -> String {
+pub fn default_google_stt_language_code() -> String {
     "en-US".into()
 }
 
@@ -227,7 +227,7 @@ pub struct McpConfig {
     pub servers: Vec<McpServerConfig>,
 }
 
-fn default_deferred_loading() -> bool {
+pub fn default_deferred_loading() -> bool {
     true
 }
 
@@ -257,7 +257,7 @@ pub struct VerifiableIntentConfig {
     pub strictness: String,
 }
 
-fn default_vi_strictness() -> String {
+pub fn default_vi_strictness() -> String {
     "strict".to_owned()
 }
 
@@ -292,7 +292,7 @@ pub struct NodesConfig {
     pub auth_token: Option<String>,
 }
 
-fn default_max_nodes() -> usize {
+pub fn default_max_nodes() -> usize {
     16
 }
 
@@ -308,51 +308,51 @@ impl Default for NodesConfig {
 
 // ── TTS (Text-to-Speech) ─────────────────────────────────────────
 
-fn default_tts_provider() -> String {
+pub fn default_tts_provider() -> String {
     "openai".into()
 }
 
-fn default_tts_voice() -> String {
+pub fn default_tts_voice() -> String {
     "alloy".into()
 }
 
-fn default_tts_format() -> String {
+pub fn default_tts_format() -> String {
     "mp3".into()
 }
 
-fn default_tts_max_text_length() -> usize {
+pub fn default_tts_max_text_length() -> usize {
     4096
 }
 
-fn default_openai_tts_model() -> String {
+pub fn default_openai_tts_model() -> String {
     "tts-1".into()
 }
 
-fn default_openai_tts_speed() -> f64 {
+pub fn default_openai_tts_speed() -> f64 {
     1.0
 }
 
-fn default_elevenlabs_model_id() -> String {
+pub fn default_elevenlabs_model_id() -> String {
     "eleven_monolingual_v1".into()
 }
 
-fn default_elevenlabs_stability() -> f64 {
+pub fn default_elevenlabs_stability() -> f64 {
     0.5
 }
 
-fn default_elevenlabs_similarity_boost() -> f64 {
+pub fn default_elevenlabs_similarity_boost() -> f64 {
     0.5
 }
 
-fn default_google_tts_language_code() -> String {
+pub fn default_google_tts_language_code() -> String {
     "en-US".into()
 }
 
-fn default_edge_tts_binary_path() -> String {
+pub fn default_edge_tts_binary_path() -> String {
     "edge-tts".into()
 }
 
-fn default_piper_tts_api_url() -> String {
+pub fn default_piper_tts_api_url() -> String {
     "http://127.0.0.1:5000/v1/audio/speech".into()
 }
 
@@ -631,11 +631,11 @@ pub struct LocalWhisperConfig {
     pub timeout_secs: u64,
 }
 
-fn default_local_whisper_max_audio_bytes() -> usize {
+pub fn default_local_whisper_max_audio_bytes() -> usize {
     25 * 1024 * 1024
 }
 
-fn default_local_whisper_timeout_secs() -> u64 {
+pub fn default_local_whisper_timeout_secs() -> u64 {
     300
 }
 
@@ -725,31 +725,31 @@ pub struct AgentConfig {
     pub keep_tool_context_turns: usize,
 }
 
-fn default_max_tool_result_chars() -> usize {
+pub fn default_max_tool_result_chars() -> usize {
     50_000
 }
 
-fn default_keep_tool_context_turns() -> usize {
+pub fn default_keep_tool_context_turns() -> usize {
     2
 }
 
-fn default_agent_max_tool_iterations() -> usize {
+pub fn default_agent_max_tool_iterations() -> usize {
     10
 }
 
-fn default_agent_max_history_messages() -> usize {
+pub fn default_agent_max_history_messages() -> usize {
     50
 }
 
-fn default_agent_max_context_tokens() -> usize {
+pub fn default_agent_max_context_tokens() -> usize {
     32_000
 }
 
-fn default_agent_tool_dispatcher() -> String {
+pub fn default_agent_tool_dispatcher() -> String {
     "auto".into()
 }
 
-fn default_max_system_prompt_chars() -> usize {
+pub fn default_max_system_prompt_chars() -> usize {
     0
 }
 
@@ -831,15 +831,15 @@ pub struct PacingConfig {
     pub loop_detection_max_repeats: usize,
 }
 
-fn default_loop_detection_enabled() -> bool {
+pub fn default_loop_detection_enabled() -> bool {
     true
 }
 
-fn default_loop_detection_window_size() -> usize {
+pub fn default_loop_detection_window_size() -> usize {
     20
 }
 
-fn default_loop_detection_max_repeats() -> usize {
+pub fn default_loop_detection_max_repeats() -> usize {
     3
 }
 
@@ -897,27 +897,27 @@ pub struct ReliabilityConfig {
     pub scheduler_retries: u32,
 }
 
-fn default_provider_retries() -> u32 {
+pub fn default_provider_retries() -> u32 {
     2
 }
 
-fn default_provider_backoff_ms() -> u64 {
+pub fn default_provider_backoff_ms() -> u64 {
     500
 }
 
-fn default_channel_backoff_secs() -> u64 {
+pub fn default_channel_backoff_secs() -> u64 {
     2
 }
 
-fn default_channel_backoff_max_secs() -> u64 {
+pub fn default_channel_backoff_max_secs() -> u64 {
     60
 }
 
-fn default_scheduler_poll_secs() -> u64 {
+pub fn default_scheduler_poll_secs() -> u64 {
     15
 }
 
-fn default_scheduler_retries() -> u32 {
+pub fn default_scheduler_retries() -> u32 {
     2
 }
 

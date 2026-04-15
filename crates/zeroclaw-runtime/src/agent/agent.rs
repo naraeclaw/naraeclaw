@@ -390,16 +390,8 @@ impl Agent {
                 config.api_key.as_deref(),
             )?);
 
-        let composio_key = if config.composio.enabled {
-            config.composio.api_key.as_deref()
-        } else {
-            None
-        };
-        let composio_entity_id = if config.composio.enabled {
-            Some(config.composio.entity_id.as_str())
-        } else {
-            None
-        };
+        let composio_key: Option<&str> = None;
+        let composio_entity_id: Option<&str> = None;
 
         let (
             mut tools,

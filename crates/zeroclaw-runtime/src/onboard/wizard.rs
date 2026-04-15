@@ -10,9 +10,9 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 use tokio::fs;
 use zeroclaw_config::schema::{
-    AutonomyConfig, BrowserConfig, ChannelsConfig, ComposioConfig, Config, DiscordConfig,
-    HeartbeatConfig, IMessageConfig, MatrixConfig, MemoryConfig, ObservabilityConfig,
-    RuntimeConfig, SecretsConfig, SlackConfig, StorageConfig, TelegramConfig, WebhookConfig,
+    AutonomyConfig, BrowserConfig, ChannelsConfig, Config, DiscordConfig, HeartbeatConfig,
+    IMessageConfig, MatrixConfig, MemoryConfig, ObservabilityConfig, RuntimeConfig, SecretsConfig,
+    SlackConfig, StorageConfig, TelegramConfig, WebhookConfig,
 };
 use zeroclaw_config::schema::{HardwareConfig, HardwareTransport};
 use zeroclaw_config::schema::{
@@ -138,7 +138,7 @@ pub async fn run_wizard(force: bool, callbacks: WizardCallbacks) -> Result<Confi
     let tunnel_config = setup_tunnel()?;
 
     print_step(5, 9, "Tool Mode & Security");
-    let (composio_config, secrets_config) = setup_tool_mode()?;
+    let secrets_config = setup_tool_mode()?;
 
     print_step(6, 9, "Hardware (Physical World)");
     let hardware_config = if let Some(ref hw_setup) = callbacks.hardware_setup {
@@ -181,7 +181,6 @@ pub async fn run_wizard(force: bool, callbacks: WizardCallbacks) -> Result<Confi
         backup: zeroclaw_config::schema::BackupConfig::default(),
         data_retention: zeroclaw_config::schema::DataRetentionConfig::default(),
         cloud_ops: zeroclaw_config::schema::CloudOpsConfig::default(),
-        conversational_ai: zeroclaw_config::schema::ConversationalAiConfig::default(),
         security: zeroclaw_config::schema::SecurityConfig::default(),
         security_ops: zeroclaw_config::schema::SecurityOpsConfig::default(),
         runtime: RuntimeConfig::default(),
@@ -200,8 +199,6 @@ pub async fn run_wizard(force: bool, callbacks: WizardCallbacks) -> Result<Confi
         storage: StorageConfig::default(),
         tunnel: tunnel_config,
         gateway: zeroclaw_config::schema::GatewayConfig::default(),
-        composio: composio_config,
-        microsoft365: zeroclaw_config::schema::Microsoft365Config::default(),
         secrets: secrets_config,
         browser: BrowserConfig::default(),
         browser_delegate: zeroclaw_tools::browser_delegate::BrowserDelegateConfig::default(),
@@ -212,7 +209,6 @@ pub async fn run_wizard(force: bool, callbacks: WizardCallbacks) -> Result<Confi
         link_enricher: zeroclaw_config::schema::LinkEnricherConfig::default(),
         text_browser: zeroclaw_config::schema::TextBrowserConfig::default(),
         web_search: zeroclaw_config::schema::WebSearchConfig::default(),
-        project_intel: zeroclaw_config::schema::ProjectIntelConfig::default(),
         google_workspace: zeroclaw_config::schema::GoogleWorkspaceConfig::default(),
         proxy: zeroclaw_config::schema::ProxyConfig::default(),
         identity: zeroclaw_config::schema::IdentityConfig::default(),
@@ -229,7 +225,6 @@ pub async fn run_wizard(force: bool, callbacks: WizardCallbacks) -> Result<Confi
         mcp: zeroclaw_config::schema::McpConfig::default(),
         nodes: zeroclaw_config::schema::NodesConfig::default(),
         workspace: zeroclaw_config::schema::WorkspaceConfig::default(),
-        notion: zeroclaw_config::schema::NotionConfig::default(),
         jira: zeroclaw_config::schema::JiraConfig::default(),
         node_transport: zeroclaw_config::schema::NodeTransportConfig::default(),
         knowledge: zeroclaw_config::schema::KnowledgeConfig::default(),
@@ -646,7 +641,6 @@ async fn run_quick_setup_with_home(
         backup: zeroclaw_config::schema::BackupConfig::default(),
         data_retention: zeroclaw_config::schema::DataRetentionConfig::default(),
         cloud_ops: zeroclaw_config::schema::CloudOpsConfig::default(),
-        conversational_ai: zeroclaw_config::schema::ConversationalAiConfig::default(),
         security: zeroclaw_config::schema::SecurityConfig::default(),
         security_ops: zeroclaw_config::schema::SecurityOpsConfig::default(),
         runtime: RuntimeConfig::default(),
@@ -665,8 +659,6 @@ async fn run_quick_setup_with_home(
         storage: StorageConfig::default(),
         tunnel: zeroclaw_config::schema::TunnelConfig::default(),
         gateway: zeroclaw_config::schema::GatewayConfig::default(),
-        composio: ComposioConfig::default(),
-        microsoft365: zeroclaw_config::schema::Microsoft365Config::default(),
         secrets: SecretsConfig::default(),
         browser: BrowserConfig::default(),
         browser_delegate: zeroclaw_tools::browser_delegate::BrowserDelegateConfig::default(),
@@ -677,7 +669,6 @@ async fn run_quick_setup_with_home(
         link_enricher: zeroclaw_config::schema::LinkEnricherConfig::default(),
         text_browser: zeroclaw_config::schema::TextBrowserConfig::default(),
         web_search: zeroclaw_config::schema::WebSearchConfig::default(),
-        project_intel: zeroclaw_config::schema::ProjectIntelConfig::default(),
         google_workspace: zeroclaw_config::schema::GoogleWorkspaceConfig::default(),
         proxy: zeroclaw_config::schema::ProxyConfig::default(),
         identity: zeroclaw_config::schema::IdentityConfig::default(),
@@ -694,7 +685,6 @@ async fn run_quick_setup_with_home(
         mcp: zeroclaw_config::schema::McpConfig::default(),
         nodes: zeroclaw_config::schema::NodesConfig::default(),
         workspace: zeroclaw_config::schema::WorkspaceConfig::default(),
-        notion: zeroclaw_config::schema::NotionConfig::default(),
         jira: zeroclaw_config::schema::JiraConfig::default(),
         node_transport: zeroclaw_config::schema::NodeTransportConfig::default(),
         knowledge: zeroclaw_config::schema::KnowledgeConfig::default(),
@@ -3151,67 +3141,14 @@ fn provider_supports_device_flow(provider_name: &str) -> bool {
     )
 }
 
-// ── Step 5: Tool Mode & Security ────────────────────────────────
+// ── Step 5: Security ────────────────────────────────────────────
 
-fn setup_tool_mode() -> Result<(ComposioConfig, SecretsConfig)> {
-    print_bullet("Choose how NaraeClaw connects to external apps.");
-    print_bullet("You can always change this later in config.toml.");
-    println!();
-
-    let options = vec![
-        "Sovereign (local only) — you manage API keys, full privacy (default)",
-        "Composio (managed OAuth) — 1000+ apps via OAuth, no raw keys shared",
-    ];
-
-    let choice = Select::new()
-        .with_prompt("  Select tool mode")
-        .items(&options)
-        .default(0)
-        .interact()?;
-
-    let composio_config = if choice == 1 {
-        println!();
-        println!(
-            "  {} {}",
-            style("Composio Setup").white().bold(),
-            style("— 1000+ OAuth integrations (Gmail, Notion, GitHub, Slack, ...)").dim()
-        );
-        print_bullet("Get your API key at: https://app.composio.dev/settings");
-        print_bullet("NaraeClaw uses Composio as a tool — your core agent stays local.");
-        println!();
-
-        let api_key: String = Input::new()
-            .with_prompt("  Composio API key (or Enter to skip)")
-            .allow_empty(true)
-            .interact_text()?;
-
-        if api_key.trim().is_empty() {
-            println!(
-                "  {} Skipped — set composio.api_key in config.toml later",
-                style("→").dim()
-            );
-            ComposioConfig::default()
-        } else {
-            println!(
-                "  {} Composio: {} (1000+ OAuth tools available)",
-                style("✓").green().bold(),
-                style("enabled").green()
-            );
-            {
-                let mut c = ComposioConfig::default();
-                c.enabled = true;
-                c.api_key = Some(api_key);
-                c
-            }
-        }
-    } else {
-        println!(
-            "  {} Tool mode: {} — full privacy, you own every key",
-            style("✓").green().bold(),
-            style("Sovereign (local only)").green()
-        );
-        ComposioConfig::default()
-    };
+fn setup_tool_mode() -> Result<SecretsConfig> {
+    println!(
+        "  {} Tool mode: {} — full privacy, you own every key",
+        style("✓").green().bold(),
+        style("Sovereign (local only)").green()
+    );
 
     // ── Encrypted secrets ──
     println!();
@@ -3239,7 +3176,7 @@ fn setup_tool_mode() -> Result<(ComposioConfig, SecretsConfig)> {
         );
     }
 
-    Ok((composio_config, secrets_config))
+    Ok(secrets_config)
 }
 
 // ── Step 6: Project Context ─────────────────────────────────────
@@ -5548,17 +5485,6 @@ fn print_summary(config: &Config) {
             "none (local only)".to_string()
         } else {
             config.tunnel.provider.clone()
-        }
-    );
-
-    // Composio
-    println!(
-        "    {} Composio:      {}",
-        style("🔗").cyan(),
-        if config.composio.enabled {
-            style("enabled (1000+ OAuth apps)").green().to_string()
-        } else {
-            "disabled (sovereign mode)".to_string()
         }
     );
 

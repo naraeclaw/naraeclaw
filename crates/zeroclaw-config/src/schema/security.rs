@@ -74,11 +74,11 @@ pub struct AutonomyConfig {
     pub shell_timeout_secs: u64,
 }
 
-fn default_shell_timeout_secs() -> u64 {
+pub fn default_shell_timeout_secs() -> u64 {
     60
 }
 
-fn default_auto_approve() -> Vec<String> {
+pub fn default_auto_approve() -> Vec<String> {
     vec![
         "file_read".into(),
         "memory_recall".into(),
@@ -94,7 +94,7 @@ fn default_auto_approve() -> Vec<String> {
     ]
 }
 
-fn default_always_ask() -> Vec<String> {
+pub fn default_always_ask() -> Vec<String> {
     vec![]
 }
 
@@ -254,15 +254,15 @@ impl Default for WebAuthnConfig {
     }
 }
 
-fn default_webauthn_rp_id() -> String {
+pub fn default_webauthn_rp_id() -> String {
     "localhost".into()
 }
 
-fn default_webauthn_rp_origin() -> String {
+pub fn default_webauthn_rp_origin() -> String {
     "http://localhost:42617".into()
 }
 
-fn default_webauthn_rp_name() -> String {
+pub fn default_webauthn_rp_name() -> String {
     "ZeroClaw".into()
 }
 
@@ -319,19 +319,19 @@ pub struct OtpConfig {
     pub challenge_max_attempts: u32,
 }
 
-fn default_otp_token_ttl_secs() -> u64 {
+pub fn default_otp_token_ttl_secs() -> u64 {
     30
 }
 
-fn default_otp_cache_valid_secs() -> u64 {
+pub fn default_otp_cache_valid_secs() -> u64 {
     300
 }
 
-fn default_otp_challenge_max_attempts() -> u32 {
+pub fn default_otp_challenge_max_attempts() -> u32 {
     3
 }
 
-fn default_otp_gated_actions() -> Vec<String> {
+pub fn default_otp_gated_actions() -> Vec<String> {
     vec![
         "shell".to_string(),
         "file_write".to_string(),
@@ -375,7 +375,7 @@ pub struct EstopConfig {
     pub require_otp_to_resume: bool,
 }
 
-fn default_estop_state_file() -> String {
+pub fn default_estop_state_file() -> String {
     "~/.zeroclaw/estop-state.json".to_string()
 }
 
@@ -504,15 +504,15 @@ impl NevisConfig {
     }
 }
 
-fn default_nevis_realm() -> String {
+pub fn default_nevis_realm() -> String {
     "master".into()
 }
 
-fn default_nevis_token_validation() -> String {
+pub fn default_nevis_token_validation() -> String {
     "local".into()
 }
 
-fn default_nevis_session_timeout_secs() -> u64 {
+pub fn default_nevis_session_timeout_secs() -> u64 {
     3600
 }
 
@@ -623,19 +623,19 @@ pub struct ResourceLimitsConfig {
     pub memory_monitoring: bool,
 }
 
-fn default_max_memory_mb() -> u32 {
+pub fn default_max_memory_mb() -> u32 {
     512
 }
 
-fn default_max_cpu_time_seconds() -> u64 {
+pub fn default_max_cpu_time_seconds() -> u64 {
     60
 }
 
-fn default_max_subprocesses() -> u32 {
+pub fn default_max_subprocesses() -> u32 {
     10
 }
 
-fn default_memory_monitoring_enabled() -> bool {
+pub fn default_memory_monitoring_enabled() -> bool {
     true
 }
 
@@ -672,15 +672,15 @@ pub struct AuditConfig {
     pub sign_events: bool,
 }
 
-fn default_audit_enabled() -> bool {
+pub fn default_audit_enabled() -> bool {
     true
 }
 
-fn default_audit_log_path() -> String {
+pub fn default_audit_log_path() -> String {
     "audit.log".to_string()
 }
 
-fn default_audit_max_size_mb() -> u32 {
+pub fn default_audit_max_size_mb() -> u32 {
     100
 }
 

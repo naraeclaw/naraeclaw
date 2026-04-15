@@ -4654,34 +4654,6 @@ fn collect_configured_channels(
         }
     }
 
-    // Notion database poller channel
-    if config.notion.enabled && !config.notion.database_id.trim().is_empty() {
-        let notion_api_key = if config.notion.api_key.trim().is_empty() {
-            std::env::var("NOTION_API_KEY").unwrap_or_default()
-        } else {
-            config.notion.api_key.trim().to_string()
-        };
-        if notion_api_key.trim().is_empty() {
-            tracing::warn!(
-                "Notion channel enabled but no API key found (set notion.api_key or NOTION_API_KEY env var)"
-            );
-        } else {
-            channels.push(ConfiguredChannel {
-                display_name: "Notion",
-                channel: Arc::new(NotionChannel::new(
-                    notion_api_key,
-                    config.notion.database_id.clone(),
-                    config.notion.poll_interval_secs,
-                    config.notion.status_property.clone(),
-                    config.notion.input_property.clone(),
-                    config.notion.result_property.clone(),
-                    config.notion.max_concurrent,
-                    config.notion.recover_stale,
-                )),
-            });
-        }
-    }
-
     #[cfg(feature = "channel-reddit")]
     if let Some(ref rd) = config.channels_config.reddit {
         channels.push(ConfiguredChannel {
@@ -4853,14 +4825,6 @@ pub async fn start_channels(config: Config) -> Result<()> {
         &config.workspace_dir,
         config.api_key.as_deref(),
     )?);
-    let (composio_key, composio_entity_id) = if config.composio.enabled {
-        (
-            config.composio.api_key.as_deref(),
-            Some(config.composio.entity_id.as_str()),
-        )
-    } else {
-        (None, None)
-    };
     // Build system prompt from workspace identity files + skills
     let workspace = config.workspace_dir.clone();
     let (
@@ -4875,8 +4839,8 @@ pub async fn start_channels(config: Config) -> Result<()> {
         &security,
         runtime,
         Arc::clone(&mem),
-        composio_key,
-        composio_entity_id,
+        None::<&str>,
+        None::<&str>,
         &config.browser,
         &config.http_request,
         &config.web_fetch,
@@ -5012,12 +4976,6 @@ pub async fn start_channels(config: Config) -> Result<()> {
         tool_descs.push((
             "browser_open",
             "Open approved HTTPS URLs in system browser (allowlist-only, no scraping)",
-        ));
-    }
-    if config.composio.enabled {
-        tool_descs.push((
-            "composio",
-            "Execute actions on 1000+ apps via Composio (Gmail, Notion, GitHub, Slack, etc.). Use action='list' to discover actions, 'list_accounts' to retrieve connected account IDs, 'execute' to run (optionally with connected_account_id), and 'connect' for OAuth.",
         ));
     }
     tool_descs.push((

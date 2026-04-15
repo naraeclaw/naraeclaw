@@ -47,7 +47,6 @@ const SUPPORTED_PROXY_SERVICE_KEYS: &[&str] = &[
     "channel.wati",
     "channel.whatsapp",
     "tool.browser",
-    "tool.composio",
     "tool.http_request",
     "tool.pushover",
     "tool.web_search",
@@ -96,7 +95,6 @@ impl Default for Config {
             backup: BackupConfig::default(),
             data_retention: DataRetentionConfig::default(),
             cloud_ops: CloudOpsConfig::default(),
-            conversational_ai: ConversationalAiConfig::default(),
             security: SecurityConfig::default(),
             security_ops: SecurityOpsConfig::default(),
             runtime: RuntimeConfig::default(),
@@ -115,8 +113,6 @@ impl Default for Config {
             storage: StorageConfig::default(),
             tunnel: TunnelConfig::default(),
             gateway: GatewayConfig::default(),
-            composio: ComposioConfig::default(),
-            microsoft365: Microsoft365Config::default(),
             secrets: SecretsConfig::default(),
             browser: BrowserConfig::default(),
             browser_delegate: crate::scattered_types::BrowserDelegateConfig::default(),
@@ -127,7 +123,6 @@ impl Default for Config {
             link_enricher: LinkEnricherConfig::default(),
             text_browser: TextBrowserConfig::default(),
             web_search: WebSearchConfig::default(),
-            project_intel: ProjectIntelConfig::default(),
             google_workspace: GoogleWorkspaceConfig::default(),
             proxy: ProxyConfig::default(),
             identity: IdentityConfig::default(),
@@ -144,7 +139,6 @@ impl Default for Config {
             mcp: McpConfig::default(),
             nodes: NodesConfig::default(),
             workspace: WorkspaceConfig::default(),
-            notion: NotionConfig::default(),
             jira: JiraConfig::default(),
             node_transport: NodeTransportConfig::default(),
             knowledge: KnowledgeConfig::default(),
@@ -1072,90 +1066,6 @@ impl Config {
             }
         }
 
-        // Microsoft 365
-        if self.microsoft365.enabled {
-            let tenant = self
-                .microsoft365
-                .tenant_id
-                .as_deref()
-                .map(str::trim)
-                .filter(|s| !s.is_empty());
-            if tenant.is_none() {
-                anyhow::bail!(
-                    "microsoft365.tenant_id must not be empty when microsoft365 is enabled"
-                );
-            }
-            let client = self
-                .microsoft365
-                .client_id
-                .as_deref()
-                .map(str::trim)
-                .filter(|s| !s.is_empty());
-            if client.is_none() {
-                anyhow::bail!(
-                    "microsoft365.client_id must not be empty when microsoft365 is enabled"
-                );
-            }
-            let flow = self.microsoft365.auth_flow.trim();
-            if flow != "client_credentials" && flow != "device_code" {
-                anyhow::bail!(
-                    "microsoft365.auth_flow must be 'client_credentials' or 'device_code'"
-                );
-            }
-            if flow == "client_credentials"
-                && self
-                    .microsoft365
-                    .client_secret
-                    .as_deref()
-                    .is_none_or(|s| s.trim().is_empty())
-            {
-                anyhow::bail!(
-                    "microsoft365.client_secret must not be empty when auth_flow is 'client_credentials'"
-                );
-            }
-        }
-
-        // Microsoft 365
-        if self.microsoft365.enabled {
-            let tenant = self
-                .microsoft365
-                .tenant_id
-                .as_deref()
-                .map(str::trim)
-                .filter(|s| !s.is_empty());
-            if tenant.is_none() {
-                anyhow::bail!(
-                    "microsoft365.tenant_id must not be empty when microsoft365 is enabled"
-                );
-            }
-            let client = self
-                .microsoft365
-                .client_id
-                .as_deref()
-                .map(str::trim)
-                .filter(|s| !s.is_empty());
-            if client.is_none() {
-                anyhow::bail!(
-                    "microsoft365.client_id must not be empty when microsoft365 is enabled"
-                );
-            }
-            let flow = self.microsoft365.auth_flow.trim();
-            if flow != "client_credentials" && flow != "device_code" {
-                anyhow::bail!("microsoft365.auth_flow must be client_credentials or device_code");
-            }
-            if flow == "client_credentials"
-                && self
-                    .microsoft365
-                    .client_secret
-                    .as_deref()
-                    .is_none_or(|s| s.trim().is_empty())
-            {
-                anyhow::bail!(
-                    "microsoft365.client_secret must not be empty when auth_flow is client_credentials"
-                );
-            }
-        }
-
         // MCP
         if self.mcp.enabled {
             tools::validate_mcp_config(&self.mcp)?;
@@ -1302,53 +1212,9 @@ impl Config {
             }
         }
 
-        // Project intelligence
-        if self.project_intel.enabled {
-            let lang = &self.project_intel.default_language;
-            if !["en", "de", "fr", "it"].contains(&lang.as_str()) {
-                anyhow::bail!(
-                    "project_intel.default_language must be one of: en, de, fr, it (got '{lang}')"
-                );
-            }
-            let sens = &self.project_intel.risk_sensitivity;
-            if !["low", "medium", "high"].contains(&sens.as_str()) {
-                anyhow::bail!(
-                    "project_intel.risk_sensitivity must be one of: low, medium, high (got '{sens}')"
-                );
-            }
-            if let Some(ref tpl_dir) = self.project_intel.templates_dir {
-                let path = std::path::Path::new(tpl_dir);
-                if !path.exists() {
-                    anyhow::bail!("project_intel.templates_dir path does not exist: {tpl_dir}");
-                }
-            }
-        }
-
         // Proxy (delegate to existing validation)
         self.proxy.validate()?;
         self.cloud_ops.validate()?;
-
-        // Notion
-        if self.notion.enabled {
-            if self.notion.database_id.trim().is_empty() {
-                anyhow::bail!("notion.database_id must not be empty when notion.enabled = true");
-            }
-            if self.notion.poll_interval_secs == 0 {
-                anyhow::bail!("notion.poll_interval_secs must be greater than 0");
-            }
-            if self.notion.max_concurrent == 0 {
-                anyhow::bail!("notion.max_concurrent must be greater than 0");
-            }
-            if self.notion.status_property.trim().is_empty() {
-                anyhow::bail!("notion.status_property must not be empty");
-            }
-            if self.notion.input_property.trim().is_empty() {
-                anyhow::bail!("notion.input_property must not be empty");
-            }
-            if self.notion.result_property.trim().is_empty() {
-                anyhow::bail!("notion.result_property must not be empty");
-            }
-        }
 
         // Pinggy tunnel region — validate allowed values (case-insensitive, auto-lowercased at runtime).
         if let Some(ref pinggy) = self.tunnel.pinggy
@@ -1814,13 +1680,6 @@ impl Config {
         }
 
         set_runtime_proxy_config(self.proxy.clone());
-
-        if self.conversational_ai.enabled {
-            tracing::warn!(
-                "conversational_ai.enabled = true but conversational AI features are not yet \
-                 implemented; this section is reserved for future use and will be ignored"
-            );
-        }
     }
 
     async fn resolve_config_path_for_save(&self) -> Result<PathBuf> {
@@ -2080,13 +1939,7 @@ mod tests {
 
     fn parse_test_config(raw: &str) -> Config {
         let mut merged = raw.trim().to_string();
-        for table in [
-            "data_retention",
-            "cloud_ops",
-            "conversational_ai",
-            "security",
-            "security_ops",
-        ] {
+        for table in ["data_retention", "cloud_ops", "security", "security_ops"] {
             if has_test_table(&merged, table) {
                 continue;
             }
@@ -2470,7 +2323,6 @@ auto_save = true
             backup: BackupConfig::default(),
             data_retention: DataRetentionConfig::default(),
             cloud_ops: CloudOpsConfig::default(),
-            conversational_ai: ConversationalAiConfig::default(),
             security: SecurityConfig::default(),
             security_ops: SecurityOpsConfig::default(),
             runtime: RuntimeConfig {
@@ -2549,8 +2401,6 @@ auto_save = true
             storage: StorageConfig::default(),
             tunnel: TunnelConfig::default(),
             gateway: GatewayConfig::default(),
-            composio: ComposioConfig::default(),
-            microsoft365: Microsoft365Config::default(),
             secrets: SecretsConfig::default(),
             browser: BrowserConfig::default(),
             browser_delegate: crate::scattered_types::BrowserDelegateConfig::default(),
@@ -2561,7 +2411,6 @@ auto_save = true
             link_enricher: LinkEnricherConfig::default(),
             text_browser: TextBrowserConfig::default(),
             web_search: WebSearchConfig::default(),
-            project_intel: ProjectIntelConfig::default(),
             google_workspace: GoogleWorkspaceConfig::default(),
             proxy: ProxyConfig::default(),
             agent: AgentConfig::default(),
@@ -2579,7 +2428,6 @@ auto_save = true
             mcp: McpConfig::default(),
             nodes: NodesConfig::default(),
             workspace: WorkspaceConfig::default(),
-            notion: NotionConfig::default(),
             jira: JiraConfig::default(),
             node_transport: NodeTransportConfig::default(),
             knowledge: KnowledgeConfig::default(),
@@ -3061,7 +2909,6 @@ default_temperature = 0.7
             backup: BackupConfig::default(),
             data_retention: DataRetentionConfig::default(),
             cloud_ops: CloudOpsConfig::default(),
-            conversational_ai: ConversationalAiConfig::default(),
             security: SecurityConfig::default(),
             security_ops: SecurityOpsConfig::default(),
             runtime: RuntimeConfig::default(),
@@ -3079,8 +2926,6 @@ default_temperature = 0.7
             storage: StorageConfig::default(),
             tunnel: TunnelConfig::default(),
             gateway: GatewayConfig::default(),
-            composio: ComposioConfig::default(),
-            microsoft365: Microsoft365Config::default(),
             secrets: SecretsConfig::default(),
             browser: BrowserConfig::default(),
             browser_delegate: crate::scattered_types::BrowserDelegateConfig::default(),
@@ -3091,7 +2936,6 @@ default_temperature = 0.7
             link_enricher: LinkEnricherConfig::default(),
             text_browser: TextBrowserConfig::default(),
             web_search: WebSearchConfig::default(),
-            project_intel: ProjectIntelConfig::default(),
             google_workspace: GoogleWorkspaceConfig::default(),
             proxy: ProxyConfig::default(),
             agent: AgentConfig::default(),
@@ -3109,7 +2953,6 @@ default_temperature = 0.7
             mcp: McpConfig::default(),
             nodes: NodesConfig::default(),
             workspace: WorkspaceConfig::default(),
-            notion: NotionConfig::default(),
             jira: JiraConfig::default(),
             node_transport: NodeTransportConfig::default(),
             knowledge: KnowledgeConfig::default(),
@@ -3159,7 +3002,6 @@ default_temperature = 0.7
         config.workspace_dir = dir.join("workspace");
         config.config_path = dir.join("config.toml");
         config.api_key = Some("root-credential".into());
-        config.composio.api_key = Some("composio-credential".into());
         config.browser.computer_use.api_key = Some("browser-credential".into());
         config.web_search.brave_api_key = Some("brave-credential".into());
         config.storage.provider.config.db_url = Some("postgres://user:pw@host/db".into());
@@ -4012,69 +3854,6 @@ default_temperature = 0.7
     }
 
     // ══════════════════════════════════════════════════════════
-    // COMPOSIO CONFIG TESTS
-    // ══════════════════════════════════════════════════════════
-
-    #[test]
-    async fn composio_config_default_disabled() {
-        let c = ComposioConfig::default();
-        assert!(!c.enabled, "Composio must be disabled by default");
-        assert!(c.api_key.is_none(), "No API key by default");
-        assert_eq!(c.entity_id, "default");
-    }
-
-    #[test]
-    async fn composio_config_serde_roundtrip() {
-        let c = ComposioConfig {
-            enabled: true,
-            api_key: Some("comp-key-123".into()),
-            entity_id: "user42".into(),
-        };
-        let toml_str = toml::to_string(&c).unwrap();
-        let parsed: ComposioConfig = toml::from_str(&toml_str).unwrap();
-        assert!(parsed.enabled);
-        assert_eq!(parsed.api_key.as_deref(), Some("comp-key-123"));
-        assert_eq!(parsed.entity_id, "user42");
-    }
-
-    #[test]
-    async fn composio_config_backward_compat_missing_section() {
-        let minimal = r#"
-workspace_dir = "/tmp/ws"
-config_path = "/tmp/config.toml"
-default_temperature = 0.7
-"#;
-        let parsed = parse_test_config(minimal);
-        assert!(
-            !parsed.composio.enabled,
-            "Missing [composio] must default to disabled"
-        );
-        assert!(parsed.composio.api_key.is_none());
-    }
-
-    #[test]
-    async fn composio_config_partial_toml() {
-        let toml_str = r"
-enabled = true
-";
-        let parsed: ComposioConfig = toml::from_str(toml_str).unwrap();
-        assert!(parsed.enabled);
-        assert!(parsed.api_key.is_none());
-        assert_eq!(parsed.entity_id, "default");
-    }
-
-    #[test]
-    async fn composio_config_enable_alias_supported() {
-        let toml_str = r"
-enable = true
-";
-        let parsed: ComposioConfig = toml::from_str(toml_str).unwrap();
-        assert!(parsed.enabled);
-        assert!(parsed.api_key.is_none());
-        assert_eq!(parsed.entity_id, "default");
-    }
-
-    // ══════════════════════════════════════════════════════════
     // SECRETS CONFIG TESTS
     // ══════════════════════════════════════════════════════════
 
@@ -4104,16 +3883,6 @@ default_temperature = 0.7
             parsed.secrets.encrypt,
             "Missing [secrets] must default to encrypt=true"
         );
-    }
-
-    #[test]
-    async fn config_default_has_composio_and_secrets() {
-        let c = Config::default();
-        assert!(!c.composio.enabled);
-        assert!(c.composio.api_key.is_none());
-        assert!(c.secrets.encrypt);
-        assert!(c.browser.enabled);
-        assert_eq!(c.browser.allowed_domains, vec!["*".to_string()]);
     }
 
     #[test]
