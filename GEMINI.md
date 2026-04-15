@@ -1,56 +1,47 @@
 # GEMINI.md - NaraeClaw Project Context
 
 ## Project Overview
-**NaraeClaw (나래클로)** is a lightweight, Korean-first AI agent runtime optimized for messaging platforms like Telegram. It is a fork of [ZeroClaw](https://github.com/zeroclaw-labs/zeroclaw), optimized for low latency, memory safety, and Korean language environment.
+**NaraeClaw (나래클로)** is a lightweight, Korean-first AI agent runtime optimized for messaging platforms like Telegram. It is a highly optimized fork of ZeroClaw, focusing on low latency, in-memory security, and a streamlined developer experience.
 
 - **Primary Goal:** To provide a fast, responsive AI assistant with a "Korean-first" experience.
-- **Key Optimization:** High-performance **Telegram Webhooks** (Axum-based) to eliminate polling latency.
-- **Security Mandate:** Multi-layered protection including unified credential filtering and in-memory zeroization.
-- **Core Stack:** Rust (Edition 2024), Tokio (Async), Ratatui (TUI), Axum (Gateway/Webhooks), ChaCha20-Poly1305 (Encryption).
+- **Key Optimization:** High-performance **Telegram Webhooks** (Axum-based) and a modularized configuration system.
+- **Security Mandate:** Unified credential filtering (`CredentialFilter`), in-memory zeroization (`Zeroize`), and thread-safe environment management.
+- **Core Stack:** Rust (Edition 2024), Tokio (Async), Axum (Gateway/Webhooks), ChaCha20-Poly1305 (Encryption).
 
 ## Core Architecture
-The project is a modular Rust workspace:
+The project is a modular Rust workspace, recently refactored for maximum maintainability:
 
-- **`naraeclaw` (Binary):** CLI entry point in `src/main.rs`. Handles startup, logging init, and command routing.
+- **`naraeclaw` (Binary):** CLI entry point in `src/main.rs`.
 - **`zeroclaw-runtime`:** The core engine.
-  - `agent/`: Main execution loop with anti-narration logic and tool-call handling.
-  - `security/`: **CredentialFilter** (unified leak detection), **SecretStore** (AEAD encryption), and sandbox policies.
+  - `agent/`: Main execution loop with anti-narration and integrated scrubbing.
+  - `security/`: **CredentialFilter** (unified leak detection), **SecretStore** (AEAD), and sandbox.
 - **`zeroclaw-channels`:** Platform integrations.
   - Optimized for **Telegram Webhooks**.
-  - Uses a **Feature-gate system** to exclude 24+ non-core channels by default, minimizing binary size.
-- **`zeroclaw-config`:** Robust configuration system.
-  - **`#[secret]` macros**: Automatically implements `Zeroize` on Drop for sensitive fields.
-  - **OnceLock/Mutex**: Thread-safe environment variable management for configuration overrides.
-- **`zeroclaw-providers`:** LLM backend factory.
-  - Centralized constants for API keys and base URLs for easy override.
+  - Uses a **Feature-gate system** to exclude non-core channels, minimizing binary size.
+- **`zeroclaw-config`:** Highly modularized configuration system.
+  - **`schema/` Directory:** Formerly a single 17k line file, now split into `mod.rs`, `config_types.rs`, `channels.rs`, `providers.rs`, `security.rs`, `tools.rs`, and `automation.rs`.
+  - **Security Macros**: Automatically implements `Zeroize` on Drop for `#[secret]` fields.
+- **`zeroclaw-providers`:** LLM backend factory with centralized environment key management.
 
 ## Development & Security Guide
 
 ### Building and Running
-- **Default (Lightweight):** `cargo build --release` (only core channels like Telegram/Slack).
-- **Full Build:** `cargo build --release --features channels-full` (includes all 30+ channels).
-- **Setup:** `cargo run -- onboard` (Interactive Korean wizard).
-- **Run:** `cargo run -- agent` or `cargo run -- daemon` (for webhooks).
+- **Lightweight (Default):** `cargo build --release`
+- **Full Build:** `cargo build --release --features channels-full`
+- **Onboarding:** `cargo run -- onboard` (Full Korean UI).
 
 ### Security Implementation
-- **Unified Filtering:** All outbound messages pass through `CredentialFilter` which detects raw, Base64, Hex, and URL-encoded secrets, even across streaming chunk boundaries.
-- **Memory Safety:** `Zeroize` is enforced on all secret fields (API keys, tokens) to prevent data recovery from memory dumps.
-- **Env Var Safety:** Production code avoids `unsafe { set_var }` during runtime, using serialized access or early-init patterns.
+- **Unified Filtering:** All outbound messages pass through `CredentialFilter` (handles Base64, Hex, URL-encoding, and streaming chunks).
+- **Memory Safety:** Every sensitive field (API keys, tokens) is wiped from memory on Drop via the `Zeroize` trait.
+- **Env Var Safety:** Serialized access to environment variables via `OnceLock` and `Mutex` to prevent UB in async contexts.
 
-### Testing
-- **Security Check:** `cargo test -p zeroclaw-runtime security::leak_detector`
-- **Full Gate:** `just ci` (runs fmt, clippy, and all tests).
-
-## Localization Status (100% Complete)
-1. **CLI Help:** Fully translated to Korean in `src/main.rs`.
-2. **System Prompts:** Optimized for Korean natural language, including anti-narration and hardware control instructions.
-3. **User Docs:** `README.md` and `Plan.md` are maintained in Korean.
+### Cleanup & Pruning (Completed)
+- **Dead Code Removal:** Removed legacy providers (`glm.rs`) and experimental configs (`ConversationalAi`, `ProjectIntel`, etc.).
+- **Resource Optimization:** Only Korean (`ko`) and English (`en`) docs/descriptions are retained.
 
 ## Key Files & Modules
-- `src/main.rs`: CLI definitions and early-init security.
+- `src/main.rs`: CLI definitions and thread-safe early initialization.
 - `crates/zeroclaw-runtime/src/security/leak_detector.rs`: The **CredentialFilter** engine.
-- `crates/zeroclaw-runtime/src/agent/loop_.rs`: Core agent loop with integrated scrub logic.
-- `crates/zeroclaw-channels/src/telegram.rs`: Telegram Webhook and polling implementations.
-- `crates/zeroclaw-config/src/schema.rs`: Main configuration schema with security macros.
-- `crates/zeroclaw-providers/src/env_keys.rs`: Centralized constants for environment variable keys.
-- `Plan.md`: Detailed history of architectural improvements and future roadmap.
+- `crates/zeroclaw-config/src/schema/mod.rs`: Entry point for the modularized config system.
+- `crates/zeroclaw-channels/src/telegram.rs`: Telegram Webhook implementation.
+- `Plan.md`: Historical record of architectural evolution and future roadmap.
