@@ -1,6 +1,5 @@
 //! Tool implementations for agent-callable capabilities.
 
-pub mod microsoft365;
 pub mod util_helpers;
 
 pub mod ask_user;
@@ -16,7 +15,6 @@ pub mod cli_discovery;
 pub mod cloud_ops;
 pub mod cloud_patterns;
 pub mod codex_cli;
-pub mod composio;
 pub mod content_search;
 pub mod data_management;
 pub mod discord_search;
@@ -50,17 +48,13 @@ pub mod memory_recall;
 pub mod memory_store;
 pub mod model_routing_config;
 pub mod node_capabilities;
-pub mod notion_tool;
 pub mod opencode_cli;
 pub mod pdf_read;
 pub mod pipeline;
 pub mod poll;
-pub mod project_intel;
 pub mod proxy_config;
 pub mod pushover;
 pub mod reaction;
-pub mod report_template_tool;
-pub mod report_templates;
 pub mod screenshot;
 pub mod sessions;
 pub mod swarm;
