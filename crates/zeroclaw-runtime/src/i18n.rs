@@ -258,31 +258,37 @@ shell = "Execute a shell command"
 
     #[test]
     fn detect_locale_from_env() {
-        // Save and restore env.
+        // Hold ENV_WRITE_MUTEX for the duration of this test to serialize
+        // environment-variable mutations against other tests that may run
+        // concurrently in the same process.
+        let _guard = zeroclaw_config::schema::ENV_WRITE_MUTEX
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+
         let saved = std::env::var("ZEROCLAW_LOCALE").ok();
         let saved_lang = std::env::var("LANG").ok();
 
-        // SAFETY: test-only, single-threaded test runner.
+        // SAFETY: ENV_WRITE_MUTEX is held, serializing all env mutations.
         unsafe { std::env::set_var("ZEROCLAW_LOCALE", "ja-JP") };
         assert_eq!(detect_locale(), "ja-JP");
 
-        // SAFETY: test-only, single-threaded test runner.
+        // SAFETY: ENV_WRITE_MUTEX is held, serializing all env mutations.
         unsafe { std::env::remove_var("ZEROCLAW_LOCALE") };
-        // SAFETY: test-only, single-threaded test runner.
+        // SAFETY: ENV_WRITE_MUTEX is held, serializing all env mutations.
         unsafe { std::env::set_var("LANG", "zh_CN.UTF-8") };
         assert_eq!(detect_locale(), "zh-CN");
 
-        // Restore.
+        // Restore original values.
         match saved {
-            // SAFETY: test-only, single-threaded test runner.
+            // SAFETY: ENV_WRITE_MUTEX is held, serializing all env mutations.
             Some(v) => unsafe { std::env::set_var("ZEROCLAW_LOCALE", v) },
-            // SAFETY: test-only, single-threaded test runner.
+            // SAFETY: ENV_WRITE_MUTEX is held, serializing all env mutations.
             None => unsafe { std::env::remove_var("ZEROCLAW_LOCALE") },
         }
         match saved_lang {
-            // SAFETY: test-only, single-threaded test runner.
+            // SAFETY: ENV_WRITE_MUTEX is held, serializing all env mutations.
             Some(v) => unsafe { std::env::set_var("LANG", v) },
-            // SAFETY: test-only, single-threaded test runner.
+            // SAFETY: ENV_WRITE_MUTEX is held, serializing all env mutations.
             None => unsafe { std::env::remove_var("LANG") },
         }
     }

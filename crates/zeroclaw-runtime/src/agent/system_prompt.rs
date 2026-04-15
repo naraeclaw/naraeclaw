@@ -201,7 +201,8 @@ pub fn build_system_prompt_with_mode_and_autonomy(
              - 감독·승인 메커니즘을 우회하지 마세요.\n",
         );
     }
-    prompt.push_str("- `rm` 대신 `trash`를 선호하세요 (복구 가능한 것이 영구 삭제보다 낫습니다).\n");
+    prompt
+        .push_str("- `rm` 대신 `trash`를 선호하세요 (복구 가능한 것이 영구 삭제보다 낫습니다).\n");
     prompt.push_str(match autonomy_config.map(|cfg| cfg.level) {
         Some(crate::security::AutonomyLevel::Full) => {
             "- 런타임 자율성 정책을 준수하세요: tool 또는 동작이 허용된 경우 사용자의 추가 승인을 구하지 말고 직접 실행하세요.\n\
@@ -298,7 +299,9 @@ pub fn build_system_prompt_with_mode_and_autonomy(
     // ── 8. Channel Capabilities (skipped in compact_context mode) ──
     if !compact_context {
         prompt.push_str("## 채널 기능\n\n");
-        prompt.push_str("- 메시징 봇으로 실행 중입니다. 응답은 자동으로 사용자의 채널로 전송됩니다.\n");
+        prompt.push_str(
+            "- 메시징 봇으로 실행 중입니다. 응답은 자동으로 사용자의 채널로 전송됩니다.\n",
+        );
         prompt.push_str("- 응답 권한을 물어볼 필요 없습니다 — 바로 응답하세요.\n");
         prompt.push_str(match autonomy_config.map(|cfg| cfg.level) {
         Some(crate::security::AutonomyLevel::Full) => {
@@ -314,8 +317,12 @@ pub fn build_system_prompt_with_mode_and_autonomy(
              - 이 채널에 승인 경로가 없거나 런타임이 동작을 차단한 경우, 승인 흐름을 시뮬레이션하는 대신 그 제한을 직접 설명하세요.\n"
         }
     });
-        prompt.push_str("- 자격증명, 토큰, API 키, 비밀 정보를 응답에 절대 반복하거나 노출하지 마세요.\n");
-        prompt.push_str("- Tool 출력에 자격증명이 포함된 경우 이미 삭제되어 있습니다 — 언급하지 마세요.\n");
+        prompt.push_str(
+            "- 자격증명, 토큰, API 키, 비밀 정보를 응답에 절대 반복하거나 노출하지 마세요.\n",
+        );
+        prompt.push_str(
+            "- Tool 출력에 자격증명이 포함된 경우 이미 삭제되어 있습니다 — 언급하지 마세요.\n",
+        );
         prompt.push_str("- 사용자가 음성 메시지를 보내면 자동으로 텍스트로 변환됩니다. 텍스트 응답은 자동으로 음성으로 변환되어 전송됩니다. 직접 오디오를 생성하려 하지 마세요 — TTS는 채널이 처리합니다.\n");
         prompt.push_str("- Tool 사용을 절대 설명하거나 예고하지 마세요. 'Let me fetch...', 'I will use...', '검색 중...' 같은 말은 하지 마세요. 최종 답변만 제시하세요 — 중간 단계, tool 언급, 진행 상황 업데이트 없이.\n\n");
     } // end if !compact_context (Channel Capabilities)
@@ -380,7 +387,10 @@ fn inject_workspace_file(
         }
         Err(_) => {
             // Missing-file marker (matches OpenClaw behavior)
-            let _ = writeln!(prompt, "### {filename}\n\n[파일을 찾을 수 없음: {filename}]\n");
+            let _ = writeln!(
+                prompt,
+                "### {filename}\n\n[파일을 찾을 수 없음: {filename}]\n"
+            );
         }
     }
 }

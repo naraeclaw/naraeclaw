@@ -6,8 +6,8 @@ use std::sync::Arc;
 use zeroclaw_api::tool::{Tool, ToolResult};
 use zeroclaw_config::policy::SecurityPolicy;
 use zeroclaw_config::schema::{
-    Config, ProxyConfig, ProxyScope, runtime_proxy_config, set_runtime_proxy_config,
-    ENV_WRITE_MUTEX,
+    Config, ENV_WRITE_MUTEX, ProxyConfig, ProxyScope, runtime_proxy_config,
+    set_runtime_proxy_config,
 };
 
 pub struct ProxyConfigTool {

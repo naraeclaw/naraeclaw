@@ -1108,6 +1108,7 @@ pub struct NodesConfig {
     pub max_nodes: usize,
     /// Optional bearer token for node authentication.
     #[serde(default)]
+    #[secret]
     pub auth_token: Option<String>,
 }
 
