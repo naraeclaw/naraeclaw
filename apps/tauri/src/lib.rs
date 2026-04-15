@@ -80,7 +80,18 @@ fn set_dock_icon() {
     }
 }
 
+/// Minimum and maximum allowed window dimensions.
+const WIN_MIN_W: u32 = 600;
+const WIN_MIN_H: u32 = 400;
+const WIN_MAX_W: u32 = 7680; // 8K width
+const WIN_MAX_H: u32 = 4320; // 8K height
+
 /// Restore window size and position from the persisted store.
+///
+/// Dimensions are clamped to sane bounds so a stale or corrupted store
+/// cannot produce a window that is too small, too large, or invisible.
+/// Position is only restored when both x and y are non-negative to avoid
+/// placing the window off-screen on single-monitor setups.
 fn restore_window_state<R: tauri::Runtime>(app: &tauri::App<R>) {
     let Ok(store) = app.store("naraeclaw.json") else { return };
     let Some(window) = app.get_webview_window("main") else { return };
@@ -88,24 +99,31 @@ fn restore_window_state<R: tauri::Runtime>(app: &tauri::App<R>) {
         store.get("window_width").and_then(|v| v.as_u64()),
         store.get("window_height").and_then(|v| v.as_u64()),
     ) {
-        let _ = window.set_size(tauri::Size::Physical(tauri::PhysicalSize {
-            width: w as u32,
-            height: h as u32,
-        }));
+        let width = (w as u32).clamp(WIN_MIN_W, WIN_MAX_W);
+        let height = (h as u32).clamp(WIN_MIN_H, WIN_MAX_H);
+        let _ = window.set_size(tauri::Size::Physical(tauri::PhysicalSize { width, height }));
     }
     if let (Some(x), Some(y)) = (
         store.get("window_x").and_then(|v| v.as_i64()),
         store.get("window_y").and_then(|v| v.as_i64()),
     ) {
-        let _ = window.set_position(tauri::Position::Physical(tauri::PhysicalPosition {
-            x: x as i32,
-            y: y as i32,
-        }));
+        // Only restore position when both coordinates are non-negative;
+        // negative values indicate off-screen positions (e.g. from a
+        // disconnected secondary monitor).
+        if x >= 0 && y >= 0 {
+            let _ = window.set_position(tauri::Position::Physical(tauri::PhysicalPosition {
+                x: x as i32,
+                y: y as i32,
+            }));
+        }
     }
 }
 
 /// Save window size and position to the persisted store.
-fn save_window_state<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
+///
+/// Called from the tray "Quit" handler (primary path) and from
+/// `RunEvent::Exit` as a fallback.
+pub fn save_window_state<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
     let Some(window) = app.get_webview_window("main") else { return };
     let Ok(store) = app.store("naraeclaw.json") else { return };
     if let Ok(size) = window.outer_size() {

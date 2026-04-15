@@ -7,8 +7,12 @@ pub fn handle_menu_event<R: Runtime>(app: &AppHandle<R>, event: MenuEvent) {
         "show" => show_main_window(app, None),
         "chat" => show_main_window(app, Some("/agent")),
         "quit" => {
-            // Shut down the gateway sidecar before exiting so it doesn't
-            // outlive the app. This is the primary shutdown path.
+            // Save window state, shut down the gateway sidecar, then exit.
+            // State is saved here (primary quit path) because RunEvent::Exit
+            // fires only after ExitRequested is not prevented; the run loop's
+            // prevent_exit() guard exists to keep the tray app alive on window
+            // close, so the Exit event is not guaranteed when exit() is called.
+            crate::save_window_state(app);
             tauri::async_runtime::block_on(crate::sidecar::shutdown_agent());
             app.exit(0);
         }
