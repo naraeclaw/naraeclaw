@@ -1198,6 +1198,10 @@ async fn main() -> Result<()> {
         } => {
             let final_temperature = temperature.unwrap_or(config.default_temperature);
 
+            zeroclaw_runtime::agent::loop_::register_cli_channel_fn(Box::new(|| {
+                Box::new(zeroclaw_channels::cli::CliChannel::new())
+            }));
+
             Box::pin(agent::run(
                 config,
                 message,
