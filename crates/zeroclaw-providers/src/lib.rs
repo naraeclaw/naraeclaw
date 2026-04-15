@@ -26,7 +26,6 @@ pub mod copilot;
 pub mod env_keys;
 pub mod gemini;
 pub mod gemini_cli;
-// glm.rs excluded — not compiled in upstream (dead code with known issues)
 pub mod kilocli;
 pub mod multimodal;
 pub mod ollama;
