@@ -107,13 +107,11 @@ Tools are grouped by logical function rather than one label per file.
 |---|---|
 | `tool:browser` | `browser.rs`, `browser_delegate.rs`, `browser_open.rs`, `text_browser.rs`, `screenshot.rs` |
 | `tool:cloud` | `cloud_ops.rs`, `cloud_patterns.rs` |
-| `tool:composio` | `composio.rs` |
 | `tool:cron` | `cron_add.rs`, `cron_list.rs`, `cron_remove.rs`, `cron_run.rs`, `cron_runs.rs`, `cron_update.rs` |
 | `tool:file` | `file_edit.rs`, `file_read.rs`, `file_write.rs`, `glob_search.rs`, `content_search.rs` |
 | `tool:google-workspace` | `google_workspace.rs` |
 | `tool:mcp` | `mcp_client.rs`, `mcp_deferred.rs`, `mcp_protocol.rs`, `mcp_tool.rs`, `mcp_transport.rs` |
 | `tool:memory` | `memory_forget.rs`, `memory_recall.rs`, `memory_store.rs` |
-| `tool:microsoft365` | `microsoft365/**` |
 | `tool:security` | `security_ops.rs`, `verifiable_intent.rs` |
 | `tool:shell` | `shell.rs`, `node_tool.rs`, `cli_discovery.rs` |
 | `tool:sop` | `sop_advance.rs`, `sop_approve.rs`, `sop_execute.rs`, `sop_list.rs`, `sop_status.rs` |
