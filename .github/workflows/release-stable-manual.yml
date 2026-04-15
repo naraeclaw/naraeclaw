@@ -602,16 +602,6 @@ jobs:
       dry_run: false
     secrets: inherit
 
-  aur:
-    name: Update AUR Package
-    needs: [validate, publish]
-    if: ${{ !cancelled() && needs.publish.result == 'success' }}
-    uses: ./.github/workflows/pub-aur.yml
-    with:
-      release_tag: ${{ needs.validate.outputs.tag }}
-      dry_run: false
-    secrets: inherit
-
   homebrew:
     name: Update Homebrew Core
     needs: [validate, publish]
@@ -620,16 +610,6 @@ jobs:
     with:
       release_tag: ${{ needs.validate.outputs.tag }}
       dry_run: false
-    secrets: inherit
-
-  # ── Post-publish: sync marketplace templates (Coolify, Dokploy, EasyPanel) ──
-  marketplace:
-    name: Sync Marketplace Templates
-    needs: [validate, docker]
-    if: ${{ !cancelled() && needs.docker.result == 'success' }}
-    uses: ./.github/workflows/sync-marketplace-templates.yml
-    with:
-      release_tag: ${{ needs.validate.outputs.tag }}
     secrets: inherit
 
   # ── Post-publish: announce after release + website are live ───────────
