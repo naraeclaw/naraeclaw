@@ -9,9 +9,17 @@ pub mod tray;
 
 use gateway_client::GatewayClient;
 use state::shared_state;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 use tauri::{Manager, RunEvent};
 use tauri_plugin_store::StoreExt;
+
+/// Set to `true` by the tray Quit handler before calling `app.exit(0)`.
+///
+/// `RunEvent::ExitRequested` fires first on every `exit()` call. For tray apps
+/// we prevent that exit (keeping the process alive when windows close). This
+/// flag lets the Quit handler signal "this exit is intentional — let it through."
+pub static INTENTIONAL_QUIT: AtomicBool = AtomicBool::new(false);
 
 /// Attempt to auto-pair with the gateway so the WebView has a valid token
 /// before the React frontend mounts. Runs on localhost so the admin endpoints
@@ -235,13 +243,16 @@ pub fn run() {
         .expect("error while building tauri application")
         .run(|app_handle, event| {
             match event {
-                // Keep the app running in the background when all windows are closed.
-                // This is the standard pattern for menu bar / tray apps.
+                // Keep the app alive when windows are closed (tray app pattern).
+                // Exception: the tray Quit handler sets INTENTIONAL_QUIT before
+                // calling app.exit(0), so we let that exit through.
                 RunEvent::ExitRequested { api, .. } => {
-                    api.prevent_exit();
+                    if !INTENTIONAL_QUIT.load(Ordering::Acquire) {
+                        api.prevent_exit();
+                    }
                 }
-                // On actual exit (user clicked Quit in the tray menu):
-                // save window state, then kill the sidecar.
+                // Fallback shutdown path — reached when INTENTIONAL_QUIT is true
+                // and ExitRequested was not prevented.
                 RunEvent::Exit => {
                     save_window_state(app_handle);
                     tauri::async_runtime::block_on(sidecar::shutdown_agent());
