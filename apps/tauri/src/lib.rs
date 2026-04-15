@@ -1,4 +1,4 @@
-//! ZeroClaw Desktop — Tauri application library.
+//! NaraeClaw Desktop — Tauri application library.
 
 pub mod commands;
 pub mod gateway_client;
@@ -9,8 +9,17 @@ pub mod tray;
 
 use gateway_client::GatewayClient;
 use state::shared_state;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 use tauri::{Manager, RunEvent};
+use tauri_plugin_store::StoreExt;
+
+/// Set to `true` by the tray Quit handler before calling `app.exit(0)`.
+///
+/// `RunEvent::ExitRequested` fires first on every `exit()` call. For tray apps
+/// we prevent that exit (keeping the process alive when windows close). This
+/// flag lets the Quit handler signal "this exit is intentional — let it through."
+pub static INTENTIONAL_QUIT: AtomicBool = AtomicBool::new(false);
 
 /// Attempt to auto-pair with the gateway so the WebView has a valid token
 /// before the React frontend mounts. Runs on localhost so the admin endpoints
@@ -79,6 +88,63 @@ fn set_dock_icon() {
     }
 }
 
+/// Minimum and maximum allowed window dimensions.
+const WIN_MIN_W: u32 = 600;
+const WIN_MIN_H: u32 = 400;
+const WIN_MAX_W: u32 = 7680; // 8K width
+const WIN_MAX_H: u32 = 4320; // 8K height
+
+/// Restore window size and position from the persisted store.
+///
+/// Dimensions are clamped to sane bounds so a stale or corrupted store
+/// cannot produce a window that is too small, too large, or invisible.
+/// Position is only restored when both x and y are non-negative to avoid
+/// placing the window off-screen on single-monitor setups.
+fn restore_window_state<R: tauri::Runtime>(app: &tauri::App<R>) {
+    let Ok(store) = app.store("naraeclaw.json") else { return };
+    let Some(window) = app.get_webview_window("main") else { return };
+    if let (Some(w), Some(h)) = (
+        store.get("window_width").and_then(|v| v.as_u64()),
+        store.get("window_height").and_then(|v| v.as_u64()),
+    ) {
+        let width = (w as u32).clamp(WIN_MIN_W, WIN_MAX_W);
+        let height = (h as u32).clamp(WIN_MIN_H, WIN_MAX_H);
+        let _ = window.set_size(tauri::Size::Physical(tauri::PhysicalSize { width, height }));
+    }
+    if let (Some(x), Some(y)) = (
+        store.get("window_x").and_then(|v| v.as_i64()),
+        store.get("window_y").and_then(|v| v.as_i64()),
+    ) {
+        // Only restore position when both coordinates are non-negative;
+        // negative values indicate off-screen positions (e.g. from a
+        // disconnected secondary monitor).
+        if x >= 0 && y >= 0 {
+            let _ = window.set_position(tauri::Position::Physical(tauri::PhysicalPosition {
+                x: x as i32,
+                y: y as i32,
+            }));
+        }
+    }
+}
+
+/// Save window size and position to the persisted store.
+///
+/// Called from the tray "Quit" handler (primary path) and from
+/// `RunEvent::Exit` as a fallback.
+pub fn save_window_state<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
+    let Some(window) = app.get_webview_window("main") else { return };
+    let Ok(store) = app.store("naraeclaw.json") else { return };
+    if let Ok(size) = window.outer_size() {
+        store.set("window_width", size.width);
+        store.set("window_height", size.height);
+    }
+    if let Ok(pos) = window.outer_position() {
+        store.set("window_x", pos.x);
+        store.set("window_y", pos.y);
+    }
+    let _ = store.save();
+}
+
 /// Configure and run the Tauri application.
 pub fn run() {
     let shared = shared_state();
@@ -109,6 +175,9 @@ pub fn run() {
 
             // Set up the system tray.
             let _ = tray::setup_tray(app);
+
+            // Restore saved window size and position from previous session.
+            restore_window_state(app);
 
             // Spawn the naraeclaw agent sidecar. The gateway HTTP server it starts
             // is what the WebView connects to. We show the window only after the
@@ -172,15 +241,20 @@ pub fn run() {
         })
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
-        .run(|_app, event| {
+        .run(|app_handle, event| {
             match event {
-                // Keep the app running in the background when all windows are closed.
-                // This is the standard pattern for menu bar / tray apps.
+                // Keep the app alive when windows are closed (tray app pattern).
+                // Exception: the tray Quit handler sets INTENTIONAL_QUIT before
+                // calling app.exit(0), so we let that exit through.
                 RunEvent::ExitRequested { api, .. } => {
-                    api.prevent_exit();
+                    if !INTENTIONAL_QUIT.load(Ordering::Acquire) {
+                        api.prevent_exit();
+                    }
                 }
-                // On actual exit (user clicked Quit in the tray menu), kill the sidecar.
+                // Fallback shutdown path — reached when INTENTIONAL_QUIT is true
+                // and ExitRequested was not prevented.
                 RunEvent::Exit => {
+                    save_window_state(app_handle);
                     tauri::async_runtime::block_on(sidecar::shutdown_agent());
                 }
                 _ => {}

@@ -1,4 +1,4 @@
-//! HTTP client for communicating with the ZeroClaw gateway.
+//! HTTP client for communicating with the NaraeClaw gateway.
 
 use anyhow::{Context, Result};
 
