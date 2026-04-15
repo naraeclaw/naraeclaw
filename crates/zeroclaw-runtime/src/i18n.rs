@@ -261,7 +261,7 @@ shell = "Execute a shell command"
         // Hold ENV_WRITE_MUTEX for the duration of this test to serialize
         // environment-variable mutations against other tests that may run
         // concurrently in the same process.
-        let _guard = zeroclaw_config::ENV_WRITE_MUTEX
+        let _guard = zeroclaw_config::schema::ENV_WRITE_MUTEX
             .lock()
             .unwrap_or_else(|e| e.into_inner());
 
