@@ -336,11 +336,6 @@
           - "src/tools/text_browser.rs"
           - "src/tools/screenshot.rs"
 
-"tool:composio":
-  - changed-files:
-      - any-glob-to-any-file:
-          - "src/tools/composio.rs"
-
 "tool:cron":
   - changed-files:
       - any-glob-to-any-file:
@@ -380,11 +375,6 @@
           - "src/tools/memory_forget.rs"
           - "src/tools/memory_recall.rs"
           - "src/tools/memory_store.rs"
-
-"tool:microsoft365":
-  - changed-files:
-      - any-glob-to-any-file:
-          - "src/tools/microsoft365/**"
 
 "tool:shell":
   - changed-files:

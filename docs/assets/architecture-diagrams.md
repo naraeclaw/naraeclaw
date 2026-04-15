@@ -637,7 +637,6 @@ flowchart TB
     Complete --> Runtime[runtime config<br/>kind, exec]
     Complete --> Peripherals[peripherals<br/>boards, datasheet_dir]
     Complete --> Cron[cron config<br/>enabled, db_path]
-    Complete --> Composio[composio<br/>enabled, api_key]
     Complete --> Browser[browser<br/>enabled, allowlist]
     Complete --> Tunnel[tunnel<br/>provider, token]
 
