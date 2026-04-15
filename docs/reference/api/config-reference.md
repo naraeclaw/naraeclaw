@@ -343,22 +343,6 @@ Notes:
 - `prompt_injection_mode = "compact"` is recommended on low-context local models to reduce startup prompt size while keeping skill files available on demand.
 - Skill loading and `zeroclaw skills install` both apply a static security audit. Skills that contain symlinks, script-like files, high-risk shell payload snippets, or unsafe markdown link traversal are rejected.
 
-## `[composio]`
-
-| Key | Default | Purpose |
-|---|---|---|
-| `enabled` | `false` | Enable Composio managed OAuth tools |
-| `api_key` | unset | Composio API key used by the `composio` tool |
-| `entity_id` | `default` | Default `user_id` sent on connect/execute calls |
-
-Notes:
-
-- Backward compatibility: legacy `enable = true` is accepted as an alias for `enabled = true`.
-- If `enabled = false` or `api_key` is missing, the `composio` tool is not registered.
-- ZeroClaw requests Composio v3 tools with `toolkit_versions=latest` and executes tools with `version="latest"` to avoid stale default tool revisions.
-- Typical flow: call `connect`, complete browser OAuth, then run `execute` for the desired tool action.
-- If Composio returns a missing connected-account reference error, call `list_accounts` (optionally with `app`) and pass the returned `connected_account_id` to `execute`.
-
 ## `[cost]`
 
 | Key | Default | Purpose |

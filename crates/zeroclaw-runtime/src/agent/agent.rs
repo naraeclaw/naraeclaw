@@ -390,9 +390,6 @@ impl Agent {
                 config.api_key.as_deref(),
             )?);
 
-        let composio_key: Option<&str> = None;
-        let composio_entity_id: Option<&str> = None;
-
         let (
             mut tools,
             delegate_handle,
@@ -405,8 +402,6 @@ impl Agent {
             &security,
             runtime,
             memory.clone(),
-            composio_key,
-            composio_entity_id,
             &config.browser,
             &config.http_request,
             &config.web_fetch,

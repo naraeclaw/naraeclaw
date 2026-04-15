@@ -4839,8 +4839,6 @@ pub async fn start_channels(config: Config) -> Result<()> {
         &security,
         runtime,
         Arc::clone(&mem),
-        None::<&str>,
-        None::<&str>,
         &config.browser,
         &config.http_request,
         &config.web_fetch,

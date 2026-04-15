@@ -453,8 +453,6 @@ pub async fn run_gateway(
         &config.workspace_dir,
     ));
 
-    let (composio_key, composio_entity_id): (Option<&str>, Option<&str>) = (None, None);
-
     let canvas_store = tools::CanvasStore::new();
 
     let (
@@ -469,8 +467,6 @@ pub async fn run_gateway(
         &security,
         runtime,
         Arc::clone(&mem),
-        composio_key,
-        composio_entity_id,
         &config.browser,
         &config.http_request,
         &config.web_fetch,

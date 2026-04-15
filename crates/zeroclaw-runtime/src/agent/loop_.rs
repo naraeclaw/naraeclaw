@@ -1980,7 +1980,6 @@ pub async fn run(
     }
 
     // ── Tools (including memory tools and peripherals) ────────────
-    let (composio_key, composio_entity_id): (Option<&str>, Option<&str>) = (None, None);
     let (
         mut tools_registry,
         delegate_handle,
@@ -1993,8 +1992,6 @@ pub async fn run(
         &security,
         runtime,
         mem.clone(),
-        composio_key,
-        composio_entity_id,
         &config.browser,
         &config.http_request,
         &config.web_fetch,
@@ -2959,7 +2956,6 @@ pub async fn process_message(
         config.api_key.as_deref(),
     )?);
 
-    let (composio_key, composio_entity_id): (Option<&str>, Option<&str>) = (None, None);
     let (
         mut tools_registry,
         delegate_handle_pm,
@@ -2972,8 +2968,6 @@ pub async fn process_message(
         &security,
         runtime,
         mem.clone(),
-        composio_key,
-        composio_entity_id,
         &config.browser,
         &config.http_request,
         &config.web_fetch,
