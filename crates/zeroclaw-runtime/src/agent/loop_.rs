@@ -1980,14 +1980,7 @@ pub async fn run(
     }
 
     // ── Tools (including memory tools and peripherals) ────────────
-    let (composio_key, composio_entity_id) = if config.composio.enabled {
-        (
-            config.composio.api_key.as_deref(),
-            Some(config.composio.entity_id.as_str()),
-        )
-    } else {
-        (None, None)
-    };
+    let (composio_key, composio_entity_id): (Option<&str>, Option<&str>) = (None, None);
     let (
         mut tools_registry,
         delegate_handle,
@@ -2246,12 +2239,7 @@ pub async fn run(
             "Open approved HTTPS URLs in system browser (allowlist-only, no scraping)",
         ));
     }
-    if config.composio.enabled {
-        tool_descs.push((
-            "composio",
-            "Execute actions on 1000+ apps via Composio (Gmail, Notion, GitHub, Slack, etc.). Use action='list' to discover, 'execute' to run (optionally with connected_account_id), 'connect' to OAuth.",
-        ));
-    }
+
     tool_descs.push((
         "schedule",
         "Manage scheduled tasks (create/list/get/cancel/pause/resume). Supports recurring cron and one-shot delays.",
@@ -2971,14 +2959,7 @@ pub async fn process_message(
         config.api_key.as_deref(),
     )?);
 
-    let (composio_key, composio_entity_id) = if config.composio.enabled {
-        (
-            config.composio.api_key.as_deref(),
-            Some(config.composio.entity_id.as_str()),
-        )
-    } else {
-        (None, None)
-    };
+    let (composio_key, composio_entity_id): (Option<&str>, Option<&str>) = (None, None);
     let (
         mut tools_registry,
         delegate_handle_pm,
@@ -3148,9 +3129,7 @@ pub async fn process_message(
     if config.browser.enabled {
         tool_descs.push(("browser_open", "Open approved URLs in browser."));
     }
-    if config.composio.enabled {
-        tool_descs.push(("composio", "Execute actions on 1000+ apps via Composio."));
-    }
+
     if config.peripherals.enabled && !config.peripherals.boards.is_empty() {
         tool_descs.push(("gpio_read", "Read GPIO pin value on connected hardware."));
         tool_descs.push((

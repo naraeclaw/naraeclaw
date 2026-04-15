@@ -8,116 +8,6 @@ use std::path::{Path, PathBuf};
 use std::sync::{Mutex, OnceLock, RwLock};
 use zeroclaw_macros::Configurable;
 
-// ── Composio (managed tool surface) ─────────────────────────────
-
-/// Composio managed OAuth tools integration (`[composio]` section).
-///
-/// Provides access to 1000+ OAuth-connected tools via the Composio platform.
-#[derive(Debug, Clone, Serialize, Deserialize, Configurable)]
-#[cfg_attr(feature = "schema-export", derive(schemars::JsonSchema))]
-#[prefix = "composio"]
-pub struct ComposioConfig {
-    /// Enable Composio integration for 1000+ OAuth tools
-    #[serde(default, alias = "enable")]
-    pub enabled: bool,
-    /// Composio API key (stored encrypted when secrets.encrypt = true)
-    #[serde(default)]
-    #[secret]
-    pub api_key: Option<String>,
-    /// Default entity ID for multi-user setups
-    #[serde(default = "default_entity_id")]
-    pub entity_id: String,
-}
-
-fn default_entity_id() -> String {
-    "default".into()
-}
-
-impl Default for ComposioConfig {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            api_key: None,
-            entity_id: default_entity_id(),
-        }
-    }
-}
-
-// ── Microsoft 365 (Graph API integration) ───────────────────────
-
-/// Microsoft 365 integration via Microsoft Graph API (`[microsoft365]` section).
-///
-/// Provides access to Outlook mail, Teams messages, Calendar events,
-/// OneDrive files, and SharePoint search.
-#[derive(Clone, Serialize, Deserialize, Configurable)]
-#[cfg_attr(feature = "schema-export", derive(schemars::JsonSchema))]
-#[prefix = "ms365"]
-pub struct Microsoft365Config {
-    /// Enable Microsoft 365 integration
-    #[serde(default, alias = "enable")]
-    pub enabled: bool,
-    /// Azure AD tenant ID
-    #[serde(default)]
-    pub tenant_id: Option<String>,
-    /// Azure AD application (client) ID
-    #[serde(default)]
-    pub client_id: Option<String>,
-    /// Azure AD client secret (stored encrypted when secrets.encrypt = true)
-    #[serde(default)]
-    #[secret]
-    pub client_secret: Option<String>,
-    /// Authentication flow: "client_credentials" or "device_code"
-    #[serde(default = "default_ms365_auth_flow")]
-    pub auth_flow: String,
-    /// OAuth scopes to request
-    #[serde(default = "default_ms365_scopes")]
-    pub scopes: Vec<String>,
-    /// Encrypt the token cache file on disk
-    #[serde(default = "default_true")]
-    pub token_cache_encrypted: bool,
-    /// User principal name or "me" (for delegated flows)
-    #[serde(default)]
-    pub user_id: Option<String>,
-}
-
-fn default_ms365_auth_flow() -> String {
-    "client_credentials".to_string()
-}
-
-fn default_ms365_scopes() -> Vec<String> {
-    vec!["https://graph.microsoft.com/.default".to_string()]
-}
-
-impl std::fmt::Debug for Microsoft365Config {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Microsoft365Config")
-            .field("enabled", &self.enabled)
-            .field("tenant_id", &self.tenant_id)
-            .field("client_id", &self.client_id)
-            .field("client_secret", &self.client_secret.as_ref().map(|_| "***"))
-            .field("auth_flow", &self.auth_flow)
-            .field("scopes", &self.scopes)
-            .field("token_cache_encrypted", &self.token_cache_encrypted)
-            .field("user_id", &self.user_id)
-            .finish()
-    }
-}
-
-impl Default for Microsoft365Config {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            tenant_id: None,
-            client_id: None,
-            client_secret: None,
-            auth_flow: default_ms365_auth_flow(),
-            scopes: default_ms365_scopes(),
-            token_cache_encrypted: true,
-            user_id: None,
-        }
-    }
-}
-
 // ── Secrets (encrypted credential store) ────────────────────────
 
 /// Secrets encryption configuration (`[secrets]` section).
@@ -169,11 +59,11 @@ pub struct BrowserComputerUseConfig {
     pub max_coordinate_y: Option<i64>,
 }
 
-fn default_browser_computer_use_endpoint() -> String {
+pub fn default_browser_computer_use_endpoint() -> String {
     "http://127.0.0.1:8787/v1/actions".into()
 }
 
-fn default_browser_computer_use_timeout_ms() -> u64 {
+pub fn default_browser_computer_use_timeout_ms() -> u64 {
     15_000
 }
 
@@ -225,15 +115,15 @@ pub struct BrowserConfig {
     pub computer_use: BrowserComputerUseConfig,
 }
 
-fn default_browser_allowed_domains() -> Vec<String> {
+pub fn default_browser_allowed_domains() -> Vec<String> {
     vec!["*".into()]
 }
 
-fn default_browser_backend() -> String {
+pub fn default_browser_backend() -> String {
     "agent_browser".into()
 }
 
-fn default_browser_webdriver_url() -> String {
+pub fn default_browser_webdriver_url() -> String {
     "http://127.0.0.1:9515".into()
 }
 
@@ -293,11 +183,11 @@ impl Default for HttpRequestConfig {
     }
 }
 
-fn default_http_max_response_size() -> usize {
+pub fn default_http_max_response_size() -> usize {
     1_000_000 // 1MB
 }
 
-fn default_http_timeout_secs() -> u64 {
+pub fn default_http_timeout_secs() -> u64 {
     30
 }
 
@@ -373,11 +263,11 @@ pub struct FirecrawlConfig {
     pub mode: FirecrawlMode,
 }
 
-fn default_firecrawl_api_key_env() -> String {
+pub fn default_firecrawl_api_key_env() -> String {
     "FIRECRAWL_API_KEY".into()
 }
 
-fn default_firecrawl_api_url() -> String {
+pub fn default_firecrawl_api_url() -> String {
     "https://api.firecrawl.dev/v1".into()
 }
 
@@ -392,15 +282,15 @@ impl Default for FirecrawlConfig {
     }
 }
 
-fn default_web_fetch_max_response_size() -> usize {
+pub fn default_web_fetch_max_response_size() -> usize {
     500_000 // 500KB
 }
 
-fn default_web_fetch_timeout_secs() -> u64 {
+pub fn default_web_fetch_timeout_secs() -> u64 {
     30
 }
 
-fn default_web_fetch_allowed_domains() -> Vec<String> {
+pub fn default_web_fetch_allowed_domains() -> Vec<String> {
     vec!["*".into()]
 }
 
@@ -441,11 +331,11 @@ pub struct LinkEnricherConfig {
     pub timeout_secs: u64,
 }
 
-fn default_link_enricher_max_links() -> usize {
+pub fn default_link_enricher_max_links() -> usize {
     3
 }
 
-fn default_link_enricher_timeout_secs() -> u64 {
+pub fn default_link_enricher_timeout_secs() -> u64 {
     10
 }
 
@@ -480,7 +370,7 @@ pub struct TextBrowserConfig {
     pub timeout_secs: u64,
 }
 
-fn default_text_browser_timeout_secs() -> u64 {
+pub fn default_text_browser_timeout_secs() -> u64 {
     30
 }
 
@@ -510,7 +400,7 @@ pub struct ShellToolConfig {
     pub timeout_secs: u64,
 }
 
-fn default_shell_tool_timeout_secs() -> u64 {
+pub fn default_shell_tool_timeout_secs() -> u64 {
     60
 }
 
@@ -550,15 +440,15 @@ pub struct WebSearchConfig {
     pub timeout_secs: u64,
 }
 
-fn default_web_search_provider() -> String {
+pub fn default_web_search_provider() -> String {
     "duckduckgo".into()
 }
 
-fn default_web_search_max_results() -> usize {
+pub fn default_web_search_max_results() -> usize {
     5
 }
 
-fn default_web_search_timeout_secs() -> u64 {
+pub fn default_web_search_timeout_secs() -> u64 {
     15
 }
 
@@ -571,66 +461,6 @@ impl Default for WebSearchConfig {
             searxng_instance_url: None,
             max_results: default_web_search_max_results(),
             timeout_secs: default_web_search_timeout_secs(),
-        }
-    }
-}
-
-// ── Project Intelligence ────────────────────────────────────────
-
-/// Project delivery intelligence configuration (`[project_intel]` section).
-#[derive(Debug, Clone, Serialize, Deserialize, Configurable)]
-#[cfg_attr(feature = "schema-export", derive(schemars::JsonSchema))]
-#[prefix = "project-intel"]
-pub struct ProjectIntelConfig {
-    /// Enable the project_intel tool. Default: false.
-    #[serde(default)]
-    pub enabled: bool,
-    /// Default report language (en, de, fr, it). Default: "en".
-    #[serde(default = "default_project_intel_language")]
-    pub default_language: String,
-    /// Output directory for generated reports.
-    #[serde(default = "default_project_intel_report_dir")]
-    pub report_output_dir: String,
-    /// Optional custom templates directory.
-    #[serde(default)]
-    pub templates_dir: Option<String>,
-    /// Risk detection sensitivity: low, medium, high. Default: "medium".
-    #[serde(default = "default_project_intel_risk_sensitivity")]
-    pub risk_sensitivity: String,
-    /// Include git log data in reports. Default: true.
-    #[serde(default = "default_true")]
-    pub include_git_data: bool,
-    /// Include Jira data in reports. Default: false.
-    #[serde(default)]
-    pub include_jira_data: bool,
-    /// Jira instance base URL (required if include_jira_data is true).
-    #[serde(default)]
-    pub jira_base_url: Option<String>,
-}
-
-fn default_project_intel_language() -> String {
-    "en".into()
-}
-
-fn default_project_intel_report_dir() -> String {
-    "~/.zeroclaw/project-reports".into()
-}
-
-fn default_project_intel_risk_sensitivity() -> String {
-    "medium".into()
-}
-
-impl Default for ProjectIntelConfig {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            default_language: default_project_intel_language(),
-            report_output_dir: default_project_intel_report_dir(),
-            templates_dir: None,
-            risk_sensitivity: default_project_intel_risk_sensitivity(),
-            include_git_data: true,
-            include_jira_data: false,
-            jira_base_url: None,
         }
     }
 }
@@ -668,11 +498,11 @@ pub struct BackupConfig {
     pub encrypt: bool,
 }
 
-fn default_backup_max_keep() -> usize {
+pub fn default_backup_max_keep() -> usize {
     10
 }
 
-fn default_backup_include_dirs() -> Vec<String> {
+pub fn default_backup_include_dirs() -> Vec<String> {
     vec![
         "config".into(),
         "memory".into(),
@@ -681,7 +511,7 @@ fn default_backup_include_dirs() -> Vec<String> {
     ]
 }
 
-fn default_backup_destination_dir() -> String {
+pub fn default_backup_destination_dir() -> String {
     "state/backups".into()
 }
 
@@ -721,7 +551,7 @@ pub struct DataRetentionConfig {
     pub categories: Vec<String>,
 }
 
-fn default_retention_days() -> u64 {
+pub fn default_retention_days() -> u64 {
     90
 }
 
@@ -883,11 +713,11 @@ pub struct GoogleWorkspaceConfig {
     pub audit_log: bool,
 }
 
-fn default_gws_rate_limit() -> u32 {
+pub fn default_gws_rate_limit() -> u32 {
     60
 }
 
-fn default_gws_timeout_secs() -> u64 {
+pub fn default_gws_timeout_secs() -> u64 {
     30
 }
 
@@ -934,11 +764,11 @@ pub struct KnowledgeConfig {
     pub cross_workspace_search: bool,
 }
 
-fn default_knowledge_db_path() -> String {
+pub fn default_knowledge_db_path() -> String {
     "~/.zeroclaw/knowledge.db".into()
 }
 
-fn default_knowledge_max_nodes() -> usize {
+pub fn default_knowledge_max_nodes() -> usize {
     100_000
 }
 
@@ -995,7 +825,7 @@ impl Default for LinkedInConfig {
     }
 }
 
-fn default_linkedin_api_version() -> String {
+pub fn default_linkedin_api_version() -> String {
     "202602".to_string()
 }
 
@@ -1040,7 +870,7 @@ pub struct PluginSecurityConfig {
     pub trusted_publisher_keys: Vec<String>,
 }
 
-fn default_signature_mode() -> String {
+pub fn default_signature_mode() -> String {
     "disabled".to_string()
 }
 
@@ -1053,11 +883,11 @@ impl Default for PluginSecurityConfig {
     }
 }
 
-fn default_plugins_dir() -> String {
+pub fn default_plugins_dir() -> String {
     "~/.zeroclaw/plugins".to_string()
 }
 
-fn default_max_plugins() -> usize {
+pub fn default_max_plugins() -> usize {
     50
 }
 
@@ -1152,7 +982,7 @@ pub struct LinkedInImageConfig {
     pub flux: ImageProviderFluxConfig,
 }
 
-fn default_image_providers() -> Vec<String> {
+pub fn default_image_providers() -> Vec<String> {
     vec![
         "stability".into(),
         "imagen".into(),
@@ -1161,11 +991,11 @@ fn default_image_providers() -> Vec<String> {
     ]
 }
 
-fn default_card_accent_color() -> String {
+pub fn default_card_accent_color() -> String {
     "#0A66C2".into()
 }
 
-fn default_image_temp_dir() -> String {
+pub fn default_image_temp_dir() -> String {
     "linkedin/images".into()
 }
 
@@ -1198,10 +1028,10 @@ pub struct ImageProviderStabilityConfig {
     pub model: String,
 }
 
-fn default_stability_api_key_env() -> String {
+pub fn default_stability_api_key_env() -> String {
     "STABILITY_API_KEY".into()
 }
-fn default_stability_model() -> String {
+pub fn default_stability_model() -> String {
     "stable-diffusion-xl-1024-v1-0".into()
 }
 
@@ -1230,13 +1060,13 @@ pub struct ImageProviderImagenConfig {
     pub region: String,
 }
 
-fn default_imagen_api_key_env() -> String {
+pub fn default_imagen_api_key_env() -> String {
     "GOOGLE_VERTEX_API_KEY".into()
 }
-fn default_imagen_project_id_env() -> String {
+pub fn default_imagen_project_id_env() -> String {
     "GOOGLE_CLOUD_PROJECT".into()
 }
-fn default_imagen_region() -> String {
+pub fn default_imagen_region() -> String {
     "us-central1".into()
 }
 
@@ -1266,13 +1096,13 @@ pub struct ImageProviderDalleConfig {
     pub size: String,
 }
 
-fn default_dalle_api_key_env() -> String {
+pub fn default_dalle_api_key_env() -> String {
     "OPENAI_API_KEY".into()
 }
-fn default_dalle_model() -> String {
+pub fn default_dalle_model() -> String {
     "dall-e-3".into()
 }
-fn default_dalle_size() -> String {
+pub fn default_dalle_size() -> String {
     "1024x1024".into()
 }
 
@@ -1299,10 +1129,10 @@ pub struct ImageProviderFluxConfig {
     pub model: String,
 }
 
-fn default_flux_api_key_env() -> String {
+pub fn default_flux_api_key_env() -> String {
     "FAL_API_KEY".into()
 }
-fn default_flux_model() -> String {
+pub fn default_flux_model() -> String {
     "fal-ai/flux/schnell".into()
 }
 
@@ -1339,11 +1169,11 @@ pub struct ImageGenConfig {
     pub api_key_env: String,
 }
 
-fn default_image_gen_model() -> String {
+pub fn default_image_gen_model() -> String {
     "fal-ai/flux/schnell".into()
 }
 
-fn default_image_gen_api_key_env() -> String {
+pub fn default_image_gen_api_key_env() -> String {
     "FAL_API_KEY".into()
 }
 
@@ -1388,15 +1218,15 @@ pub struct ClaudeCodeConfig {
     pub env_passthrough: Vec<String>,
 }
 
-fn default_claude_code_timeout_secs() -> u64 {
+pub fn default_claude_code_timeout_secs() -> u64 {
     600
 }
 
-fn default_claude_code_allowed_tools() -> Vec<String> {
+pub fn default_claude_code_allowed_tools() -> Vec<String> {
     vec!["Read".into(), "Edit".into(), "Bash".into(), "Write".into()]
 }
 
-fn default_claude_code_max_output_bytes() -> usize {
+pub fn default_claude_code_max_output_bytes() -> usize {
     2_097_152
 }
 
@@ -1438,11 +1268,11 @@ pub struct ClaudeCodeRunnerConfig {
     pub session_ttl: u64,
 }
 
-fn default_claude_code_runner_tmux_prefix() -> String {
+pub fn default_claude_code_runner_tmux_prefix() -> String {
     "zc-claude-".into()
 }
 
-fn default_claude_code_runner_session_ttl() -> u64 {
+pub fn default_claude_code_runner_session_ttl() -> u64 {
     3600
 }
 
@@ -1482,11 +1312,11 @@ pub struct CodexCliConfig {
     pub env_passthrough: Vec<String>,
 }
 
-fn default_codex_cli_timeout_secs() -> u64 {
+pub fn default_codex_cli_timeout_secs() -> u64 {
     600
 }
 
-fn default_codex_cli_max_output_bytes() -> usize {
+pub fn default_codex_cli_max_output_bytes() -> usize {
     2_097_152
 }
 
@@ -1526,11 +1356,11 @@ pub struct GeminiCliConfig {
     pub env_passthrough: Vec<String>,
 }
 
-fn default_gemini_cli_timeout_secs() -> u64 {
+pub fn default_gemini_cli_timeout_secs() -> u64 {
     600
 }
 
-fn default_gemini_cli_max_output_bytes() -> usize {
+pub fn default_gemini_cli_max_output_bytes() -> usize {
     2_097_152
 }
 
@@ -1570,11 +1400,11 @@ pub struct OpenCodeCliConfig {
     pub env_passthrough: Vec<String>,
 }
 
-fn default_opencode_cli_timeout_secs() -> u64 {
+pub fn default_opencode_cli_timeout_secs() -> u64 {
     600
 }
 
-fn default_opencode_cli_max_output_bytes() -> usize {
+pub fn default_opencode_cli_max_output_bytes() -> usize {
     2_097_152
 }
 
@@ -1815,7 +1645,7 @@ impl ProxyConfig {
     }
 }
 
-fn apply_no_proxy(proxy: reqwest::Proxy, no_proxy: Option<reqwest::NoProxy>) -> reqwest::Proxy {
+pub fn apply_no_proxy(proxy: reqwest::Proxy, no_proxy: Option<reqwest::NoProxy>) -> reqwest::Proxy {
     proxy.no_proxy(no_proxy)
 }
 
@@ -1838,7 +1668,7 @@ pub(super) fn normalize_service_list(values: Vec<String>) -> Vec<String> {
     normalized
 }
 
-fn normalize_comma_values(values: Vec<String>) -> Vec<String> {
+pub fn normalize_comma_values(values: Vec<String>) -> Vec<String> {
     let mut output = Vec::new();
     for value in values {
         for part in value.split(',') {
@@ -1854,7 +1684,7 @@ fn normalize_comma_values(values: Vec<String>) -> Vec<String> {
     output
 }
 
-fn is_supported_proxy_service_selector(selector: &str) -> bool {
+pub fn is_supported_proxy_service_selector(selector: &str) -> bool {
     if SUPPORTED_PROXY_SERVICE_KEYS
         .iter()
         .any(|known| known.eq_ignore_ascii_case(selector))
@@ -1867,7 +1697,7 @@ fn is_supported_proxy_service_selector(selector: &str) -> bool {
         .any(|known| known.eq_ignore_ascii_case(selector))
 }
 
-fn service_selector_matches(selector: &str, service_key: &str) -> bool {
+pub fn service_selector_matches(selector: &str, service_key: &str) -> bool {
     if selector == service_key {
         return true;
     }
@@ -1882,7 +1712,7 @@ fn service_selector_matches(selector: &str, service_key: &str) -> bool {
     false
 }
 
-const MCP_MAX_TOOL_TIMEOUT_SECS: u64 = 600;
+pub const MCP_MAX_TOOL_TIMEOUT_SECS: u64 = 600;
 
 pub(super) fn validate_mcp_config(config: &McpConfig) -> Result<()> {
     let mut seen_names = std::collections::HashSet::new();
@@ -1941,7 +1771,7 @@ pub(super) fn validate_mcp_config(config: &McpConfig) -> Result<()> {
     Ok(())
 }
 
-fn validate_proxy_url(field: &str, url: &str) -> Result<()> {
+pub fn validate_proxy_url(field: &str, url: &str) -> Result<()> {
     let parsed = reqwest::Url::parse(url)
         .with_context(|| format!("Invalid {field} URL: '{url}' is not a valid URL"))?;
 
@@ -1974,7 +1804,7 @@ fn validate_proxy_url(field: &str, url: &str) -> Result<()> {
 /// this lock inside the closure.
 pub static ENV_WRITE_MUTEX: Mutex<()> = Mutex::new(());
 
-fn set_proxy_env_pair(key: &str, value: Option<&str>) {
+pub fn set_proxy_env_pair(key: &str, value: Option<&str>) {
     let lowercase_key = key.to_ascii_lowercase();
     let _guard = ENV_WRITE_MUTEX.lock().unwrap_or_else(|e| e.into_inner());
     if let Some(value) = value.and_then(|candidate| normalize_proxy_url_option(Some(candidate))) {
@@ -1992,7 +1822,7 @@ fn set_proxy_env_pair(key: &str, value: Option<&str>) {
     }
 }
 
-fn clear_proxy_env_pair(key: &str) {
+pub fn clear_proxy_env_pair(key: &str) {
     let _guard = ENV_WRITE_MUTEX.lock().unwrap_or_else(|e| e.into_inner());
     // SAFETY: ENV_WRITE_MUTEX is held, serializing all env mutations.
     unsafe {
@@ -2001,15 +1831,15 @@ fn clear_proxy_env_pair(key: &str) {
     }
 }
 
-fn runtime_proxy_state() -> &'static RwLock<ProxyConfig> {
+pub fn runtime_proxy_state() -> &'static RwLock<ProxyConfig> {
     RUNTIME_PROXY_CONFIG.get_or_init(|| RwLock::new(ProxyConfig::default()))
 }
 
-fn runtime_proxy_client_cache() -> &'static RwLock<HashMap<String, reqwest::Client>> {
+pub fn runtime_proxy_client_cache() -> &'static RwLock<HashMap<String, reqwest::Client>> {
     RUNTIME_PROXY_CLIENT_CACHE.get_or_init(|| RwLock::new(HashMap::new()))
 }
 
-fn clear_runtime_proxy_client_cache() {
+pub fn clear_runtime_proxy_client_cache() {
     match runtime_proxy_client_cache().write() {
         Ok(mut guard) => {
             guard.clear();
@@ -2020,7 +1850,7 @@ fn clear_runtime_proxy_client_cache() {
     }
 }
 
-fn runtime_proxy_cache_key(
+pub fn runtime_proxy_cache_key(
     service_key: &str,
     timeout_secs: Option<u64>,
     connect_timeout_secs: Option<u64>,
@@ -2037,14 +1867,14 @@ fn runtime_proxy_cache_key(
     )
 }
 
-fn runtime_proxy_cached_client(cache_key: &str) -> Option<reqwest::Client> {
+pub fn runtime_proxy_cached_client(cache_key: &str) -> Option<reqwest::Client> {
     match runtime_proxy_client_cache().read() {
         Ok(guard) => guard.get(cache_key).cloned(),
         Err(poisoned) => poisoned.into_inner().get(cache_key).cloned(),
     }
 }
 
-fn set_runtime_proxy_cached_client(cache_key: String, client: reqwest::Client) {
+pub fn set_runtime_proxy_cached_client(cache_key: String, client: reqwest::Client) {
     match runtime_proxy_client_cache().write() {
         Ok(mut guard) => {
             guard.insert(cache_key, client);
@@ -2171,7 +2001,7 @@ pub fn apply_channel_proxy_to_builder(
 }
 
 /// Build a client with a single explicit proxy URL (http+https via `Proxy::all`).
-fn build_explicit_proxy_client(
+pub fn build_explicit_proxy_client(
     service_key: &str,
     proxy_url: &str,
     timeout_secs: Option<u64>,
@@ -2213,7 +2043,7 @@ fn build_explicit_proxy_client(
 }
 
 /// Apply a single explicit proxy URL to a builder via `Proxy::all`.
-fn apply_explicit_proxy_to_builder(
+pub fn apply_explicit_proxy_to_builder(
     mut builder: reqwest::ClientBuilder,
     service_key: &str,
     proxy_url: &str,
@@ -2298,7 +2128,7 @@ pub type ProxiedWsStream = tokio_tungstenite::WebSocketStream<BoxedIo>;
 /// Resolve the effective proxy URL for a WebSocket connection to the
 /// given `ws_url`, taking into account the per-channel `proxy_url`
 /// override, the runtime proxy config, scope and no_proxy list.
-fn resolve_ws_proxy_url(
+pub fn resolve_ws_proxy_url(
     service_key: &str,
     ws_url: &str,
     channel_proxy_url: Option<&str>,
@@ -2540,7 +2370,7 @@ async fn ws_connect_via_proxy(
 }
 
 /// Find the `\r\n\r\n` boundary marking the end of HTTP headers.
-fn find_header_end(buf: &[u8]) -> Option<usize> {
+pub fn find_header_end(buf: &[u8]) -> Option<usize> {
     buf.windows(4).position(|w| w == b"\r\n\r\n").map(|p| p + 4)
 }
 

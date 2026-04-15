@@ -981,7 +981,6 @@ fn mask_sensitive_fields(
     mask_optional_secret(&mut masked.api_key);
     mask_vec_secrets(&mut masked.reliability.api_keys);
     mask_vec_secrets(&mut masked.gateway.paired_tokens);
-    mask_optional_secret(&mut masked.composio.api_key);
     mask_optional_secret(&mut masked.browser.computer_use.api_key);
     mask_optional_secret(&mut masked.web_search.brave_api_key);
     mask_optional_secret(&mut masked.storage.provider.config.db_url);
@@ -1071,7 +1070,6 @@ fn restore_masked_sensitive_fields(
         &mut incoming.reliability.api_keys,
         &current.reliability.api_keys,
     );
-    restore_optional_secret(&mut incoming.composio.api_key, &current.composio.api_key);
     restore_optional_secret(
         &mut incoming.browser.computer_use.api_key,
         &current.browser.computer_use.api_key,

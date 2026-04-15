@@ -273,11 +273,11 @@ impl ChannelsConfig {
     }
 }
 
-fn default_channel_message_timeout_secs() -> u64 {
+pub fn default_channel_message_timeout_secs() -> u64 {
     300
 }
 
-fn default_session_backend() -> String {
+pub fn default_session_backend() -> String {
     "sqlite".into()
 }
 
@@ -338,23 +338,23 @@ pub enum StreamMode {
     MultiMessage,
 }
 
-fn default_draft_update_interval_ms() -> u64 {
+pub fn default_draft_update_interval_ms() -> u64 {
     1000
 }
 
-fn default_multi_message_delay_ms() -> u64 {
+pub fn default_multi_message_delay_ms() -> u64 {
     800
 }
 
-fn default_matrix_draft_update_interval_ms() -> u64 {
+pub fn default_matrix_draft_update_interval_ms() -> u64 {
     1500
 }
 
-fn default_telegram_webhook_listen_addr() -> String {
+pub fn default_telegram_webhook_listen_addr() -> String {
     "0.0.0.0:8443".to_string()
 }
 
-fn default_telegram_webhook_path() -> String {
+pub fn default_telegram_webhook_path() -> String {
     "/telegram/webhook".to_string()
 }
 
@@ -579,7 +579,7 @@ pub struct SlackConfig {
     pub cancel_reaction: Option<String>,
 }
 
-fn default_slack_draft_update_interval_ms() -> u64 {
+pub fn default_slack_draft_update_interval_ms() -> u64 {
     1200
 }
 
@@ -976,7 +976,7 @@ pub struct WatiConfig {
     pub proxy_url: Option<String>,
 }
 
-fn default_wati_api_url() -> String {
+pub fn default_wati_api_url() -> String {
     "https://live-mt-server.wati.io".to_string()
 }
 
@@ -1161,11 +1161,11 @@ impl ChannelConfig for MqttConfig {
     }
 }
 
-fn default_mqtt_qos() -> u8 {
+pub fn default_mqtt_qos() -> u8 {
     1
 }
 
-fn default_mqtt_keep_alive_secs() -> u64 {
+pub fn default_mqtt_keep_alive_secs() -> u64 {
     30
 }
 
@@ -1214,7 +1214,7 @@ impl ChannelConfig for IrcConfig {
     }
 }
 
-fn default_irc_port() -> u16 {
+pub fn default_irc_port() -> u16 {
     6697
 }
 
@@ -1294,7 +1294,7 @@ pub struct LineConfig {
     pub proxy_url: Option<String>,
 }
 
-fn default_line_webhook_port() -> u16 {
+pub fn default_line_webhook_port() -> u16 {
     8443
 }
 

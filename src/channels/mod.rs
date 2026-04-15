@@ -31,12 +31,6 @@ pub async fn handle_command(command: crate::ChannelCommands, config: &Config) ->
                     channel.name()
                 );
             }
-            // Notion is a top-level config section, not part of ChannelsConfig
-            {
-                let notion_configured =
-                    config.notion.enabled && !config.notion.database_id.trim().is_empty();
-                println!("  {} Notion", if notion_configured { "✅" } else { "❌" });
-            }
             if !cfg!(feature = "channel-matrix") {
                 println!(
                     "  ℹ️ Matrix channel support is disabled in this build (enable `channel-matrix`)."

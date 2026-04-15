@@ -109,14 +109,6 @@ pub struct Config {
 
     /// Conversational AI agent builder configuration (`[conversational_ai]`).
     ///
-    /// Experimental / future feature — not yet wired into the agent runtime.
-    /// Omitted from generated config files when disabled (the default).
-    /// Existing configs that already contain this section will continue to
-    /// deserialize correctly thanks to `#[serde(default)]`.
-    #[serde(default, skip_serializing_if = "ConversationalAiConfig::is_disabled")]
-    #[nested]
-    pub conversational_ai: ConversationalAiConfig,
-
     /// Managed cybersecurity service configuration (`[security_ops]`).
     #[serde(default)]
     #[nested]
@@ -205,16 +197,6 @@ pub struct Config {
     #[nested]
     pub gateway: GatewayConfig,
 
-    /// Composio managed OAuth tools integration (`[composio]`).
-    #[serde(default)]
-    #[nested]
-    pub composio: ComposioConfig,
-
-    /// Microsoft 365 Graph API integration (`[microsoft365]`).
-    #[serde(default)]
-    #[nested]
-    pub microsoft365: Microsoft365Config,
-
     /// Secrets encryption configuration (`[secrets]`).
     #[serde(default)]
     #[nested]
@@ -284,11 +266,6 @@ pub struct Config {
     #[serde(default)]
     #[nested]
     pub web_search: WebSearchConfig,
-
-    /// Project delivery intelligence configuration (`[project_intel]`).
-    #[serde(default)]
-    #[nested]
-    pub project_intel: ProjectIntelConfig,
 
     /// Google Workspace CLI (`gws`) tool configuration (`[google_workspace]`).
     #[serde(default)]
@@ -363,11 +340,6 @@ pub struct Config {
     #[serde(default)]
     #[nested]
     pub workspace: WorkspaceConfig,
-
-    /// Notion integration configuration (`[notion]`).
-    #[serde(default)]
-    #[nested]
-    pub notion: NotionConfig,
 
     /// Jira integration configuration (`[jira]`).
     #[serde(default)]
@@ -2585,73 +2557,6 @@ pub fn default_nostr_relays() -> Vec<String> {
     ]
 }
 
-// -- Notion --
-
-/// Notion integration configuration (`[notion]`).
-///
-/// When `enabled = true`, the agent polls a Notion database for pending tasks
-/// and exposes a `notion` tool for querying, reading, creating, and updating pages.
-/// Requires `api_key` (or the `NOTION_API_KEY` env var) and `database_id`.
-#[derive(Debug, Clone, Serialize, Deserialize, Configurable)]
-#[cfg_attr(feature = "schema-export", derive(schemars::JsonSchema))]
-#[prefix = "notion"]
-pub struct NotionConfig {
-    #[serde(default)]
-    pub enabled: bool,
-    #[serde(default)]
-    #[secret]
-    pub api_key: String,
-    #[serde(default)]
-    pub database_id: String,
-    #[serde(default = "default_notion_poll_interval")]
-    pub poll_interval_secs: u64,
-    #[serde(default = "default_notion_status_prop")]
-    pub status_property: String,
-    #[serde(default = "default_notion_input_prop")]
-    pub input_property: String,
-    #[serde(default = "default_notion_result_prop")]
-    pub result_property: String,
-    #[serde(default = "default_notion_max_concurrent")]
-    pub max_concurrent: usize,
-    #[serde(default = "default_notion_recover_stale")]
-    pub recover_stale: bool,
-}
-
-pub fn default_notion_poll_interval() -> u64 {
-    5
-}
-pub fn default_notion_status_prop() -> String {
-    "Status".into()
-}
-pub fn default_notion_input_prop() -> String {
-    "Input".into()
-}
-pub fn default_notion_result_prop() -> String {
-    "Result".into()
-}
-pub fn default_notion_max_concurrent() -> usize {
-    4
-}
-pub fn default_notion_recover_stale() -> bool {
-    true
-}
-
-impl Default for NotionConfig {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            api_key: String::new(),
-            database_id: String::new(),
-            poll_interval_secs: default_notion_poll_interval(),
-            status_property: default_notion_status_prop(),
-            input_property: default_notion_input_prop(),
-            result_property: default_notion_result_prop(),
-            max_concurrent: default_notion_max_concurrent(),
-            recover_stale: default_notion_recover_stale(),
-        }
-    }
-}
-
 /// Jira integration configuration (`[jira]`).
 ///
 /// When `enabled = true`, registers the `jira` tool which can get tickets,
@@ -2812,92 +2717,6 @@ pub fn default_cloud_ops_cost_threshold() -> f64 {
 
 pub fn default_cloud_ops_waf() -> Vec<String> {
     vec!["aws-waf".into()]
-}
-
-// ── Conversational AI ──────────────────────────────────────────────
-
-pub fn default_conversational_ai_language() -> String {
-    "en".into()
-}
-
-pub fn default_conversational_ai_supported_languages() -> Vec<String> {
-    vec!["en".into(), "de".into(), "fr".into(), "it".into()]
-}
-
-pub fn default_conversational_ai_escalation_threshold() -> f64 {
-    0.3
-}
-
-pub fn default_conversational_ai_max_turns() -> usize {
-    50
-}
-
-pub fn default_conversational_ai_timeout_secs() -> u64 {
-    1800
-}
-
-/// Conversational AI agent builder configuration (`[conversational_ai]` section).
-///
-/// **Status: Reserved for future use.** This configuration is parsed but not yet
-/// consumed by the runtime. Setting `enabled = true` will produce a startup warning.
-#[derive(Debug, Clone, Serialize, Deserialize, Configurable)]
-#[cfg_attr(feature = "schema-export", derive(schemars::JsonSchema))]
-#[prefix = "conversational-ai"]
-pub struct ConversationalAiConfig {
-    /// Enable conversational AI features. Default: false.
-    #[serde(default)]
-    pub enabled: bool,
-    /// Default language for conversations (BCP-47 tag). Default: "en".
-    #[serde(default = "default_conversational_ai_language")]
-    pub default_language: String,
-    /// Supported languages for conversations. Default: [`en`, `de`, `fr`, `it`].
-    #[serde(default = "default_conversational_ai_supported_languages")]
-    pub supported_languages: Vec<String>,
-    /// Automatically detect user language from message content. Default: true.
-    #[serde(default = "default_true")]
-    pub auto_detect_language: bool,
-    /// Intent confidence below this threshold triggers escalation. Default: 0.3.
-    #[serde(default = "default_conversational_ai_escalation_threshold")]
-    pub escalation_confidence_threshold: f64,
-    /// Maximum conversation turns before auto-ending. Default: 50.
-    #[serde(default = "default_conversational_ai_max_turns")]
-    pub max_conversation_turns: usize,
-    /// Conversation timeout in seconds (inactivity). Default: 1800.
-    #[serde(default = "default_conversational_ai_timeout_secs")]
-    pub conversation_timeout_secs: u64,
-    /// Enable conversation analytics tracking. Default: false (privacy-by-default).
-    #[serde(default)]
-    pub analytics_enabled: bool,
-    /// Optional tool name for RAG-based knowledge base lookup during conversations.
-    #[serde(default)]
-    pub knowledge_base_tool: Option<String>,
-}
-
-impl ConversationalAiConfig {
-    /// Returns `true` when the feature is disabled (the default).
-    ///
-    /// Used by `#[serde(skip_serializing_if)]` to omit the entire
-    /// `[conversational_ai]` section from newly-generated config files,
-    /// avoiding user confusion over an undocumented / experimental section.
-    pub fn is_disabled(&self) -> bool {
-        !self.enabled
-    }
-}
-
-impl Default for ConversationalAiConfig {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            default_language: default_conversational_ai_language(),
-            supported_languages: default_conversational_ai_supported_languages(),
-            auto_detect_language: true,
-            escalation_confidence_threshold: default_conversational_ai_escalation_threshold(),
-            max_conversation_turns: default_conversational_ai_max_turns(),
-            conversation_timeout_secs: default_conversational_ai_timeout_secs(),
-            analytics_enabled: false,
-            knowledge_base_tool: None,
-        }
-    }
 }
 
 // ── Security ops config ─────────────────────────────────────────

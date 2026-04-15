@@ -23,15 +23,15 @@ pub struct SchedulerConfig {
     pub max_concurrent: usize,
 }
 
-fn default_scheduler_enabled() -> bool {
+pub fn default_scheduler_enabled() -> bool {
     true
 }
 
-fn default_scheduler_max_tasks() -> usize {
+pub fn default_scheduler_max_tasks() -> usize {
     64
 }
 
-fn default_scheduler_max_concurrent() -> usize {
+pub fn default_scheduler_max_concurrent() -> usize {
     4
 }
 
@@ -214,27 +214,27 @@ pub struct HeartbeatConfig {
     pub task_timeout_secs: u64,
 }
 
-fn default_heartbeat_interval() -> u32 {
+pub fn default_heartbeat_interval() -> u32 {
     30
 }
 
-fn default_two_phase() -> bool {
+pub fn default_two_phase() -> bool {
     true
 }
 
-fn default_heartbeat_min_interval() -> u32 {
+pub fn default_heartbeat_min_interval() -> u32 {
     5
 }
 
-fn default_heartbeat_max_interval() -> u32 {
+pub fn default_heartbeat_max_interval() -> u32 {
     120
 }
 
-fn default_heartbeat_max_run_history() -> u32 {
+pub fn default_heartbeat_max_run_history() -> u32 {
     100
 }
 
-fn default_heartbeat_task_timeout() -> u64 {
+pub fn default_heartbeat_task_timeout() -> u64 {
     600
 }
 
@@ -365,15 +365,15 @@ pub struct DeliveryConfigDecl {
     pub best_effort: bool,
 }
 
-fn default_job_type_decl() -> String {
+pub fn default_job_type_decl() -> String {
     "shell".to_string()
 }
 
-fn default_delivery_mode() -> String {
+pub fn default_delivery_mode() -> String {
     "none".to_string()
 }
 
-fn default_max_run_history() -> u32 {
+pub fn default_max_run_history() -> u32 {
     50
 }
 
@@ -426,19 +426,19 @@ pub struct SopConfig {
     pub max_finished_runs: usize,
 }
 
-fn default_sop_execution_mode() -> String {
+pub fn default_sop_execution_mode() -> String {
     "supervised".to_string()
 }
 
-fn default_sop_max_concurrent_total() -> usize {
+pub fn default_sop_max_concurrent_total() -> usize {
     4
 }
 
-fn default_sop_approval_timeout_secs() -> u64 {
+pub fn default_sop_approval_timeout_secs() -> u64 {
     300
 }
 
-fn default_sop_max_finished_runs() -> usize {
+pub fn default_sop_max_finished_runs() -> usize {
     100
 }
 
