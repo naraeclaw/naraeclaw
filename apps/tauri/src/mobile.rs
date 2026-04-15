@@ -1,4 +1,4 @@
-//! Mobile entry point for ZeroClaw Desktop (iOS/Android).
+//! Mobile entry point for NaraeClaw Desktop (iOS/Android).
 
 #[tauri::mobile_entry_point]
 fn main() {
