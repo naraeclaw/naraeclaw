@@ -57,7 +57,7 @@ export class ErrorBoundary extends Component<
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
-    console.error('[ZeroClaw] Render error:', error, info.componentStack);
+    console.error('[NaraeClaw] Render error:', error, info.componentStack);
   }
 
   render() {
@@ -66,10 +66,10 @@ export class ErrorBoundary extends Component<
         <div className="p-6">
           <div className="card p-6 w-full max-w-lg" style={{ borderColor: 'rgba(239, 68, 68, 0.3)' }}>
             <h2 className="text-lg font-semibold mb-2" style={{ color: 'var(--color-status-error)' }}>
-              Something went wrong
+              화면을 불러오지 못했습니다
             </h2>
             <p className="text-sm mb-4" style={{ color: 'var(--pc-text-muted)' }}>
-              A render error occurred. Check the browser console for details.
+              렌더링 오류가 발생했습니다. 자세한 내용은 브라우저 콘솔을 확인하세요.
             </p>
             <pre className="text-xs rounded-lg p-3 overflow-x-auto whitespace-pre-wrap break-all font-mono" style={{ background: 'var(--pc-bg-base)', color: 'var(--color-status-error)' }}>
               {this.state.error.message}
@@ -78,7 +78,7 @@ export class ErrorBoundary extends Component<
               onClick={() => this.setState({ error: null })}
               className="btn-electric mt-6 px-4 py-2 text-sm font-medium"
             >
-              Try again
+              다시 시도
             </button>
           </div>
         </div>
@@ -121,7 +121,7 @@ function PairingDialog({ onPair }: { onPair: (code: string) => Promise<void> }) 
     try {
       await onPair(code);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Pairing failed');
+      setError(err instanceof Error ? err.message : '페어링에 실패했습니다');
     } finally {
       setLoading(false);
     }
@@ -135,13 +135,13 @@ function PairingDialog({ onPair }: { onPair: (code: string) => Promise<void> }) 
         <div className="text-center mb-8">
           <img
             src={`${basePath}/_app/zeroclaw-trans.png`}
-            alt="ZeroClaw"
+            alt="NaraeClaw"
             className="h-20 w-20 rounded-2xl object-cover mx-auto mb-4 animate-float"
             onError={(e) => { e.currentTarget.style.display = 'none'; }}
           />
-          <h1 className="text-2xl font-bold mb-2 text-gradient-blue">ZeroClaw</h1>
+          <h1 className="text-2xl font-bold mb-2 text-gradient-blue">NaraeClaw</h1>
           <p className="text-sm" style={{ color: 'var(--pc-text-muted)' }}>
-            {displayCode ? 'Your pairing code' : 'Enter the pairing code from your terminal'}
+            {displayCode ? '페어링 코드' : '터미널에 표시된 페어링 코드를 입력하세요'}
           </p>
         </div>
 
@@ -151,7 +151,7 @@ function PairingDialog({ onPair }: { onPair: (code: string) => Promise<void> }) 
             <div className="text-4xl font-mono font-bold tracking-[0.4em] py-2" style={{ color: 'var(--pc-text-primary)' }}>
               {displayCode}
             </div>
-            <p className="text-xs mt-2" style={{ color: 'var(--pc-text-muted)' }}>Enter this code below or on another device</p>
+            <p className="text-xs mt-2" style={{ color: 'var(--pc-text-muted)' }}>아래에 이 코드를 입력하거나 다른 기기에서 사용하세요</p>
           </div>
         )}
 
@@ -160,7 +160,7 @@ function PairingDialog({ onPair }: { onPair: (code: string) => Promise<void> }) 
             type="text"
             value={code}
             onChange={(e) => setCode(e.target.value)}
-            placeholder="6-digit code"
+            placeholder="6자리 코드"
             className="input-electric w-full px-4 py-4 text-center text-2xl tracking-[0.3em] font-medium mb-4"
             maxLength={6}
             autoFocus
@@ -176,9 +176,9 @@ function PairingDialog({ onPair }: { onPair: (code: string) => Promise<void> }) 
             {loading ? (
               <span className="flex items-center justify-center gap-2">
                 <span className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                Pairing...
+                페어링 중...
               </span>
-            ) : 'Pair'}
+            ) : '페어링'}
           </button>
         </form>
       </div>
@@ -212,7 +212,7 @@ function AppContent() {
       <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--pc-bg-base)' }}>
         <div className="flex flex-col items-center gap-4 animate-fade-in">
           <div className="h-10 w-10 border-2 rounded-full animate-spin" style={{ borderColor: 'var(--pc-border)', borderTopColor: 'var(--pc-accent)' }} />
-          <p className="text-sm" style={{ color: 'var(--pc-text-muted)' }}>Connecting...</p>
+          <p className="text-sm" style={{ color: 'var(--pc-text-muted)' }}>연결 중...</p>
         </div>
       </div>
     );

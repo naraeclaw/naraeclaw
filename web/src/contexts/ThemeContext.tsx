@@ -90,7 +90,7 @@ function loadMonoFont(font: string) {
 export const LOCALE_STORAGE_KEY = 'zeroclaw-locale';
 
 export function loadLocale(): string {
-  return localStorage.getItem(LOCALE_STORAGE_KEY) ?? 'en';
+  return localStorage.getItem(LOCALE_STORAGE_KEY) ?? 'ko';
 }
 
 export function saveLocale(locale: string) {
