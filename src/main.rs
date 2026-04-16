@@ -963,8 +963,8 @@ async fn main() -> Result<()> {
     // it runs the quick (scriptable) setup.  Use --quick to force quick setup,
     // or set ZEROCLAW_INTERACTIVE=1 to force interactive mode when TTY
     // detection fails.  This means `curl … | bash` and
-    // `zeroclaw onboard --api-key …` both take the fast path, while a bare
-    // `zeroclaw onboard` in a terminal launches the wizard.
+    // `naraeclaw onboard --api-key …` both take the fast path, while a bare
+    // `naraeclaw onboard` in a terminal launches the wizard.
     #[cfg(feature = "agent-runtime")]
     if let Commands::Onboard {
         force,
@@ -1012,7 +1012,7 @@ async fn main() -> Result<()> {
                 let timestamp = chrono::Local::now().format("%Y%m%d%H%M%S");
                 let backup_dir = format!("{}.backup.{}", zeroclaw_dir.display(), timestamp);
 
-                println!("⚠️  Reinitializing ZeroClaw configuration...");
+                println!("⚠️  Reinitializing NaraeClaw configuration...");
                 println!("   Current config directory: {}", zeroclaw_dir.display());
                 println!(
                     "   This will back up your existing config to: {}",
@@ -1113,7 +1113,7 @@ async fn main() -> Result<()> {
         let (_validator, enrollment_uri) =
             security::OtpValidator::from_config(&config.security.otp, config_dir, &store)?;
         if let Some(uri) = enrollment_uri {
-            println!("Initialized OTP secret for ZeroClaw.");
+            println!("Initialized OTP secret for NaraeClaw.");
             println!("Enrollment URI: {uri}");
         }
     }
@@ -1237,7 +1237,7 @@ async fn main() -> Result<()> {
                 Some(zeroclaw::GatewayCommands::Restart { port, host }) => {
                     let (port, host) = resolve_gateway_addr(&config, port, host);
                     let addr = format!("{host}:{port}");
-                    info!("🔄 Restarting ZeroClaw Gateway on {addr}");
+                    info!("🔄 Restarting NaraeClaw Gateway on {addr}");
 
                     // Try to gracefully shutdown existing gateway via admin endpoint
                     match shutdown_gateway(&host, port).await {
@@ -1313,7 +1313,7 @@ async fn main() -> Result<()> {
                             println!("   Error: {e}");
                             println!();
                             println!("   Is the gateway running? Start it with:");
-                            println!("     zeroclaw gateway start");
+                            println!("     naraeclaw gateway start");
                         }
                     }
                     Ok(())
@@ -1346,9 +1346,9 @@ async fn main() -> Result<()> {
             let port = port.unwrap_or(config.gateway.port);
             let host = host.unwrap_or_else(|| config.gateway.host.clone());
             if port == 0 {
-                info!("🧠 Starting ZeroClaw Daemon on {host} (random port)");
+                info!("🧠 Starting NaraeClaw Daemon on {host} (random port)");
             } else {
-                info!("🧠 Starting ZeroClaw Daemon on {host}:{port}");
+                info!("🧠 Starting NaraeClaw Daemon on {host}:{port}");
             }
             // Wire CLI channel for interactive mode
             #[cfg(feature = "agent-runtime")]
@@ -1436,7 +1436,7 @@ async fn main() -> Result<()> {
                     }
                 }
             }
-            println!("🦀 ZeroClaw Status");
+            println!("🦀 NaraeClaw Status");
             println!();
             println!("Version:     {}", env!("CARGO_PKG_VERSION"));
             println!("Workspace:   {}", config.workspace_dir.display());
@@ -1695,17 +1695,17 @@ async fn main() -> Result<()> {
         Commands::Desktop {
             install: do_install,
         } => {
-            let download_url = "https://www.zeroclawlabs.ai/download";
+            let download_url = "https://www.naraeclaw.ai/download";
 
             if do_install {
-                println!("Download the ZeroClaw companion app:");
+                println!("Download the NaraeClaw companion app:");
                 println!();
                 #[cfg(target_os = "macos")]
                 {
                     println!("  macOS:  {download_url}");
                     println!();
                     println!("Or install via Homebrew (coming soon):");
-                    println!("  brew install --cask zeroclaw");
+                    println!("  brew install --cask naraeclaw");
                 }
                 #[cfg(target_os = "linux")]
                 {
@@ -1737,13 +1737,13 @@ async fn main() -> Result<()> {
             let desktop_bin = {
                 let mut found = None;
 
-                // 1. macOS: check /Applications/ZeroClaw.app
+                // 1. macOS: check /Applications/NaraeClaw.app
                 #[cfg(target_os = "macos")]
                 {
                     let app_paths = [
-                        PathBuf::from("/Applications/ZeroClaw.app/Contents/MacOS/ZeroClaw"),
+                        PathBuf::from("/Applications/NaraeClaw.app/Contents/MacOS/NaraeClaw"),
                         PathBuf::from(std::env::var("HOME").unwrap_or_default())
-                            .join("Applications/ZeroClaw.app/Contents/MacOS/ZeroClaw"),
+                            .join("Applications/NaraeClaw.app/Contents/MacOS/NaraeClaw"),
                     ];
                     for app in &app_paths {
                         if app.is_file() {
@@ -1756,19 +1756,19 @@ async fn main() -> Result<()> {
                 // 2. Same directory as the current executable
                 if found.is_none() {
                     if let Ok(exe) = std::env::current_exe() {
-                        let sibling = exe.with_file_name("zeroclaw-desktop");
+                        let sibling = exe.with_file_name("naraeclaw-desktop");
                         if sibling.is_file() {
                             found = Some(sibling);
                         }
                     }
                 }
 
-                // 3. ~/.cargo/bin/zeroclaw-desktop or ~/.local/bin/zeroclaw-desktop
+                // 3. ~/.cargo/bin/naraeclaw-desktop or ~/.local/bin/naraeclaw-desktop
                 if found.is_none() {
                     if let Some(home) = std::env::var_os("HOME") {
                         let home = PathBuf::from(home);
                         for dir in &[".cargo/bin", ".local/bin"] {
-                            let candidate = home.join(dir).join("zeroclaw-desktop");
+                            let candidate = home.join(dir).join("naraeclaw-desktop");
                             if candidate.is_file() {
                                 found = Some(candidate);
                                 break;
@@ -1779,7 +1779,7 @@ async fn main() -> Result<()> {
 
                 // 4. Fallback to PATH lookup
                 if found.is_none() {
-                    if let Ok(path) = which::which("zeroclaw-desktop") {
+                    if let Ok(path) = which::which("naraeclaw-desktop") {
                         found = Some(path);
                     }
                 }
@@ -1789,17 +1789,17 @@ async fn main() -> Result<()> {
 
             match desktop_bin {
                 Some(bin) => {
-                    println!("Launching ZeroClaw companion app...");
+                    println!("Launching NaraeClaw companion app...");
                     let _child = std::process::Command::new(&bin)
                         .spawn()
                         .with_context(|| format!("Failed to launch {}", bin.display()))?;
                     Ok(())
                 }
                 None => {
-                    println!("ZeroClaw companion app is not installed.");
+                    println!("NaraeClaw companion app is not installed.");
                     println!();
                     println!("  Download it at: {download_url}");
-                    println!("  Or run: zeroclaw desktop --install");
+                    println!("  Or run: naraeclaw desktop --install");
                     println!();
                     println!("The companion app is a lightweight menu bar app that");
                     println!("connects to the same gateway as the CLI.");
@@ -1912,7 +1912,7 @@ async fn main() -> Result<()> {
                     // Scripted mode: require value on CLI, no prompts
                     let val = value.ok_or_else(|| {
                         anyhow::anyhow!(
-                            "Value required in --no-interactive mode. Usage: zeroclaw props set --no-interactive {path} <value>"
+                            "Value required in --no-interactive mode. Usage: naraeclaw props set --no-interactive {path} <value>"
                         )
                     })?;
                     config.set_prop(&path, &val)?;
@@ -1955,7 +1955,7 @@ async fn main() -> Result<()> {
                             .interact()?;
                         config.set_prop(&path, &variants[selected])?;
                     } else {
-                        anyhow::bail!("Value required. Usage: zeroclaw props set {path} <value>");
+                        anyhow::bail!("Value required. Usage: naraeclaw props set {path} <value>");
                     }
                 }
                 config.save().await?;
@@ -1975,7 +1975,7 @@ async fn main() -> Result<()> {
                         println!("  {name}");
                     }
                     config.save().await?;
-                    println!("\nRun `zeroclaw props list` to review, then set required fields.");
+                    println!("\nRun `naraeclaw props list` to review, then set required fields.");
                 }
                 Ok(())
             }
@@ -2054,7 +2054,7 @@ fn build_wizard_callbacks() -> onboard::WizardCallbacks {
             println!(
                 "  {} {}",
                 style("ℹ").dim(),
-                style("ZeroClaw can talk to physical hardware (LEDs, sensors, motors).").dim()
+                style("NaraeClaw can talk to physical hardware (LEDs, sensors, motors).").dim()
             );
             println!(
                 "  {} {}",
@@ -2115,7 +2115,7 @@ fn build_wizard_callbacks() -> onboard::WizardCallbacks {
             let recommended = zeroclaw_hardware::recommended_wizard_default(&devices);
 
             let choice = Select::new()
-                .with_prompt("  How should ZeroClaw interact with the physical world?")
+                .with_prompt("  How should NaraeClaw interact with the physical world?")
                 .items(&options)
                 .default(recommended)
                 .interact()?;
@@ -2308,7 +2308,7 @@ fn handle_estop_command(
                 let (validator, enrollment_uri) =
                     security::OtpValidator::from_config(&config.security.otp, config_dir, &store)?;
                 if let Some(uri) = enrollment_uri {
-                    println!("Initialized OTP secret for ZeroClaw.");
+                    println!("Initialized OTP secret for NaraeClaw.");
                     println!("Enrollment URI: {uri}");
                 }
                 Some(validator)
@@ -2439,20 +2439,20 @@ fn write_shell_completion<W: Write>(shell: CompletionShell, writer: &mut W) -> R
     match shell {
         CompletionShell::Bash => {
             generate(shells::Bash, &mut cmd, bin_name.clone(), writer);
-            // Wrap clap's _zeroclaw to inject dynamic props path completion
+            // Wrap clap's _naraeclaw to inject dynamic props path completion
             writeln!(
                 writer,
                 r#"
-# Dynamic completion for zeroclaw props get/set paths
-if type _zeroclaw &>/dev/null; then
-    _zeroclaw_clap_orig() {{ _zeroclaw "$@"; }}
-    _zeroclaw() {{
+# Dynamic completion for naraeclaw props get/set paths
+if type _naraeclaw &>/dev/null; then
+    _naraeclaw_clap_orig() {{ _naraeclaw "$@"; }}
+    _naraeclaw() {{
         local cur="${{COMP_WORDS[COMP_CWORD]}}"
         if [[ "${{COMP_WORDS[*]}}" =~ "props "(get|set)" " ]]; then
-            COMPREPLY=($(compgen -W "$(zeroclaw props complete "$cur" 2>/dev/null)" -- "$cur"))
+            COMPREPLY=($(compgen -W "$(naraeclaw props complete "$cur" 2>/dev/null)" -- "$cur"))
             return
         fi
-        _zeroclaw_clap_orig "$@"
+        _naraeclaw_clap_orig "$@"
     }}
 fi"#
             )?;
@@ -2462,28 +2462,28 @@ fi"#
             writeln!(
                 writer,
                 r#"
-# Dynamic completion for zeroclaw props get/set paths
-complete -c zeroclaw -n '__fish_seen_subcommand_from props; and __fish_seen_subcommand_from get set' \
-    -a '(zeroclaw props complete (commandline -ct) 2>/dev/null)' -f"#
+# Dynamic completion for naraeclaw props get/set paths
+complete -c naraeclaw -n '__fish_seen_subcommand_from props; and __fish_seen_subcommand_from get set' \
+    -a '(naraeclaw props complete (commandline -ct) 2>/dev/null)' -f"#
             )?;
         }
         CompletionShell::Zsh => {
             generate(shells::Zsh, &mut cmd, bin_name.clone(), writer);
-            // Wrap clap's _zeroclaw to inject dynamic props path completion
+            // Wrap clap's _naraeclaw to inject dynamic props path completion
             writeln!(
                 writer,
                 r#"
-# Dynamic completion for zeroclaw props get/set paths
-if (( $+functions[_zeroclaw] )); then
-    functions[_zeroclaw_clap_orig]=$functions[_zeroclaw]
-    _zeroclaw() {{
+# Dynamic completion for naraeclaw props get/set paths
+if (( $+functions[_naraeclaw] )); then
+    functions[_naraeclaw_clap_orig]=$functions[_naraeclaw]
+    _naraeclaw() {{
         if [[ "${{words[*]}}" == *"props "(get|set)* ]] && (( CURRENT > 3 )); then
             local -a props
-            props=(${{(f)"$(zeroclaw props complete "$words[CURRENT]" 2>/dev/null)"}})
+            props=(${{(f)"$(naraeclaw props complete "$words[CURRENT]" 2>/dev/null)"}})
             compadd -a props
             return
         fi
-        _zeroclaw_clap_orig "$@"
+        _naraeclaw_clap_orig "$@"
     }}
 fi"#
             )?;
@@ -2510,9 +2510,9 @@ fn resolve_gateway_addr(config: &Config, port: Option<u16>, host: Option<String>
 /// Log gateway startup message.
 fn log_gateway_start(host: &str, port: u16) {
     if port == 0 {
-        info!("🚀 Starting ZeroClaw Gateway on {host} (random port)");
+        info!("🚀 Starting NaraeClaw Gateway on {host} (random port)");
     } else {
-        info!("🚀 Starting ZeroClaw Gateway on {host}:{port}");
+        info!("🚀 Starting NaraeClaw Gateway on {host}:{port}");
     }
 }
 
@@ -3336,7 +3336,7 @@ mod tests {
     #[cfg(feature = "agent-runtime")]
     fn onboard_cli_accepts_model_provider_and_api_key_in_quick_mode() {
         let cli = Cli::try_parse_from([
-            "zeroclaw",
+            "naraeclaw",
             "onboard",
             "--provider",
             "openrouter",
@@ -3370,7 +3370,7 @@ mod tests {
     #[cfg(feature = "agent-runtime")]
     fn completions_cli_parses_supported_shells() {
         for shell in ["bash", "fish", "zsh", "powershell", "elvish"] {
-            let cli = Cli::try_parse_from(["zeroclaw", "completions", shell])
+            let cli = Cli::try_parse_from(["naraeclaw", "completions", shell])
                 .expect("completions invocation should parse");
             match cli.command {
                 Commands::Completions { .. } => {}
@@ -3387,7 +3387,7 @@ mod tests {
             .expect("completion generation should succeed");
         let script = String::from_utf8(output).expect("completion output should be valid utf-8");
         assert!(
-            script.contains("zeroclaw"),
+            script.contains("naraeclaw"),
             "completion script should reference binary name"
         );
     }
@@ -3395,7 +3395,7 @@ mod tests {
     #[test]
     #[cfg(feature = "agent-runtime")]
     fn onboard_cli_accepts_force_flag() {
-        let cli = Cli::try_parse_from(["zeroclaw", "onboard", "--force"])
+        let cli = Cli::try_parse_from(["naraeclaw", "onboard", "--force"])
             .expect("onboard --force should parse");
 
         match cli.command {
@@ -3408,13 +3408,13 @@ mod tests {
     #[cfg(feature = "agent-runtime")]
     fn onboard_cli_rejects_removed_interactive_flag() {
         // --interactive was removed; onboard auto-detects TTY instead.
-        assert!(Cli::try_parse_from(["zeroclaw", "onboard", "--interactive"]).is_err());
+        assert!(Cli::try_parse_from(["naraeclaw", "onboard", "--interactive"]).is_err());
     }
 
     #[test]
     #[cfg(feature = "agent-runtime")]
     fn onboard_cli_parses_quick_flag() {
-        let cli = Cli::try_parse_from(["zeroclaw", "onboard", "--quick"])
+        let cli = Cli::try_parse_from(["naraeclaw", "onboard", "--quick"])
             .expect("onboard --quick should parse");
 
         match cli.command {
@@ -3428,7 +3428,7 @@ mod tests {
     fn onboard_cli_quick_and_channels_only_conflict() {
         // --quick and --channels-only should both parse at the CLI level
         // (the conflict is checked at runtime), but we verify both flags parse.
-        let cli = Cli::try_parse_from(["zeroclaw", "onboard", "--quick", "--channels-only"]);
+        let cli = Cli::try_parse_from(["naraeclaw", "onboard", "--quick", "--channels-only"]);
         assert!(
             cli.is_ok(),
             "--quick --channels-only should parse at CLI level"
@@ -3438,7 +3438,7 @@ mod tests {
     #[test]
     #[cfg(feature = "agent-runtime")]
     fn onboard_cli_bare_parses() {
-        let cli = Cli::try_parse_from(["zeroclaw", "onboard"]).expect("bare onboard should parse");
+        let cli = Cli::try_parse_from(["naraeclaw", "onboard"]).expect("bare onboard should parse");
 
         match cli.command {
             Commands::Onboard { .. } => {}
@@ -3449,7 +3449,7 @@ mod tests {
     #[test]
     #[cfg(feature = "agent-runtime")]
     fn cli_parses_estop_default_engage() {
-        let cli = Cli::try_parse_from(["zeroclaw", "estop"]).expect("estop command should parse");
+        let cli = Cli::try_parse_from(["naraeclaw", "estop"]).expect("estop command should parse");
 
         match cli.command {
             Commands::Estop {
@@ -3470,7 +3470,7 @@ mod tests {
     #[test]
     #[cfg(feature = "agent-runtime")]
     fn cli_parses_estop_resume_domain() {
-        let cli = Cli::try_parse_from(["zeroclaw", "estop", "resume", "--domain", "*.chase.com"])
+        let cli = Cli::try_parse_from(["naraeclaw", "estop", "resume", "--domain", "*.chase.com"])
             .expect("estop resume command should parse");
 
         match cli.command {
@@ -3485,7 +3485,7 @@ mod tests {
     #[test]
     #[cfg(feature = "agent-runtime")]
     fn agent_command_parses_with_temperature() {
-        let cli = Cli::try_parse_from(["zeroclaw", "agent", "--temperature", "0.5"])
+        let cli = Cli::try_parse_from(["naraeclaw", "agent", "--temperature", "0.5"])
             .expect("agent command with temperature should parse");
 
         match cli.command {
@@ -3499,7 +3499,7 @@ mod tests {
     #[test]
     #[cfg(feature = "agent-runtime")]
     fn agent_command_parses_without_temperature() {
-        let cli = Cli::try_parse_from(["zeroclaw", "agent", "--message", "hello"])
+        let cli = Cli::try_parse_from(["naraeclaw", "agent", "--message", "hello"])
             .expect("agent command without temperature should parse");
 
         match cli.command {
@@ -3514,7 +3514,7 @@ mod tests {
     #[cfg(feature = "agent-runtime")]
     fn agent_command_parses_session_state_file() {
         let cli =
-            Cli::try_parse_from(["zeroclaw", "agent", "--session-state-file", "session.json"])
+            Cli::try_parse_from(["naraeclaw", "agent", "--session-state-file", "session.json"])
                 .expect("agent command with session state file should parse");
 
         match cli.command {

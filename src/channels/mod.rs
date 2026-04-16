@@ -36,9 +36,9 @@ pub async fn handle_command(command: crate::ChannelCommands, config: &Config) ->
                     "  ℹ️ Matrix channel support is disabled in this build (enable `channel-matrix`)."
                 );
             }
-            println!("\nTo start channels: zeroclaw channel start");
-            println!("To check health:    zeroclaw channel doctor");
-            println!("To configure:      zeroclaw onboard");
+            println!("\nTo start channels: naraeclaw channel start");
+            println!("To check health:    naraeclaw channel doctor");
+            println!("To configure:      naraeclaw onboard");
             Ok(())
         }
         crate::ChannelCommands::Add {
@@ -46,11 +46,11 @@ pub async fn handle_command(command: crate::ChannelCommands, config: &Config) ->
             config: _,
         } => {
             anyhow::bail!(
-                "Channel type '{channel_type}' — use `zeroclaw onboard` to configure channels"
+                "Channel type '{channel_type}' — use `naraeclaw onboard` to configure channels"
             );
         }
         crate::ChannelCommands::Remove { name } => {
-            anyhow::bail!("Remove channel '{name}' — edit ~/.zeroclaw/config.toml directly");
+            anyhow::bail!("Remove channel '{name}' — edit ~/.naraeclaw/config.toml directly");
         }
         crate::ChannelCommands::BindTelegram { identity } => {
             Box::pin(bind_telegram_identity(config, &identity)).await
