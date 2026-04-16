@@ -23,10 +23,6 @@ For complete code examples of each extension trait, see [extension-examples.md](
 - Validate and sanitize all inputs.
 - Return structured `ToolResult`; avoid panics in runtime path.
 
-## Adding a Peripheral
-
-- Register board type in config schema if needed.
-
 ## Security / Runtime / Gateway Changes
 
 - Include threat/risk notes and rollback strategy.
@@ -39,8 +35,7 @@ For complete code examples of each extension trait, see [extension-examples.md](
 - Treat docs navigation as product UX: preserve clear pathing from README -> docs hub -> SUMMARY -> category index.
 - Keep top-level nav concise; avoid duplicative links across adjacent nav blocks.
 - When runtime surfaces change, update related references in `docs/reference/`.
-- Keep multilingual entry-point parity for all supported locales (`en`, `zh-CN`, `ja`, `ru`, `fr`, `vi`) when nav or key wording changes.
-- When shared docs wording changes, sync corresponding localized docs in the same PR (or explicitly document deferral and follow-up PR).
+- Keep English and Korean entry-point docs aligned when nav or key wording changes.
 
 ## Tool Shared State
 

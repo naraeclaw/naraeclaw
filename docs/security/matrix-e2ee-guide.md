@@ -313,5 +313,4 @@ RUST_LOG=naraeclaw::channels::matrix=debug,matrix_sdk_crypto=debug naraeclaw dae
 - [Channels Reference](../reference/api/channels-reference.md)
 - [Operations log keyword appendix](../reference/api/channels-reference.md#7-operations-appendix-log-keywords-matrix)
 - [Network Deployment](../ops/network-deployment.md)
-- [Agnostic Security](./agnostic-security.md)
 - [Reviewer Playbook](../contributing/reviewer-playbook.md)

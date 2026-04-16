@@ -1,4 +1,4 @@
-//! Agent runtime — orchestration, security, observability, cron, SOP, skills, hardware, and more.
+//! Agent runtime — orchestration, security, observability, cron, SOP, skills, and more.
 
 pub mod cli_input;
 pub mod i18n;

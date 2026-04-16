@@ -249,15 +249,15 @@ Examples:
 Send a one-off message to a configured channel.
 
 Sends a text message through the specified channel without starting \
-the full agent loop. Useful for scripted notifications, hardware \
-sensor alerts, and automation pipelines.
+the full agent loop. Useful for scripted notifications, service \
+alerts, and automation pipelines.
 
 The --channel-id selects the channel by its config section name \
 (e.g. 'telegram', 'discord', 'slack'). The --recipient is the \
 platform-specific destination (e.g. a Telegram chat ID).
 
 Examples:
-  naraeclaw channel send 'Someone is near your device.' --channel-id telegram --recipient 123456789
+  naraeclaw channel send 'Deployment finished.' --channel-id telegram --recipient 123456789
   naraeclaw channel send 'Build succeeded!' --channel-id discord --recipient 987654321")]
     Send {
         /// Message text to send

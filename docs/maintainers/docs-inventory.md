@@ -73,7 +73,6 @@ These are valuable context, but **not strict runtime contracts**.
 | `docs/sandboxing.md` | Proposal |
 | `docs/resource-limits.md` | Proposal |
 | `docs/audit-logging.md` | Proposal |
-| `docs/agnostic-security.md` | Proposal |
 | `docs/frictionless-security.md` | Proposal |
 | `docs/security-roadmap.md` | Roadmap |
 
