@@ -6854,7 +6854,7 @@ const translations: Record<Locale, Record<string, string>> = {
     'doctor.warnings_summary': '경고',
     'doctor.all_clear': '문제 없음',
     'doctor.system_diagnostics': '시스템 진단',
-    'doctor.empty_hint': '"진단 실행"을 클릭하여 ZeroClaw 설치를 확인하세요.',
+    'doctor.empty_hint': '"진단 실행"을 클릭하여 NaraeClaw 설치를 확인하세요.',
 
     // Auth / Pairing
     'auth.pair': '장치 페어링',
@@ -11235,7 +11235,7 @@ const translations: Record<Locale, Record<string, string>> = {
 // Current locale state
 // ---------------------------------------------------------------------------
 
-let currentLocale: Locale = 'en';
+let currentLocale: Locale = 'ko';
 
 export function getLocale(): Locale {
   return currentLocale;
@@ -11320,7 +11320,7 @@ export function useLocale(): { locale: Locale; t: (key: string) => string } {
     getStatus()
       .then((status) => {
         if (cancelled) return;
-        const raw = (status.locale || 'en').toLowerCase().replace(/-.*/, '').replace(/_.*/, '');
+        const raw = (status.locale || 'ko').toLowerCase().replace(/-.*/, '').replace(/_.*/, '');
         const detected: Locale = (raw in translations) ? (raw as Locale) : 'en';
         setLocale(detected);
         setLocaleState(detected);
