@@ -33,14 +33,8 @@ pub use crate::discord_history::DiscordHistoryChannel;
 pub use crate::email_channel::EmailChannel;
 #[cfg(feature = "channel-email")]
 pub use crate::gmail_push::GmailPushChannel;
-#[cfg(feature = "channel-imessage")]
-pub use crate::imessage::IMessageChannel;
-#[cfg(feature = "channel-irc")]
-pub use crate::irc::IrcChannel;
 #[cfg(feature = "channel-line")]
 pub use crate::line::LineChannel;
-#[cfg(feature = "channel-linq")]
-pub use crate::linq::LinqChannel;
 #[cfg(feature = "channel-mattermost")]
 pub use crate::mattermost::MattermostChannel;
 #[cfg(feature = "channel-nextcloud")]
@@ -4046,19 +4040,6 @@ fn build_channel_by_id(config: &Config, channel_id: &str) -> Result<Arc<dyn Chan
                 wati_cfg.proxy_url.clone(),
             )))
         }
-        #[cfg(feature = "channel-linq")]
-        "linq" => {
-            let lq = config
-                .channels_config
-                .linq
-                .as_ref()
-                .context("Linq channel is not configured")?;
-            Ok(Arc::new(LinqChannel::new(
-                lq.api_token.clone(),
-                lq.from_phone.clone(),
-                lq.allowed_senders.clone(),
-            )))
-        }
         #[cfg(feature = "channel-email")]
         "email" => {
             let em = config
@@ -4076,26 +4057,6 @@ fn build_channel_by_id(config: &Config, channel_id: &str) -> Result<Arc<dyn Chan
                 .as_ref()
                 .context("Gmail Push channel is not configured")?;
             Ok(Arc::new(GmailPushChannel::new(gp.clone())))
-        }
-        #[cfg(feature = "channel-irc")]
-        "irc" => {
-            let irc_cfg = config
-                .channels_config
-                .irc
-                .as_ref()
-                .context("IRC channel is not configured")?;
-            Ok(Arc::new(IrcChannel::new(crate::irc::IrcChannelConfig {
-                server: irc_cfg.server.clone(),
-                port: irc_cfg.port,
-                nickname: irc_cfg.nickname.clone(),
-                username: irc_cfg.username.clone(),
-                channels: irc_cfg.channels.clone(),
-                allowed_users: irc_cfg.allowed_users.clone(),
-                server_password: irc_cfg.server_password.clone(),
-                nickserv_password: irc_cfg.nickserv_password.clone(),
-                sasl_password: irc_cfg.sasl_password.clone(),
-                verify_tls: irc_cfg.verify_tls.unwrap_or(true),
-            })))
         }
         #[cfg(feature = "channel-twitter")]
         "twitter" => {
@@ -4127,15 +4088,6 @@ fn build_channel_by_id(config: &Config, channel_id: &str) -> Result<Arc<dyn Chan
                 dh.store_dms,
                 dh.respond_to_dms,
             )))
-        }
-        #[cfg(feature = "channel-imessage")]
-        "imessage" => {
-            let im = config
-                .channels_config
-                .imessage
-                .as_ref()
-                .context("iMessage channel is not configured")?;
-            Ok(Arc::new(IMessageChannel::new(im.allowed_contacts.clone())))
         }
         "line" => {
             #[cfg(feature = "channel-line")]
@@ -4344,18 +4296,6 @@ fn collect_configured_channels(
         }
     }
 
-    #[cfg(feature = "channel-imessage")]
-    if let Some(ref im) = config.channels_config.imessage {
-        if im.enabled {
-            channels.push(ConfiguredChannel {
-                display_name: "iMessage",
-                channel: Arc::new(IMessageChannel::new(im.allowed_contacts.clone())),
-            });
-        } else {
-            tracing::info!("iMessage channel configured but disabled (enabled = false)");
-        }
-    }
-
     #[cfg(feature = "channel-matrix")]
     if let Some(ref mx) = config.channels_config.matrix {
         if mx.enabled {
@@ -4496,22 +4436,6 @@ fn collect_configured_channels(
         }
     }
 
-    #[cfg(feature = "channel-linq")]
-    if let Some(ref lq) = config.channels_config.linq {
-        if lq.enabled {
-            channels.push(ConfiguredChannel {
-                display_name: "Linq",
-                channel: Arc::new(LinqChannel::new(
-                    lq.api_token.clone(),
-                    lq.from_phone.clone(),
-                    lq.allowed_senders.clone(),
-                )),
-            });
-        } else {
-            tracing::info!("Linq channel configured but disabled (enabled = false)");
-        }
-    }
-
     #[cfg(feature = "channel-wati")]
     if let Some(ref wati_cfg) = config.channels_config.wati {
         if wati_cfg.enabled {
@@ -4566,29 +4490,6 @@ fn collect_configured_channels(
             display_name: "Gmail Push",
             channel: Arc::new(GmailPushChannel::new(gp_cfg.clone())),
         });
-    }
-
-    #[cfg(feature = "channel-irc")]
-    if let Some(ref irc) = config.channels_config.irc {
-        if irc.enabled {
-            channels.push(ConfiguredChannel {
-                display_name: "IRC",
-                channel: Arc::new(IrcChannel::new(crate::irc::IrcChannelConfig {
-                    server: irc.server.clone(),
-                    port: irc.port,
-                    nickname: irc.nickname.clone(),
-                    username: irc.username.clone(),
-                    channels: irc.channels.clone(),
-                    allowed_users: irc.allowed_users.clone(),
-                    server_password: irc.server_password.clone(),
-                    nickserv_password: irc.nickserv_password.clone(),
-                    sasl_password: irc.sasl_password.clone(),
-                    verify_tls: irc.verify_tls.unwrap_or(true),
-                })),
-            });
-        } else {
-            tracing::info!("IRC channel configured but disabled (enabled = false)");
-        }
     }
 
     #[cfg(feature = "channel-line")]
@@ -9356,10 +9257,8 @@ BTC is currently around $65,000 based on latest tool output."#
     #[tokio::test]
     async fn process_channel_message_refreshes_available_skills_after_new_session() {
         let workspace = make_workspace();
-        let mut config = Config {
-            workspace_dir: workspace.path().to_path_buf(),
-            ..Default::default()
-        };
+        let mut config = Config::default();
+        config.workspace_dir = workspace.path().to_path_buf();
         config.skills.open_skills_enabled = false;
 
         let initial_skills =

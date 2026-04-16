@@ -68,7 +68,6 @@ Operational notes:
 
 - Marker parsing applies to user-role messages before provider calls.
 - Provider capability is enforced at runtime: if the selected provider does not support vision, the request fails with a structured capability error (`capability=vision`).
-- Linq webhook `media` parts with `image/*` MIME type are automatically converted to this marker format.
 
 ## Channel Matrix
 
@@ -102,9 +101,6 @@ If `[channels_config.matrix]` is present but the corresponding feature is not co
 | Nextcloud Talk | webhook (`/nextcloud-talk`) | Yes (public HTTPS callback) |
 | Webhook | gateway endpoint (`/webhook`) | Usually yes |
 | Email | IMAP polling + SMTP send | No |
-| IRC | IRC socket | No |
-| Linq | webhook (`/linq`) | Yes (public HTTPS callback) |
-| iMessage | local integration | No |
 | Nostr | relay websocket (NIP-04 / NIP-17) | No |
 
 ---
@@ -119,11 +115,8 @@ For channels with inbound sender allowlists:
 
 Field names differ by channel:
 
-- `allowed_users` (Telegram/Discord/Slack/Mattermost/Matrix/IRC/Nextcloud Talk)
 - `allowed_from` (Signal)
 - `allowed_numbers` (WhatsApp)
-- `allowed_senders` (Email/Linq)
-- `allowed_contacts` (iMessage)
 - `allowed_pubkeys` (Nostr)
 
 ---
@@ -301,21 +294,6 @@ poll_interval_secs = 60
 allowed_senders = ["*"]
 ```
 
-### 4.10 IRC
-
-```toml
-[channels_config.irc]
-server = "irc.libera.chat"
-port = 6697
-nickname = "naraeclaw-bot"
-username = "naraeclaw"              # optional
-channels = ["#naraeclaw"]
-allowed_users = ["*"]
-server_password = ""                # optional
-nickserv_password = ""              # optional
-sasl_password = ""                  # optional
-verify_tls = true
-```
 
 ### 4.13 Nostr
 
@@ -368,70 +346,7 @@ Notes:
 - `NARAECLAW_NEXTCLOUD_TALK_WEBHOOK_SECRET` overrides config secret.
 - See [nextcloud-talk-setup.md](../../setup-guides/nextcloud-talk-setup.md) for a full runbook.
 
-### 4.16 Linq
 
-```toml
-[channels_config.linq]
-api_token = "linq-partner-api-token"
-from_phone = "+15551234567"
-signing_secret = "optional-webhook-signing-secret"  # optional but recommended
-allowed_senders = ["*"]
-```
-
-Notes:
-
-- Linq uses the Partner V3 API for iMessage, RCS, and SMS.
-- Inbound webhook endpoint: `POST /linq`.
-- Signature verification uses `X-Webhook-Signature` (HMAC-SHA256) and `X-Webhook-Timestamp`.
-- If `signing_secret` is set, invalid or stale (>300s) signatures are rejected.
-- `NARAECLAW_LINQ_SIGNING_SECRET` overrides config secret.
-- `allowed_senders` uses E.164 phone number format (e.g. `+1234567890`).
-
-### 4.17 iMessage
-
-```toml
-[channels_config.imessage]
-allowed_contacts = ["*"]
-```
-
----
-
-## 5. Validation Workflow
-
-1. Configure one channel with permissive allowlist (`"*"`) for initial verification.
-2. Run:
-
-```bash
-naraeclaw onboard --channels-only
-naraeclaw daemon
-```
-
-1. Send a message from an expected sender.
-2. Confirm a reply arrives.
-3. Tighten allowlist from `"*"` to explicit IDs.
-
----
-
-## 6. Troubleshooting Checklist
-
-If a channel appears connected but does not respond:
-
-1. Confirm the sender identity is allowed by the correct allowlist field.
-2. Confirm bot account membership/permissions in target room/channel.
-3. Confirm tokens/secrets are valid (and not expired/revoked).
-4. Confirm transport mode assumptions:
-   - polling/websocket channels do not need public inbound HTTP
-   - webhook channels do need reachable HTTPS callback
-5. Restart `naraeclaw daemon` after config changes.
-
-For Matrix encrypted rooms specifically, use:
-- [Matrix E2EE Guide](../../security/matrix-e2ee-guide.md)
-
----
-
-## 7. Operations Appendix: Log Keywords Matrix
-
-Use this appendix for fast triage. Match log keywords first, then follow the troubleshooting steps above.
 
 ### 7.1 Recommended capture command
 
@@ -442,7 +357,7 @@ RUST_LOG=info naraeclaw daemon 2>&1 | tee /tmp/naraeclaw.log
 Then filter channel/gateway events:
 
 ```bash
-rg -n "Matrix|Telegram|Discord|Slack|Mattermost|Signal|WhatsApp|Email|IRC|iMessage|Nostr|Webhook|Channel" /tmp/naraeclaw.log
+rg -n "Matrix|Telegram|Discord|Slack|Mattermost|Signal|WhatsApp|Email|Nostr|Webhook|Channel" /tmp/naraeclaw.log
 ```
 
 ### 7.2 Keyword table
@@ -458,9 +373,7 @@ rg -n "Matrix|Telegram|Discord|Slack|Mattermost|Signal|WhatsApp|Email|IRC|iMessa
 | WhatsApp (channel) | `WhatsApp channel active (webhook mode).` / `WhatsApp Web connected successfully` | `WhatsApp: ignoring message from unauthorized number:` / `WhatsApp Web: message from ... not in allowed list` | `WhatsApp send failed:` / `WhatsApp Web stream error:` |
 | Webhook / WhatsApp (gateway) | `WhatsApp webhook verified successfully` | `Webhook: rejected — not paired / invalid bearer token` / `Webhook: rejected request — invalid or missing X-Webhook-Secret` / `WhatsApp webhook verification failed — token mismatch` | `Webhook JSON parse error:` |
 | Email | `Email polling every ...` / `Email sent to ...` | `Blocked email from ...` | `Email poll failed:` / `Email poll task panicked:` |
-| IRC | `IRC channel connecting to ...` / `IRC registered as ...` | (allowlist checks are enforced by `allowed_users`) | `IRC SASL authentication failed (...)` / `IRC server does not support SASL...` / `IRC nickname ... is in use, trying ...` |
 | Nextcloud Talk (gateway) | `POST /nextcloud-talk — Nextcloud Talk bot webhook` | `Nextcloud Talk webhook signature verification failed` / `Nextcloud Talk: ignoring message from unauthorized actor:` | `Nextcloud Talk send failed:` / `LLM error for Nextcloud Talk message:` |
-| iMessage | `iMessage channel listening (AppleScript bridge)...` | (contact allowlist enforced by `allowed_contacts`) | `iMessage poll error:` |
 | Nostr | `Nostr channel listening as npub1...` | `Nostr: ignoring NIP-04 message from unauthorized pubkey:` / `Nostr: ignoring NIP-17 message from unauthorized pubkey:` | `Failed to decrypt NIP-04 message:` / `Failed to unwrap NIP-17 gift wrap:` / `Nostr relay pool shut down` |
 
 ### 7.3 Runtime supervisor keywords

@@ -4,12 +4,10 @@ use console::style;
 use dialoguer::{Confirm, Select};
 use naraeclaw_config::schema::{
     AutonomyConfig, BrowserConfig, ChannelsConfig, Config, DiscordConfig, HeartbeatConfig,
-    IMessageConfig, MatrixConfig, MemoryConfig, ObservabilityConfig, RuntimeConfig, SecretsConfig,
-    SlackConfig, StorageConfig, TelegramConfig, WebhookConfig,
+    MatrixConfig, MemoryConfig, ObservabilityConfig, RuntimeConfig, SecretsConfig, SlackConfig,
+    StorageConfig, TelegramConfig, WebhookConfig,
 };
-use naraeclaw_config::schema::{
-    IrcConfig, LinqConfig, NextcloudTalkConfig, SignalConfig, StreamMode, WhatsAppConfig,
-};
+use naraeclaw_config::schema::{NextcloudTalkConfig, SignalConfig, StreamMode, WhatsAppConfig};
 #[cfg(feature = "channel-nostr")]
 use naraeclaw_config::schema::{NostrConfig, default_nostr_relays};
 use naraeclaw_memory::{
@@ -3293,12 +3291,9 @@ enum ChannelMenuChoice {
     Telegram,
     Discord,
     Slack,
-    IMessage,
     Matrix,
     Signal,
     WhatsApp,
-    Linq,
-    Irc,
     Webhook,
     NextcloudTalk,
     #[cfg(feature = "channel-nostr")]
@@ -3310,12 +3305,9 @@ const CHANNEL_MENU_CHOICES: &[ChannelMenuChoice] = &[
     ChannelMenuChoice::Telegram,
     ChannelMenuChoice::Discord,
     ChannelMenuChoice::Slack,
-    ChannelMenuChoice::IMessage,
     ChannelMenuChoice::Matrix,
     ChannelMenuChoice::Signal,
     ChannelMenuChoice::WhatsApp,
-    ChannelMenuChoice::Linq,
-    ChannelMenuChoice::Irc,
     ChannelMenuChoice::Webhook,
     ChannelMenuChoice::NextcloudTalk,
     #[cfg(feature = "channel-nostr")]
@@ -3367,14 +3359,6 @@ fn setup_channels(
                         "— connect your bot"
                     }
                 ),
-                ChannelMenuChoice::IMessage => format!(
-                    "iMessage   {}",
-                    if config.imessage.is_some() {
-                        "✅ configured"
-                    } else {
-                        "— macOS only"
-                    }
-                ),
                 ChannelMenuChoice::Matrix => format!(
                     "Matrix     {}",
                     if config.matrix.is_some() {
@@ -3397,22 +3381,6 @@ fn setup_channels(
                         "✅ connected"
                     } else {
                         "— Business Cloud API"
-                    }
-                ),
-                ChannelMenuChoice::Linq => format!(
-                    "Linq       {}",
-                    if config.linq.is_some() {
-                        "✅ connected"
-                    } else {
-                        "— iMessage/RCS/SMS via Linq API"
-                    }
-                ),
-                ChannelMenuChoice::Irc => format!(
-                    "IRC        {}",
-                    if config.irc.is_some() {
-                        "✅ configured"
-                    } else {
-                        "— IRC over TLS"
                     }
                 ),
                 ChannelMenuChoice::Webhook => format!(
@@ -3904,53 +3872,6 @@ fn setup_channels(
                         .unwrap_or(1200),
                     cancel_reaction: existing_sl.and_then(|s| s.cancel_reaction.clone()),
                 });
-            }
-            ChannelMenuChoice::IMessage => {
-                // ── iMessage ──
-                println!();
-                println!(
-                    "  {} {}",
-                    style("iMessage Setup").white().bold(),
-                    style("— macOS only, reads from Messages.app").dim()
-                );
-
-                if !cfg!(target_os = "macos") {
-                    println!(
-                        "  {} iMessage is only available on macOS.",
-                        style("⚠").yellow().bold()
-                    );
-                    continue;
-                }
-
-                print_bullet("NaraeClaw reads your iMessage database and replies via AppleScript.");
-                print_bullet(
-                    "You need to grant Full Disk Access to your terminal in System Settings.",
-                );
-                println!();
-
-                let contacts_str: String = Input::new()
-                    .with_prompt("  Allowed contacts (comma-separated phone/email, or * for all)")
-                    .default("*")
-                    .interact_text()?;
-
-                let allowed_contacts = if contacts_str.trim() == "*" {
-                    vec!["*".into()]
-                } else {
-                    contacts_str
-                        .split(',')
-                        .map(|s| s.trim().to_string())
-                        .collect()
-                };
-
-                config.imessage = Some(IMessageConfig {
-                    enabled: true,
-                    allowed_contacts,
-                });
-                println!(
-                    "  {} iMessage configured (contacts: {})",
-                    style("✅").green().bold(),
-                    style(&contacts_str).cyan()
-                );
             }
             ChannelMenuChoice::Matrix => {
                 // ── Matrix ──
@@ -4452,239 +4373,6 @@ fn setup_channels(
                         .map(|w| w.group_mention_patterns.clone())
                         .unwrap_or_default(),
                     proxy_url: existing_wa.and_then(|w| w.proxy_url.clone()),
-                });
-            }
-            ChannelMenuChoice::Linq => {
-                // ── Linq ──
-                println!();
-                println!(
-                    "  {} {}",
-                    style("Linq Setup").white().bold(),
-                    style("— iMessage/RCS/SMS via Linq API").dim()
-                );
-                print_bullet("1. Sign up at linqapp.com and get your Partner API token");
-                print_bullet("2. Note your Linq phone number (E.164 format)");
-                print_bullet("3. Configure webhook URL to: https://your-domain/linq");
-                println!();
-
-                let api_token: String = Input::new()
-                    .with_prompt("  API token (Linq Partner API token)")
-                    .interact_text()?;
-
-                if api_token.trim().is_empty() {
-                    println!("  {} Skipped", style("→").dim());
-                    continue;
-                }
-
-                let from_phone: String = Input::new()
-                    .with_prompt("  From phone number (E.164 format, e.g. +12223334444)")
-                    .interact_text()?;
-
-                if from_phone.trim().is_empty() {
-                    println!("  {} Skipped — phone number required", style("→").dim());
-                    continue;
-                }
-
-                // Test connection
-                print!("  {} Testing connection... ", style("⏳").dim());
-                let api_token_clone = api_token.clone();
-                let thread_result = std::thread::spawn(move || {
-                    let client = reqwest::blocking::Client::new();
-                    let url = "https://api.linqapp.com/api/partner/v3/phonenumbers";
-                    let resp = client
-                        .get(url)
-                        .header(
-                            "Authorization",
-                            format!("Bearer {}", api_token_clone.trim()),
-                        )
-                        .send()?;
-                    Ok::<_, reqwest::Error>(resp.status().is_success())
-                })
-                .join();
-                match thread_result {
-                    Ok(Ok(true)) => {
-                        println!(
-                            "\r  {} Connected to Linq API              ",
-                            style("✅").green().bold()
-                        );
-                    }
-                    _ => {
-                        println!(
-                            "\r  {} Connection failed — check API token",
-                            style("❌").red().bold()
-                        );
-                        continue;
-                    }
-                }
-
-                let users_str: String = Input::new()
-                    .with_prompt(
-                        "  Allowed sender numbers (comma-separated +1234567890, or * for all)",
-                    )
-                    .default("*")
-                    .interact_text()?;
-
-                let allowed_senders = if users_str.trim() == "*" {
-                    vec!["*".into()]
-                } else {
-                    users_str.split(',').map(|s| s.trim().to_string()).collect()
-                };
-
-                let signing_secret: String = Input::new()
-                    .with_prompt("  Webhook signing secret (optional, press Enter to skip)")
-                    .allow_empty(true)
-                    .interact_text()?;
-
-                config.linq = Some(LinqConfig {
-                    enabled: true,
-                    api_token: api_token.trim().to_string(),
-                    from_phone: from_phone.trim().to_string(),
-                    signing_secret: if signing_secret.trim().is_empty() {
-                        None
-                    } else {
-                        Some(signing_secret.trim().to_string())
-                    },
-                    allowed_senders,
-                });
-            }
-            ChannelMenuChoice::Irc => {
-                // ── IRC ──
-                println!();
-                println!(
-                    "  {} {}",
-                    style("IRC Setup").white().bold(),
-                    style("— IRC over TLS").dim()
-                );
-                print_bullet("IRC connects over TLS to any IRC server");
-                print_bullet("Supports SASL PLAIN and NickServ authentication");
-                println!();
-
-                let server: String = Input::new()
-                    .with_prompt("  IRC server (hostname)")
-                    .interact_text()?;
-
-                if server.trim().is_empty() {
-                    println!("  {} Skipped", style("→").dim());
-                    continue;
-                }
-
-                let port_str: String = Input::new()
-                    .with_prompt("  Port")
-                    .default("6697")
-                    .interact_text()?;
-
-                let port: u16 = match port_str.trim().parse() {
-                    Ok(p) => p,
-                    Err(_) => {
-                        println!("  {} Invalid port, using 6697", style("→").dim());
-                        6697
-                    }
-                };
-
-                let nickname: String =
-                    Input::new().with_prompt("  Bot nickname").interact_text()?;
-
-                if nickname.trim().is_empty() {
-                    println!("  {} Skipped — nickname required", style("→").dim());
-                    continue;
-                }
-
-                let channels_str: String = Input::new()
-                    .with_prompt("  Channels to join (comma-separated: #channel1,#channel2)")
-                    .allow_empty(true)
-                    .interact_text()?;
-
-                let channels = if channels_str.trim().is_empty() {
-                    vec![]
-                } else {
-                    channels_str
-                        .split(',')
-                        .map(|s| s.trim().to_string())
-                        .filter(|s| !s.is_empty())
-                        .collect()
-                };
-
-                print_bullet(
-                    "Allowlist nicknames that can interact with the bot (case-insensitive).",
-                );
-                print_bullet("Use '*' to allow anyone (not recommended for production).");
-
-                let users_str: String = Input::new()
-                    .with_prompt("  Allowed nicknames (comma-separated, or * for all)")
-                    .allow_empty(true)
-                    .interact_text()?;
-
-                let allowed_users = if users_str.trim() == "*" {
-                    vec!["*".into()]
-                } else {
-                    users_str
-                        .split(',')
-                        .map(|s| s.trim().to_string())
-                        .filter(|s| !s.is_empty())
-                        .collect()
-                };
-
-                if allowed_users.is_empty() {
-                    print_bullet(
-                        "⚠️  Empty allowlist — only you can interact. Add nicknames above.",
-                    );
-                }
-
-                println!();
-                print_bullet("Optional authentication (press Enter to skip each):");
-
-                let server_password: String = Input::new()
-                    .with_prompt("  Server password (for bouncers like ZNC, leave empty if none)")
-                    .allow_empty(true)
-                    .interact_text()?;
-
-                let nickserv_password: String = Input::new()
-                    .with_prompt("  NickServ password (leave empty if none)")
-                    .allow_empty(true)
-                    .interact_text()?;
-
-                let sasl_password: String = Input::new()
-                    .with_prompt("  SASL PLAIN password (leave empty if none)")
-                    .allow_empty(true)
-                    .interact_text()?;
-
-                let verify_tls: bool = Confirm::new()
-                    .with_prompt("  Verify TLS certificate?")
-                    .default(true)
-                    .interact()?;
-
-                println!(
-                    "  {} IRC configured as {}@{}:{}",
-                    style("✅").green().bold(),
-                    style(&nickname).cyan(),
-                    style(&server).cyan(),
-                    style(port).cyan()
-                );
-
-                config.irc = Some(IrcConfig {
-                    enabled: true,
-                    server: server.trim().to_string(),
-                    port,
-                    nickname: nickname.trim().to_string(),
-                    username: config.irc.as_ref().and_then(|i| i.username.clone()),
-                    channels,
-                    allowed_users,
-                    server_password: if server_password.trim().is_empty() {
-                        None
-                    } else {
-                        Some(server_password.trim().to_string())
-                    },
-                    nickserv_password: if nickserv_password.trim().is_empty() {
-                        None
-                    } else {
-                        Some(nickserv_password.trim().to_string())
-                    },
-                    sasl_password: if sasl_password.trim().is_empty() {
-                        None
-                    } else {
-                        Some(sasl_password.trim().to_string())
-                    },
-                    verify_tls: Some(verify_tls),
                 });
             }
             ChannelMenuChoice::Webhook => {
@@ -5950,7 +5638,9 @@ mod tests {
         assert_eq!(config.default_model.as_deref(), Some("custom-model-946"));
         assert_eq!(config.api_key.as_deref(), Some("sk-issue946"));
 
-        let config_raw = tokio::fs::read_to_string(config.config_path).await.unwrap();
+        let config_raw = tokio::fs::read_to_string(&config.config_path)
+            .await
+            .unwrap();
         assert!(config_raw.contains("default_provider = \"openrouter\""));
         assert!(config_raw.contains("default_model = \"custom-model-946\""));
     }
@@ -6046,7 +5736,9 @@ default_model = \"stale-model\"
         assert_eq!(config.default_model.as_deref(), Some("custom-model-fresh"));
         assert_eq!(config.api_key.as_deref(), Some("sk-force"));
 
-        let config_raw = tokio::fs::read_to_string(config.config_path).await.unwrap();
+        let config_raw = tokio::fs::read_to_string(&config.config_path)
+            .await
+            .unwrap();
         assert!(config_raw.contains("default_provider = \"openrouter\""));
         assert!(config_raw.contains("default_model = \"custom-model-fresh\""));
     }
@@ -6715,7 +6407,6 @@ Do not overwrite me.",
         assert_eq!(canonical_provider_name("codex"), "openai-codex");
         assert_eq!(canonical_provider_name("openai_codex"), "openai-codex");
         assert_eq!(canonical_provider_name("moonshot-intl"), "moonshot");
-        assert_eq!(canonical_provider_name("kimi-cn"), "moonshot");
         assert_eq!(canonical_provider_name("kimi_coding"), "kimi-code");
         assert_eq!(canonical_provider_name("kimi_for_coding"), "kimi-code");
         assert_eq!(canonical_provider_name("z.ai-global"), "zai");

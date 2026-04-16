@@ -785,53 +785,6 @@ pub fn all_tools_with_runtime(
         )));
     }
 
-    // ── WASM plugin tools (requires plugins-wasm feature) ──
-    #[cfg(feature = "plugins-wasm")]
-    {
-        let plugin_dir = config.plugins.plugins_dir.clone();
-        let plugin_path = if plugin_dir.starts_with("~/") {
-            let home = directories::UserDirs::new()
-                .map(|u| u.home_dir().to_path_buf())
-                .unwrap_or_else(|| std::path::PathBuf::from("."));
-            home.join(plugin_dir.strip_prefix("~/").unwrap())
-        } else {
-            std::path::PathBuf::from(&plugin_dir)
-        };
-
-        if plugin_path.exists() && config.plugins.enabled {
-            match naraeclaw_plugins::host::PluginHost::new(
-                plugin_path.parent().unwrap_or(&plugin_path),
-            ) {
-                Ok(host) => {
-                    let tool_manifests = host.tool_plugins();
-                    let count = tool_manifests.len();
-                    for manifest in tool_manifests {
-                        tool_arcs.push(Arc::new(naraeclaw_plugins::wasm_tool::WasmTool::new(
-                            manifest.name.clone(),
-                            manifest.description.clone().unwrap_or_default(),
-                            manifest.name.clone(),
-                            "call".to_string(),
-                            serde_json::json!({
-                                "type": "object",
-                                "properties": {
-                                    "input": {
-                                        "type": "string",
-                                        "description": "Input for the plugin"
-                                    }
-                                },
-                                "required": ["input"]
-                            }),
-                        )));
-                    }
-                    tracing::info!("Loaded {count} WASM plugin tools");
-                }
-                Err(e) => {
-                    tracing::warn!("Failed to load WASM plugins: {e}");
-                }
-            }
-        }
-    }
-
     // Pipeline tool (execute_pipeline) — multi-step tool chaining.
     if root_config.pipeline.enabled {
         let pipeline_tools: Vec<Arc<dyn Tool>> = tool_arcs.clone();
@@ -895,8 +848,6 @@ mod tests {
             Arc::new(Config::default()),
             &security,
             mem,
-            None,
-            None,
             &browser,
             &http,
             &naraeclaw_config::schema::WebFetchConfig::default(),
@@ -938,8 +889,6 @@ mod tests {
             Arc::new(Config::default()),
             &security,
             mem,
-            None,
-            None,
             &browser,
             &http,
             &naraeclaw_config::schema::WebFetchConfig::default(),
@@ -1093,8 +1042,6 @@ mod tests {
             Arc::new(Config::default()),
             &security,
             mem,
-            None,
-            None,
             &browser,
             &http,
             &naraeclaw_config::schema::WebFetchConfig::default(),
@@ -1127,8 +1074,6 @@ mod tests {
             Arc::new(Config::default()),
             &security,
             mem,
-            None,
-            None,
             &browser,
             &http,
             &naraeclaw_config::schema::WebFetchConfig::default(),
@@ -1163,8 +1108,6 @@ mod tests {
             Arc::new(cfg.clone()),
             &security,
             mem,
-            None,
-            None,
             &browser,
             &http,
             &naraeclaw_config::schema::WebFetchConfig::default(),
@@ -1199,8 +1142,6 @@ mod tests {
             Arc::new(cfg.clone()),
             &security,
             mem,
-            None,
-            None,
             &browser,
             &http,
             &naraeclaw_config::schema::WebFetchConfig::default(),

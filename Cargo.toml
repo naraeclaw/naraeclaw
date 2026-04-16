@@ -1,5 +1,5 @@
 [workspace]
-members = [".", "crates/naraeclaw-api", "crates/naraeclaw-infra", "crates/naraeclaw-config", "crates/naraeclaw-providers", "crates/naraeclaw-memory", "crates/naraeclaw-channels", "crates/naraeclaw-tools", "crates/naraeclaw-runtime", "crates/naraeclaw-tui", "crates/naraeclaw-plugins", "crates/naraeclaw-gateway", "crates/naraeclaw-tool-call-parser", "crates/naraeclaw-macros", "apps/tauri"]
+members = [".", "crates/naraeclaw-api", "crates/naraeclaw-infra", "crates/naraeclaw-config", "crates/naraeclaw-providers", "crates/naraeclaw-memory", "crates/naraeclaw-channels", "crates/naraeclaw-tools", "crates/naraeclaw-runtime", "crates/naraeclaw-tui", "crates/naraeclaw-gateway", "crates/naraeclaw-tool-call-parser", "crates/naraeclaw-macros", "apps/tauri"]
 resolver = "2"
 
 [workspace.package]
@@ -19,7 +19,6 @@ naraeclaw-channels = { path = "crates/naraeclaw-channels", version = "0.6.9", de
 naraeclaw-tools = { path = "crates/naraeclaw-tools", version = "0.6.9" }
 naraeclaw-runtime = { path = "crates/naraeclaw-runtime", version = "0.6.9", default-features = false }
 naraeclaw-tui = { path = "crates/naraeclaw-tui", version = "0.6.9" }
-naraeclaw-plugins = { path = "crates/naraeclaw-plugins", version = "0.6.9" }
 naraeclaw-gateway = { path = "crates/naraeclaw-gateway", version = "0.6.9" }
 naraeclaw-tool-call-parser = { path = "crates/naraeclaw-tool-call-parser", version = "0.6.9" }
 naraeclaw-macros = { path = "crates/naraeclaw-macros", version = "0.6.9" }
@@ -69,7 +68,6 @@ naraeclaw-channels = { workspace = true, optional = true }
 naraeclaw-tools = { workspace = true, optional = true }
 naraeclaw-runtime = { workspace = true, optional = true }
 naraeclaw-tui = { workspace = true, optional = true }
-naraeclaw-plugins = { workspace = true, optional = true }
 naraeclaw-gateway = { workspace = true, optional = true }
 naraeclaw-tool-call-parser.workspace = true
 naraeclaw-macros.workspace = true
@@ -259,13 +257,10 @@ channel-discord = ["naraeclaw-channels/channel-discord"]
 channel-slack = ["naraeclaw-channels/channel-slack"]
 channel-signal = ["naraeclaw-channels/channel-signal"]
 channel-mattermost = ["naraeclaw-channels/channel-mattermost"]
-channel-irc = ["naraeclaw-channels/channel-irc"]
-channel-imessage = ["naraeclaw-channels/channel-imessage"]
 channel-bluesky = ["naraeclaw-channels/channel-bluesky"]
 channel-twitter = ["naraeclaw-channels/channel-twitter"]
 channel-reddit = ["naraeclaw-channels/channel-reddit"]
 channel-notion = ["naraeclaw-channels/channel-notion"]
-channel-linq = ["naraeclaw-channels/channel-linq", "naraeclaw-gateway/channel-linq"]
 channel-wati = ["naraeclaw-channels/channel-wati", "naraeclaw-gateway/channel-wati"]
 channel-nextcloud = ["naraeclaw-channels/channel-nextcloud"]
 channel-clawdtalk = ["naraeclaw-channels/channel-clawdtalk"]
@@ -276,9 +271,8 @@ channel-voice-call = ["naraeclaw-channels/channel-voice-call"]
 
 # Optional channel bundles for non-default integrations.
 channels-social = ["channel-bluesky", "channel-twitter", "channel-reddit"]
-channels-legacy = ["channel-irc", "channel-imessage", "channel-linq"]
 channels-full = [
-    "agent-runtime", "channels-social", "channels-legacy",
+    "agent-runtime", "channels-social",
     "channel-clawdtalk", "channel-voice-call",
 ]
 
@@ -291,7 +285,6 @@ observability-otel = ["naraeclaw-runtime/observability-otel"]
 sandbox-landlock = ["naraeclaw-runtime/sandbox-landlock"]
 sandbox-bubblewrap = ["naraeclaw-runtime/sandbox-bubblewrap"]
 browser-native = ["naraeclaw-tools/browser-native"]
-plugins-wasm = ["dep:naraeclaw-plugins", "naraeclaw-runtime/plugins-wasm"]
 rag-pdf = ["naraeclaw-tools/rag-pdf"]
 webauthn = ["naraeclaw-runtime/webauthn"]
 
@@ -306,7 +299,7 @@ ci-all = [
     "channel-nostr", "channel-matrix", "whatsapp-web",
     "observability-prometheus", "observability-otel",
     "sandbox-landlock", "sandbox-bubblewrap",
-    "browser-native", "plugins-wasm", "rag-pdf",
+    "browser-native", "rag-pdf",
     "webauthn",
 ]
 

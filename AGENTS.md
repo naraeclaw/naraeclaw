@@ -102,7 +102,6 @@ Every workspace crate carries a stability tier per the Microkernel Architecture 
 | `naraeclaw-runtime` | Experimental | Agent runtime (agent loop, security, cron, SOP, skills, observability) |
 | `naraeclaw-gateway` | Experimental | Separate binary at v0.9.0 |
 | `naraeclaw-tui` | Experimental | TUI onboarding wizard |
-| `naraeclaw-plugins` | Experimental | WASM plugin system — foundation for v1.0.0 plugin ecosystem |
 | `naraeclaw-macros` | Beta | Tightly coupled to config schema |
 
 **Tiers**: Stable = covered by breaking-change policy. Beta = breaking changes permitted in MINOR with changelog notes. Experimental = no stability guarantee.
@@ -125,7 +124,6 @@ Tiers are promoted, never demoted, through deliberate team decision.
 - `crates/naraeclaw-infra/` — shared infrastructure (debounce, session, stall watchdog)
 - `crates/naraeclaw-gateway/` — webhook/gateway server (separate binary)
 - `crates/naraeclaw-tui/` — TUI onboarding wizard
-- `crates/naraeclaw-plugins/` — WASM plugin system
 - `crates/naraeclaw-tool-call-parser/` — tool call parsing
 - `docs/` — topic-based documentation (setup-guides, reference, ops, security, contributing, maintainers)
 - `.github/` — CI, templates, automation workflows

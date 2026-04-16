@@ -22,14 +22,8 @@ pub mod discord_history;
 pub mod email_channel;
 #[cfg(feature = "channel-email")]
 pub mod gmail_push;
-#[cfg(feature = "channel-imessage")]
-pub mod imessage;
-#[cfg(feature = "channel-irc")]
-pub mod irc;
 #[cfg(feature = "channel-line")]
 pub mod line;
-#[cfg(feature = "channel-linq")]
-pub mod linq;
 #[cfg(feature = "channel-matrix")]
 pub mod matrix;
 #[cfg(feature = "channel-mattermost")]

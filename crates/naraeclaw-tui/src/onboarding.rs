@@ -16,9 +16,8 @@ use std::io::{self, IsTerminal};
 
 use naraeclaw_config::schema::Config;
 use naraeclaw_config::schema::{
-    DiscordConfig, IMessageConfig, IrcConfig, MatrixConfig, MattermostConfig, NextcloudTalkConfig,
-    SignalConfig, SlackConfig, StreamMode, TelegramConfig, WhatsAppChatPolicy, WhatsAppConfig,
-    WhatsAppWebMode,
+    DiscordConfig, MatrixConfig, MattermostConfig, NextcloudTalkConfig, SignalConfig, SlackConfig,
+    StreamMode, TelegramConfig, WhatsAppChatPolicy, WhatsAppConfig, WhatsAppWebMode,
 };
 
 use super::theme;
@@ -194,11 +193,9 @@ const CHANNELS: &[(&str, &str, bool)] = &[
     ("Telegram", "Bot API", false),
     ("WhatsApp", "QR link", true),
     ("Discord", "Bot API", false),
-    ("IRC", "Server + Nick", false),
     ("Google Chat", "Chat API", true),
     ("Slack", "Socket Mode", false),
     ("Signal", "signal-cli", false),
-    ("iMessage", "imsg", false),
     ("LINE", "Messaging API", false),
     ("Mattermost", "plugin", false),
     ("Nextcloud Talk", "self-hosted", false),
@@ -823,31 +820,6 @@ fn apply_tui_selections_to_config(app: &App, config: &mut Config) {
                     ignore_attachments: false,
                     ignore_stories: true,
                     proxy_url: None,
-                });
-            }
-        }
-        "IRC" => {
-            if config.channels_config.irc.is_none() {
-                config.channels_config.irc = Some(IrcConfig {
-                    enabled: true,
-                    server: String::from("irc.libera.chat"),
-                    port: 6697,
-                    nickname: String::from("naraeclaw-bot"),
-                    username: None,
-                    channels: vec![String::from("#your-channel")],
-                    allowed_users: vec![],
-                    server_password: None,
-                    nickserv_password: None,
-                    sasl_password: None,
-                    verify_tls: None,
-                });
-            }
-        }
-        "iMessage" => {
-            if config.channels_config.imessage.is_none() {
-                config.channels_config.imessage = Some(IMessageConfig {
-                    enabled: true,
-                    allowed_contacts: vec![],
                 });
             }
         }
@@ -2193,12 +2165,9 @@ fn render_channel_status(frame: &mut Frame, area: Rect) {
     let status_lines: Vec<Line> = vec![
         ("Telegram", "needs token", false),
         ("Discord", "needs token", false),
-        ("IRC", "needs host + nick", false),
         ("Slack", "needs tokens", false),
         ("Signal", "needs setup", false),
         ("signal-cli", "missing (signal-cli)", false),
-        ("iMessage", "needs setup", false),
-        ("imsg", "found (imsg)", true),
         ("LINE", "needs token + secret", false),
         ("Mattermost", "needs token + url", false),
         ("Nextcloud Talk", "needs setup", false),
@@ -2298,20 +2267,11 @@ fn render_how_channels_work(frame: &mut Frame, area: Rect) {
             theme::body_style(),
         )),
         Line::from(Span::styled(
-            "  IRC: classic IRC networks with DM/channel routing and pairing",
-            theme::body_style(),
-        )),
-        Line::from(Span::styled("  controls.", theme::body_style())),
-        Line::from(Span::styled(
             "  Slack: supported (Socket Mode).",
             theme::body_style(),
         )),
         Line::from(Span::styled(
             "  Signal: signal-cli linked device; more setup.",
-            theme::body_style(),
-        )),
-        Line::from(Span::styled(
-            "  iMessage: this is still a work in progress.",
             theme::body_style(),
         )),
         Line::from(Span::styled(
@@ -3264,7 +3224,7 @@ mod tests {
     #[test]
     fn save_channel_slack() {
         let mut app = test_app();
-        app.channel_idx = 5; // Slack
+        app.channel_idx = CHANNELS.iter().position(|c| c.0 == "Slack").unwrap();
         let mut config = Config::default();
         apply_tui_selections_to_config(&app, &mut config);
         let sl = config
@@ -3295,7 +3255,7 @@ mod tests {
     #[test]
     fn save_channel_signal() {
         let mut app = test_app();
-        app.channel_idx = 6; // Signal
+        app.channel_idx = CHANNELS.iter().position(|c| c.0 == "Signal").unwrap();
         let mut config = Config::default();
         apply_tui_selections_to_config(&app, &mut config);
         let sig = config
@@ -3304,31 +3264,6 @@ mod tests {
             .as_ref()
             .expect("signal should be Some");
         assert_eq!(sig.http_url, "http://127.0.0.1:8080");
-    }
-
-    #[test]
-    fn save_channel_irc() {
-        let mut app = test_app();
-        app.channel_idx = 3; // IRC
-        let mut config = Config::default();
-        apply_tui_selections_to_config(&app, &mut config);
-        let irc = config
-            .channels_config
-            .irc
-            .as_ref()
-            .expect("irc should be Some");
-        assert_eq!(irc.server, "irc.libera.chat");
-        assert_eq!(irc.port, 6697);
-        assert_eq!(irc.nickname, "naraeclaw-bot");
-    }
-
-    #[test]
-    fn save_channel_imessage() {
-        let mut app = test_app();
-        app.channel_idx = 7; // iMessage
-        let mut config = Config::default();
-        apply_tui_selections_to_config(&app, &mut config);
-        assert!(config.channels_config.imessage.is_some());
     }
 
     #[test]
@@ -3350,7 +3285,7 @@ mod tests {
     #[test]
     fn save_channel_mattermost() {
         let mut app = test_app();
-        app.channel_idx = 9; // Mattermost
+        app.channel_idx = CHANNELS.iter().position(|c| c.0 == "Mattermost").unwrap();
         let mut config = Config::default();
         apply_tui_selections_to_config(&app, &mut config);
         let mm = config
@@ -3749,10 +3684,8 @@ mod tests {
             "Telegram",
             "WhatsApp",
             "Discord",
-            "IRC",
             "Slack",
             "Signal",
-            "iMessage",
             "Mattermost",
             "Nextcloud Talk",
         ];

@@ -956,29 +956,26 @@ mod tests {
 
     #[test]
     fn sender_allowed_wildcard() {
-        let ch = GmailPushChannel::new(GmailPushConfig {
-            allowed_senders: vec!["*".into()],
-            ..Default::default()
-        });
+        let mut config = GmailPushConfig::default();
+        config.allowed_senders = vec!["*".into()];
+        let ch = GmailPushChannel::new(config);
         assert!(ch.is_sender_allowed("anyone@example.com"));
     }
 
     #[test]
     fn sender_allowed_specific_email() {
-        let ch = GmailPushChannel::new(GmailPushConfig {
-            allowed_senders: vec!["user@example.com".into()],
-            ..Default::default()
-        });
+        let mut config = GmailPushConfig::default();
+        config.allowed_senders = vec!["user@example.com".into()];
+        let ch = GmailPushChannel::new(config);
         assert!(ch.is_sender_allowed("user@example.com"));
         assert!(!ch.is_sender_allowed("other@example.com"));
     }
 
     #[test]
     fn sender_allowed_domain_with_at() {
-        let ch = GmailPushChannel::new(GmailPushConfig {
-            allowed_senders: vec!["@example.com".into()],
-            ..Default::default()
-        });
+        let mut config = GmailPushConfig::default();
+        config.allowed_senders = vec!["@example.com".into()];
+        let ch = GmailPushChannel::new(config);
         assert!(ch.is_sender_allowed("user@example.com"));
         assert!(ch.is_sender_allowed("admin@example.com"));
         assert!(!ch.is_sender_allowed("user@other.com"));
@@ -986,10 +983,9 @@ mod tests {
 
     #[test]
     fn sender_allowed_domain_without_at() {
-        let ch = GmailPushChannel::new(GmailPushConfig {
-            allowed_senders: vec!["example.com".into()],
-            ..Default::default()
-        });
+        let mut config = GmailPushConfig::default();
+        config.allowed_senders = vec!["example.com".into()];
+        let ch = GmailPushChannel::new(config);
         assert!(ch.is_sender_allowed("user@example.com"));
         assert!(!ch.is_sender_allowed("user@other.com"));
     }

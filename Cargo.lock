@@ -5194,7 +5194,6 @@ dependencies = [
  "naraeclaw-infra",
  "naraeclaw-macros",
  "naraeclaw-memory",
- "naraeclaw-plugins",
  "naraeclaw-providers",
  "naraeclaw-runtime",
  "naraeclaw-tool-call-parser",
@@ -5405,7 +5404,6 @@ dependencies = [
  "naraeclaw-config",
  "naraeclaw-infra",
  "naraeclaw-memory",
- "naraeclaw-plugins",
  "naraeclaw-providers",
  "naraeclaw-runtime",
  "naraeclaw-tools",
@@ -5479,24 +5477,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "naraeclaw-plugins"
-version = "0.6.9"
-dependencies = [
- "anyhow",
- "async-trait",
- "base64 0.22.1",
- "naraeclaw-api",
- "ring",
- "serde",
- "serde_json",
- "tempfile",
- "thiserror 2.0.18",
- "tokio",
- "toml 1.1.2+spec-1.1.0",
- "tracing",
-]
-
-[[package]]
 name = "naraeclaw-providers"
 version = "0.6.9"
 dependencies = [
@@ -5563,7 +5543,6 @@ dependencies = [
  "naraeclaw-infra",
  "naraeclaw-macros",
  "naraeclaw-memory",
- "naraeclaw-plugins",
  "naraeclaw-providers",
  "naraeclaw-tool-call-parser",
  "naraeclaw-tools",

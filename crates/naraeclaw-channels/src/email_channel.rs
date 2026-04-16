@@ -754,10 +754,8 @@ mod tests {
 
     #[test]
     fn is_sender_allowed_empty_list_denies_all() {
-        let config = EmailConfig {
-            allowed_senders: vec![],
-            ..Default::default()
-        };
+        let mut config = EmailConfig::default();
+        config.allowed_senders = vec![];
         let channel = EmailChannel::new(config);
         assert!(!channel.is_sender_allowed("anyone@example.com"));
         assert!(!channel.is_sender_allowed("user@test.com"));
@@ -765,10 +763,8 @@ mod tests {
 
     #[test]
     fn is_sender_allowed_wildcard_allows_all() {
-        let config = EmailConfig {
-            allowed_senders: vec!["*".to_string()],
-            ..Default::default()
-        };
+        let mut config = EmailConfig::default();
+        config.allowed_senders = vec!["*".to_string()];
         let channel = EmailChannel::new(config);
         assert!(channel.is_sender_allowed("anyone@example.com"));
         assert!(channel.is_sender_allowed("user@test.com"));
@@ -777,10 +773,8 @@ mod tests {
 
     #[test]
     fn is_sender_allowed_specific_email() {
-        let config = EmailConfig {
-            allowed_senders: vec!["allowed@example.com".to_string()],
-            ..Default::default()
-        };
+        let mut config = EmailConfig::default();
+        config.allowed_senders = vec!["allowed@example.com".to_string()];
         let channel = EmailChannel::new(config);
         assert!(channel.is_sender_allowed("allowed@example.com"));
         assert!(!channel.is_sender_allowed("other@example.com"));
@@ -789,10 +783,8 @@ mod tests {
 
     #[test]
     fn is_sender_allowed_domain_with_at_prefix() {
-        let config = EmailConfig {
-            allowed_senders: vec!["@example.com".to_string()],
-            ..Default::default()
-        };
+        let mut config = EmailConfig::default();
+        config.allowed_senders = vec!["@example.com".to_string()];
         let channel = EmailChannel::new(config);
         assert!(channel.is_sender_allowed("user@example.com"));
         assert!(channel.is_sender_allowed("admin@example.com"));
@@ -801,10 +793,8 @@ mod tests {
 
     #[test]
     fn is_sender_allowed_domain_without_at_prefix() {
-        let config = EmailConfig {
-            allowed_senders: vec!["example.com".to_string()],
-            ..Default::default()
-        };
+        let mut config = EmailConfig::default();
+        config.allowed_senders = vec!["example.com".to_string()];
         let channel = EmailChannel::new(config);
         assert!(channel.is_sender_allowed("user@example.com"));
         assert!(channel.is_sender_allowed("admin@example.com"));
@@ -813,10 +803,8 @@ mod tests {
 
     #[test]
     fn is_sender_allowed_case_insensitive() {
-        let config = EmailConfig {
-            allowed_senders: vec!["Allowed@Example.COM".to_string()],
-            ..Default::default()
-        };
+        let mut config = EmailConfig::default();
+        config.allowed_senders = vec!["Allowed@Example.COM".to_string()];
         let channel = EmailChannel::new(config);
         assert!(channel.is_sender_allowed("allowed@example.com"));
         assert!(channel.is_sender_allowed("ALLOWED@EXAMPLE.COM"));
@@ -825,14 +813,12 @@ mod tests {
 
     #[test]
     fn is_sender_allowed_multiple_senders() {
-        let config = EmailConfig {
-            allowed_senders: vec![
-                "user1@example.com".to_string(),
-                "user2@test.com".to_string(),
-                "@allowed.com".to_string(),
-            ],
-            ..Default::default()
-        };
+        let mut config = EmailConfig::default();
+        config.allowed_senders = vec![
+            "user1@example.com".to_string(),
+            "user2@test.com".to_string(),
+            "@allowed.com".to_string(),
+        ];
         let channel = EmailChannel::new(config);
         assert!(channel.is_sender_allowed("user1@example.com"));
         assert!(channel.is_sender_allowed("user2@test.com"));
@@ -842,10 +828,8 @@ mod tests {
 
     #[test]
     fn is_sender_allowed_wildcard_with_specific() {
-        let config = EmailConfig {
-            allowed_senders: vec!["*".to_string(), "specific@example.com".to_string()],
-            ..Default::default()
-        };
+        let mut config = EmailConfig::default();
+        config.allowed_senders = vec!["*".to_string(), "specific@example.com".to_string()];
         let channel = EmailChannel::new(config);
         assert!(channel.is_sender_allowed("anyone@example.com"));
         assert!(channel.is_sender_allowed("specific@example.com"));
@@ -853,10 +837,8 @@ mod tests {
 
     #[test]
     fn is_sender_allowed_empty_sender() {
-        let config = EmailConfig {
-            allowed_senders: vec!["@example.com".to_string()],
-            ..Default::default()
-        };
+        let mut config = EmailConfig::default();
+        config.allowed_senders = vec!["@example.com".to_string()];
         let channel = EmailChannel::new(config);
         assert!(!channel.is_sender_allowed(""));
         // "@example.com" ends with "@example.com" so it's allowed
@@ -1031,20 +1013,16 @@ mod tests {
 
     #[test]
     fn idle_timeout_propagates_to_channel() {
-        let config = EmailConfig {
-            idle_timeout_secs: 600,
-            ..Default::default()
-        };
+        let mut config = EmailConfig::default();
+        config.idle_timeout_secs = 600;
         let channel = EmailChannel::new(config);
         assert_eq!(channel.config.idle_timeout_secs, 600);
     }
 
     #[test]
     fn email_config_debug_output() {
-        let config = EmailConfig {
-            imap_host: "imap.debug.com".to_string(),
-            ..Default::default()
-        };
+        let mut config = EmailConfig::default();
+        config.imap_host = "imap.debug.com".to_string();
         let debug_str = format!("{:?}", config);
         assert!(debug_str.contains("imap.debug.com"));
     }

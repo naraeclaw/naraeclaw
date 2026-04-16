@@ -129,11 +129,6 @@ pub fn show_integration_info(config: &Config, name: &str) -> Result<()> {
             println!("    2. Pull a model: ollama pull llama3");
             println!("    3. Set provider to 'ollama' in config.toml");
         }
-        "iMessage" => {
-            println!("  Setup (macOS only):");
-            println!("    Uses AppleScript bridge to send/receive iMessages.");
-            println!("    Requires Full Disk Access in System Settings → Privacy.");
-        }
         "GitHub" => {
             println!("  Setup:");
             println!("    1. Create a personal access token at https://github.com/settings/tokens");

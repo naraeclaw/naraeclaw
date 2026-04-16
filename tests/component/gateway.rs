@@ -6,6 +6,7 @@
 //! internal rate limiter and idempotency store constructors are crate-private.
 //! Tests here verify behavior through the public API surface.
 
+use hmac::KeyInit;
 use naraeclaw::gateway::verify_whatsapp_signature;
 
 // ═════════════════════════════════════════════════════════════════════════════

@@ -1026,21 +1026,12 @@ fn mask_sensitive_fields(
         mask_optional_secret(&mut whatsapp.app_secret);
         mask_optional_secret(&mut whatsapp.verify_token);
     }
-    if let Some(linq) = masked.channels_config.linq.as_mut() {
-        mask_required_secret(&mut linq.api_token);
-        mask_optional_secret(&mut linq.signing_secret);
-    }
     if let Some(nextcloud) = masked.channels_config.nextcloud_talk.as_mut() {
         mask_required_secret(&mut nextcloud.app_token);
         mask_optional_secret(&mut nextcloud.webhook_secret);
     }
     if let Some(wati) = masked.channels_config.wati.as_mut() {
         mask_required_secret(&mut wati.api_token);
-    }
-    if let Some(irc) = masked.channels_config.irc.as_mut() {
-        mask_optional_secret(&mut irc.server_password);
-        mask_optional_secret(&mut irc.nickserv_password);
-        mask_optional_secret(&mut irc.sasl_password);
     }
     #[cfg(feature = "channel-nostr")]
     if let Some(nostr) = masked.channels_config.nostr.as_mut() {
@@ -1153,13 +1144,6 @@ fn restore_masked_sensitive_fields(
         restore_optional_secret(&mut incoming_ch.verify_token, &current_ch.verify_token);
     }
     if let (Some(incoming_ch), Some(current_ch)) = (
-        incoming.channels_config.linq.as_mut(),
-        current.channels_config.linq.as_ref(),
-    ) {
-        restore_required_secret(&mut incoming_ch.api_token, &current_ch.api_token);
-        restore_optional_secret(&mut incoming_ch.signing_secret, &current_ch.signing_secret);
-    }
-    if let (Some(incoming_ch), Some(current_ch)) = (
         incoming.channels_config.nextcloud_talk.as_mut(),
         current.channels_config.nextcloud_talk.as_ref(),
     ) {
@@ -1171,20 +1155,6 @@ fn restore_masked_sensitive_fields(
         current.channels_config.wati.as_ref(),
     ) {
         restore_required_secret(&mut incoming_ch.api_token, &current_ch.api_token);
-    }
-    if let (Some(incoming_ch), Some(current_ch)) = (
-        incoming.channels_config.irc.as_mut(),
-        current.channels_config.irc.as_ref(),
-    ) {
-        restore_optional_secret(
-            &mut incoming_ch.server_password,
-            &current_ch.server_password,
-        );
-        restore_optional_secret(
-            &mut incoming_ch.nickserv_password,
-            &current_ch.nickserv_password,
-        );
-        restore_optional_secret(&mut incoming_ch.sasl_password, &current_ch.sasl_password);
     }
     #[cfg(feature = "channel-nostr")]
     if let (Some(incoming_ch), Some(current_ch)) = (
@@ -1588,8 +1558,6 @@ mod tests {
             idempotency_store: Arc::new(IdempotencyStore::new(Duration::from_secs(300), 1000)),
             whatsapp: None,
             whatsapp_app_secret: None,
-            linq: None,
-            linq_signing_secret: None,
             nextcloud_talk: None,
             nextcloud_talk_webhook_secret: None,
             wati: None,
@@ -1625,10 +1593,8 @@ mod tests {
 
     #[test]
     fn masking_keeps_toml_valid_and_preserves_api_keys_type() {
-        let mut cfg = naraeclaw_config::schema::Config {
-            api_key: Some("sk-live-123".to_string()),
-            ..Default::default()
-        };
+        let mut cfg = naraeclaw_config::schema::Config::default();
+        cfg.api_key = Some("sk-live-123".to_string());
         cfg.reliability.api_keys = vec!["rk-1".to_string(), "rk-2".to_string()];
         cfg.gateway.paired_tokens = vec!["pair-token-1".to_string()];
         cfg.tunnel.cloudflare = Some(naraeclaw_config::schema::CloudflareTunnelConfig {
@@ -1725,12 +1691,10 @@ mod tests {
 
     #[test]
     fn hydrate_config_for_save_restores_masked_secrets_and_paths() {
-        let mut current = naraeclaw_config::schema::Config {
-            config_path: std::path::PathBuf::from("/tmp/current/config.toml"),
-            workspace_dir: std::path::PathBuf::from("/tmp/current/workspace"),
-            api_key: Some("real-key".to_string()),
-            ..Default::default()
-        };
+        let mut current = naraeclaw_config::schema::Config::default();
+        current.config_path = std::path::PathBuf::from("/tmp/current/config.toml");
+        current.workspace_dir = std::path::PathBuf::from("/tmp/current/workspace");
+        current.api_key = Some("real-key".to_string());
         current.reliability.api_keys = vec!["r1".to_string(), "r2".to_string()];
         current.gateway.paired_tokens = vec!["pair-1".to_string(), "pair-2".to_string()];
         current.tunnel.cloudflare = Some(naraeclaw_config::schema::CloudflareTunnelConfig {
@@ -1886,23 +1850,21 @@ mod tests {
 
     #[test]
     fn hydrate_config_for_save_restores_route_keys_by_identity_and_clears_unmatched_masks() {
-        let mut current = naraeclaw_config::schema::Config {
-            model_routes: vec![
-                naraeclaw_config::schema::ModelRouteConfig {
-                    hint: "reasoning".to_string(),
-                    provider: "openrouter".to_string(),
-                    model: "anthropic/claude-sonnet-4.6".to_string(),
-                    api_key: Some("route-model-key-1".to_string()),
-                },
-                naraeclaw_config::schema::ModelRouteConfig {
-                    hint: "fast".to_string(),
-                    provider: "openrouter".to_string(),
-                    model: "openai/gpt-4.1-mini".to_string(),
-                    api_key: Some("route-model-key-2".to_string()),
-                },
-            ],
-            ..Default::default()
-        };
+        let mut current = naraeclaw_config::schema::Config::default();
+        current.model_routes = vec![
+            naraeclaw_config::schema::ModelRouteConfig {
+                hint: "reasoning".to_string(),
+                provider: "openrouter".to_string(),
+                model: "anthropic/claude-sonnet-4.6".to_string(),
+                api_key: Some("route-model-key-1".to_string()),
+            },
+            naraeclaw_config::schema::ModelRouteConfig {
+                hint: "fast".to_string(),
+                provider: "openrouter".to_string(),
+                model: "openai/gpt-4.1-mini".to_string(),
+                api_key: Some("route-model-key-2".to_string()),
+            },
+        ];
         current.embedding_routes = vec![
             naraeclaw_config::schema::EmbeddingRouteConfig {
                 hint: "semantic".to_string(),
@@ -1978,11 +1940,9 @@ mod tests {
     #[tokio::test]
     async fn cron_api_shell_roundtrip_includes_delivery() {
         let tmp = tempfile::TempDir::new().unwrap();
-        let config = naraeclaw_config::schema::Config {
-            workspace_dir: tmp.path().join("workspace"),
-            config_path: tmp.path().join("config.toml"),
-            ..naraeclaw_config::schema::Config::default()
-        };
+        let mut config = naraeclaw_config::schema::Config::default();
+        config.workspace_dir = tmp.path().join("workspace");
+        config.config_path = tmp.path().join("config.toml");
         std::fs::create_dir_all(&config.workspace_dir).unwrap();
         let state = test_state(config);
 
@@ -2027,11 +1987,9 @@ mod tests {
     #[tokio::test]
     async fn cron_api_accepts_agent_jobs() {
         let tmp = tempfile::TempDir::new().unwrap();
-        let config = naraeclaw_config::schema::Config {
-            workspace_dir: tmp.path().join("workspace"),
-            config_path: tmp.path().join("config.toml"),
-            ..naraeclaw_config::schema::Config::default()
-        };
+        let mut config = naraeclaw_config::schema::Config::default();
+        config.workspace_dir = tmp.path().join("workspace");
+        config.config_path = tmp.path().join("config.toml");
         std::fs::create_dir_all(&config.workspace_dir).unwrap();
         let state = test_state(config);
 
@@ -2065,11 +2023,9 @@ mod tests {
     #[tokio::test]
     async fn cron_api_rejects_announce_delivery_without_target() {
         let tmp = tempfile::TempDir::new().unwrap();
-        let config = naraeclaw_config::schema::Config {
-            workspace_dir: tmp.path().join("workspace"),
-            config_path: tmp.path().join("config.toml"),
-            ..naraeclaw_config::schema::Config::default()
-        };
+        let mut config = naraeclaw_config::schema::Config::default();
+        config.workspace_dir = tmp.path().join("workspace");
+        config.config_path = tmp.path().join("config.toml");
         std::fs::create_dir_all(&config.workspace_dir).unwrap();
         let state = test_state(config);
 
@@ -2112,11 +2068,9 @@ mod tests {
     #[tokio::test]
     async fn cron_api_rejects_announce_delivery_with_unsupported_channel() {
         let tmp = tempfile::TempDir::new().unwrap();
-        let config = naraeclaw_config::schema::Config {
-            workspace_dir: tmp.path().join("workspace"),
-            config_path: tmp.path().join("config.toml"),
-            ..naraeclaw_config::schema::Config::default()
-        };
+        let mut config = naraeclaw_config::schema::Config::default();
+        config.workspace_dir = tmp.path().join("workspace");
+        config.config_path = tmp.path().join("config.toml");
         std::fs::create_dir_all(&config.workspace_dir).unwrap();
         let state = test_state(config);
 
