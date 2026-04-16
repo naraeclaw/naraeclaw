@@ -16,7 +16,7 @@ NaraeClaw has rate limiting (20 actions/hour) but no resource caps. A runaway ag
 ## Proposed Solutions
 
 ### Option 1: cgroups v2 (Linux, Recommended)
-Automatically create a cgroup for zeroclaw with limits.
+Automatically create a cgroup for naraeclaw with limits.
 
 ```bash
 # Create systemd service with limits

@@ -28,7 +28,7 @@ This is the most common symptom (same class as issue #499). Check these in order
 
 ## 1. Configuration Namespace
 
-All channel settings live under `channels_config` in `~/.zeroclaw/config.toml`.
+All channel settings live under `channels_config` in `~/.naraeclaw/config.toml`.
 
 ```toml
 [channels_config]
@@ -202,7 +202,7 @@ allowed_users = ["*"]
 [channels_config.matrix]
 homeserver = "https://matrix.example.com"
 access_token = "syt_..."
-user_id = "@zeroclaw:matrix.example.com"   # optional, recommended for E2EE
+user_id = "@naraeclaw:matrix.example.com"   # optional, recommended for E2EE
 device_id = "DEVICEID123"                  # optional, recommended for E2EE
 room_id = "!room:matrix.example.com"       # or room alias (#ops:matrix.example.com)
 allowed_users = ["*"]
@@ -256,7 +256,7 @@ WhatsApp Web mode:
 
 ```toml
 [channels_config.whatsapp]
-session_path = "~/.zeroclaw/state/whatsapp-web/session.db"
+session_path = "~/.naraeclaw/state/whatsapp-web/session.db"
 pair_phone = "15551234567"         # optional; omit to use QR flow
 pair_code = ""                     # optional custom pair code
 allowed_numbers = ["*"]
@@ -307,9 +307,9 @@ allowed_senders = ["*"]
 [channels_config.irc]
 server = "irc.libera.chat"
 port = 6697
-nickname = "zeroclaw-bot"
-username = "zeroclaw"              # optional
-channels = ["#zeroclaw"]
+nickname = "naraeclaw-bot"
+username = "naraeclaw"              # optional
+channels = ["#naraeclaw"]
 allowed_users = ["*"]
 server_password = ""                # optional
 nickserv_password = ""              # optional
@@ -357,7 +357,7 @@ base_url = "https://cloud.example.com"
 app_token = "nextcloud-talk-app-token"
 webhook_secret = "optional-webhook-secret"  # optional but recommended
 allowed_users = ["*"]
-# bot_name = "zeroclaw"  # display name of the bot; filters own messages to prevent feedback loops
+# bot_name = "naraeclaw"  # display name of the bot; filters own messages to prevent feedback loops
 ```
 
 Notes:
@@ -436,13 +436,13 @@ Use this appendix for fast triage. Match log keywords first, then follow the tro
 ### 7.1 Recommended capture command
 
 ```bash
-RUST_LOG=info naraeclaw daemon 2>&1 | tee /tmp/zeroclaw.log
+RUST_LOG=info naraeclaw daemon 2>&1 | tee /tmp/naraeclaw.log
 ```
 
 Then filter channel/gateway events:
 
 ```bash
-rg -n "Matrix|Telegram|Discord|Slack|Mattermost|Signal|WhatsApp|Email|IRC|iMessage|Nostr|Webhook|Channel" /tmp/zeroclaw.log
+rg -n "Matrix|Telegram|Discord|Slack|Mattermost|Signal|WhatsApp|Email|IRC|iMessage|Nostr|Webhook|Channel" /tmp/naraeclaw.log
 ```
 
 ### 7.2 Keyword table

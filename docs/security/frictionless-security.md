@@ -130,7 +130,7 @@ $ naraeclaw agent -m "hello"
 [INFO] Detecting security features...
 [INFO] ✓ Landlock sandbox enabled (kernel 6.2+)
 [INFO] ✓ Memory monitoring active (512MB limit)
-[INFO] ✓ Audit logging enabled (~/.config/zeroclaw/audit.log)
+[INFO] ✓ Audit logging enabled (~/.config/naraeclaw/audit.log)
 
 # Subsequent runs: quiet
 $ naraeclaw agent -m "hello"
@@ -140,7 +140,7 @@ $ naraeclaw agent -m "hello"
 ### 4. Config File: All Defaults Hidden
 
 ```toml
-# ~/.config/zeroclaw/config.toml
+# ~/.config/naraeclaw/config.toml
 
 # These sections are NOT written unless user customizes
 # [security.sandbox]
@@ -167,11 +167,11 @@ max_memory_mb = 1024  # User increased limit
 
 ```bash
 # Check what's active
-$ zeroclaw security --status
+$ naraeclaw security --status
 Security Status:
   ✓ Sandbox: Landlock (Linux kernel 6.2)
   ✓ Memory monitoring: 512MB limit
-  ✓ Audit logging: ~/.config/zeroclaw/audit.log
+  ✓ Audit logging: ~/.config/naraeclaw/audit.log
   → 47 events logged today
 
 # Disable sandbox explicitly (writes to config)
@@ -304,6 +304,6 @@ $ naraeclaw onboard
 ✅ **Zero new prompts** — silent auto-detection
 ✅ **Zero breaking changes** — backward compatible
 ✅ **Opt-out available** — explicit config flags
-✅ **Status visibility** — `zeroclaw security --status`
+✅ **Status visibility** — `naraeclaw security --status`
 
 The wizard remains "quick setup universal applications" — security is just **quietly better**.

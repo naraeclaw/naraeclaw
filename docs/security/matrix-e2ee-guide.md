@@ -34,7 +34,7 @@ Before testing message flow, make sure all of the following are true:
 
 ## 2. Configuration
 
-Use `~/.zeroclaw/config.toml`:
+Use `~/.naraeclaw/config.toml`:
 
 ```toml
 [channels_config.matrix]
@@ -42,7 +42,7 @@ homeserver = "https://matrix.example.com"
 access_token = "syt_your_token"
 
 # Optional but recommended for E2EE stability:
-user_id = "@zeroclaw:matrix.example.com"
+user_id = "@naraeclaw:matrix.example.com"
 device_id = "DEVICEID123"
 
 # Room ID or alias
@@ -105,7 +105,7 @@ curl -sS -H "Authorization: Bearer $MATRIX_TOKEN" \
 - If `device_id` is missing, set `channels_config.matrix.device_id` manually.
 - To update the access token without re-running onboard:
   ```bash
-  zeroclaw props set channels.matrix.access-token
+  naraeclaw props set channels.matrix.access-token
   ```
 
 ### D. E2EE-specific checks
@@ -204,7 +204,7 @@ curl -sS -X DELETE -H "Authorization: Bearer $MATRIX_TOKEN" \
 3. Delete the local crypto store. The log message includes the store path, typically:
 
 ```
-~/.zeroclaw/state/matrix/
+~/.naraeclaw/state/matrix/
 ```
 
 Delete this directory.
@@ -250,7 +250,7 @@ Paste the recovery key (input is masked). It will be encrypted and stored in `co
 Option B — via the secret CLI (recommended for existing installs):
 
 ```bash
-zeroclaw props set channels.matrix.recovery-key
+naraeclaw props set channels.matrix.recovery-key
 ```
 
 Input is masked. The value is encrypted at rest immediately.

@@ -49,27 +49,27 @@ Replace `docker` with `podman` if using Podman.
 
 ```bash
 # Start a new container from the bootstrap image
-docker run -d --name zeroclaw \
+docker run -d --name naraeclaw \
   --restart unless-stopped \
   -v "$PWD/.naraeclaw-docker/.naraeclaw:/naraeclaw-data/.naraeclaw" \
   -v "$PWD/.naraeclaw-docker/workspace:/naraeclaw-data/workspace" \
   -e HOME=/naraeclaw-data \
   -e NARAECLAW_WORKSPACE=/naraeclaw-data/workspace \
   -p 42617:42617 \
-  zeroclaw-bootstrap:local \
+  naraeclaw-bootstrap:local \
   gateway
 
 # Stop (preserves config and workspace)
-docker stop zeroclaw
+docker stop naraeclaw
 
 # Restart a stopped container
-docker start zeroclaw
+docker start naraeclaw
 
 # View logs
-docker logs -f zeroclaw
+docker logs -f naraeclaw
 
 # Health check
-docker exec zeroclaw naraeclaw status
+docker exec naraeclaw naraeclaw status
 ```
 
 For Podman, add `--userns keep-id --user "$(id -u):$(id -g)"` and append `:Z` to volume mounts.

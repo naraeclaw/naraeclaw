@@ -25,8 +25,8 @@ You can also pass flags to skip the interactive menu:
 ### Option B: Scoop (package manager)
 
 ```powershell
-scoop bucket add zeroclaw https://github.com/zeroclaw-labs/scoop-zeroclaw
-scoop install zeroclaw
+scoop bucket add naraeclaw https://github.com/naraeclaw/scoop-naraeclaw
+scoop install naraeclaw
 ```
 
 ### Option C: Manual build
@@ -34,7 +34,7 @@ scoop install zeroclaw
 ```cmd
 rustup target add x86_64-pc-windows-msvc
 cargo build --release --locked --features channel-matrix --target x86_64-pc-windows-msvc
-copy target\x86_64-pc-windows-msvc\release\zeroclaw.exe %USERPROFILE%\.zeroclaw\bin\
+copy target\x86_64-pc-windows-msvc\release\naraeclaw.exe %USERPROFILE%\.naraeclaw\bin\
 ```
 
 ## Prerequisites
@@ -82,9 +82,9 @@ cargo build --release --locked --features channel-matrix --target x86_64-pc-wind
 1. **Restart your terminal** for PATH changes to take effect
 2. **Initialize NaraeClaw:**
    ```cmd
-   zeroclaw init
+   naraeclaw init
    ```
-3. **Configure your API key** in `%USERPROFILE%\.zeroclaw\config.toml`
+3. **Configure your API key** in `%USERPROFILE%\.naraeclaw\config.toml`
 
 ## Troubleshooting
 

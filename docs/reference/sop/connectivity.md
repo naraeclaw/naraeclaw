@@ -29,7 +29,7 @@ Configure broker access in `config.toml`:
 ```toml
 [channels_config.mqtt]
 broker_url = "mqtts://broker.example.com:8883"  # use mqtt:// for plaintext
-client_id = "zeroclaw-agent-1"
+client_id = "naraeclaw-agent-1"
 topics = ["sensors/alert", "ops/deploy/#"]
 qos = 1
 username = "mqtt-user"      # optional

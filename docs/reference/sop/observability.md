@@ -18,9 +18,9 @@ Common key patterns:
 ### 2.1 Definition-level CLI
 
 ```bash
-zeroclaw sop list
-zeroclaw sop validate [name]
-zeroclaw sop show <name>
+naraeclaw sop list
+naraeclaw sop validate [name]
+naraeclaw sop show <name>
 ```
 
 ### 2.2 Runtime run-state tools

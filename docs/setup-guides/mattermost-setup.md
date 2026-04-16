@@ -8,7 +8,7 @@ NaraeClaw supports native integration with Mattermost via its REST API v4. This 
 2.  **Bot Account**:
     - Go to **Main Menu > Integrations > Bot Accounts**.
     - Click **Add Bot Account**.
-    - Set a username (e.g., `zeroclaw-bot`).
+    - Set a username (e.g., `naraeclaw-bot`).
     - Enable **post:all** and **channel:read** permissions (or appropriate scopes).
     - Save the **Access Token**.
 3.  **Channel ID**:
@@ -39,7 +39,7 @@ mention_only = true
 | `channel_id` | (Optional) The ID of the channel to listen to. Required for `listen` mode. |
 | `allowed_users` | (Optional) A list of Mattermost User IDs permitted to interact with the bot. Use `["*"]` to allow everyone. |
 | `thread_replies` | (Optional) Whether top-level user messages should be answered in a thread. Default: `true`. Existing thread replies always remain in-thread. |
-| `mention_only` | (Optional) When `true`, only messages that explicitly mention the bot username (for example `@zeroclaw-bot`) are processed. Default: `false`. |
+| `mention_only` | (Optional) When `true`, only messages that explicitly mention the bot username (for example `@naraeclaw-bot`) are processed. Default: `false`. |
 
 ## Threaded Conversations
 

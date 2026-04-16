@@ -94,7 +94,7 @@ NaraeClaw already has **excellent application-layer security**:
 | Certificate pinning for channels | 2 days | Medium |
 | Signed config verification | 2 days | Medium |
 | SIEM-compatible audit export | 2 days | Medium |
-| Security self-test (`zeroclaw audit --check`) | 1 day | Low |
+| Security self-test (`naraeclaw audit --check`) | 1 day | Low |
 
 **Deliverables**:
 - Optional Docker-based execution isolation
@@ -126,7 +126,7 @@ max_subprocesses = 10
 # Audit logging
 [security.audit]
 enabled = true
-log_path = "~/.config/zeroclaw/audit.log"
+log_path = "~/.config/naraeclaw/audit.log"
 sign_events = true
 max_size_mb = 100
 
@@ -146,18 +146,18 @@ max_actions_per_hour = 20
 
 ```bash
 # Security status check
-zeroclaw security --check
+naraeclaw security --check
 # → ✓ Sandbox: Firejail active
 # → ✓ Audit logging enabled (42 events today)
 # → → Resource limits: 512MB mem, 50% CPU
 
 # Audit log queries
-zeroclaw audit --user @alice --since 24h
-zeroclaw audit --risk high --violations-only
-zeroclaw audit --verify-signatures
+naraeclaw audit --user @alice --since 24h
+naraeclaw audit --risk high --violations-only
+naraeclaw audit --verify-signatures
 
 # Sandbox test
-zeroclaw sandbox --test
+naraeclaw sandbox --test
 # → Testing isolation...
 #   ✓ Cannot read /etc/passwd
 #   ✓ Cannot access ~/.ssh

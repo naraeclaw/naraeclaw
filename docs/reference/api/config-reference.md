@@ -6,9 +6,9 @@ Last verified: **February 21, 2026**.
 
 Config path resolution at startup:
 
-1. `ZEROCLAW_WORKSPACE` override (if set)
-2. persisted `~/.zeroclaw/active_workspace.toml` marker (if present)
-3. default `~/.zeroclaw/config.toml`
+1. `NARAECLAW_WORKSPACE` override (if set)
+2. persisted `~/.naraeclaw/active_workspace.toml` marker (if present)
+3. default `~/.naraeclaw/config.toml`
 
 NaraeClaw logs the resolved config on startup at `INFO` level:
 
@@ -32,7 +32,7 @@ Schema export command:
 |---|---|---|
 | `backend` | `none` | Observability backend: `none`, `noop`, `log`, `prometheus`, `otel`, `opentelemetry`, or `otlp` |
 | `otel_endpoint` | `http://localhost:4318` | OTLP HTTP endpoint used when backend is `otel` |
-| `otel_service_name` | `zeroclaw` | Service name emitted to OTLP collector |
+| `otel_service_name` | `naraeclaw` | Service name emitted to OTLP collector |
 | `runtime_trace_mode` | `none` | Runtime trace storage mode: `none`, `rolling`, or `full` |
 | `runtime_trace_path` | `state/runtime-trace.jsonl` | Runtime trace JSONL path (relative to workspace unless absolute) |
 | `runtime_trace_max_entries` | `200` | Maximum retained events when `runtime_trace_mode = "rolling"` |
@@ -53,7 +53,7 @@ Example:
 [observability]
 backend = "otel"
 otel_endpoint = "http://localhost:4318"
-otel_service_name = "zeroclaw"
+otel_service_name = "naraeclaw"
 runtime_trace_mode = "rolling"
 runtime_trace_path = "state/runtime-trace.jsonl"
 runtime_trace_max_entries = 200
@@ -63,14 +63,14 @@ runtime_trace_max_entries = 200
 
 Provider selection can also be controlled by environment variables. Precedence is:
 
-1. `ZEROCLAW_PROVIDER` (explicit override, always wins when non-empty)
+1. `NARAECLAW_PROVIDER` (explicit override, always wins when non-empty)
 2. `PROVIDER` (legacy fallback, only applied when config provider is unset or still `openrouter`)
 3. `default_provider` in `config.toml`
 
 Operational note for container users:
 
 - If your `config.toml` sets an explicit custom provider like `custom:https://.../v1`, a default `PROVIDER=openrouter` from Docker/container env will no longer replace it.
-- Use `ZEROCLAW_PROVIDER` when you intentionally want runtime env to override a non-default configured provider.
+- Use `NARAECLAW_PROVIDER` when you intentionally want runtime env to override a non-default configured provider.
 
 ## `[agent]`
 
@@ -169,7 +169,7 @@ Resilience configuration for multi-model fallback chains, API key rotation, and 
 Notes:
 
 - `fallback_providers` is a list of provider IDs to try in order when the primary provider fails (timeout, connection error, 503, rate limit after key rotation).
-- Each fallback provider resolves credentials independently using the standard resolution order: explicit config → provider-specific env var → `ZEROCLAW_API_KEY` → `API_KEY`.
+- Each fallback provider resolves credentials independently using the standard resolution order: explicit config → provider-specific env var → `NARAECLAW_API_KEY` → `API_KEY`.
 - `model_fallbacks` allows semantic fallbacks when a specific model is unavailable. Example: `{ "claude-opus-4-20250514" = ["claude-sonnet-4-20250514"] }`.
 - `api_keys` supplies additional API keys that NaraeClaw rotates through on `429` (rate limit) responses. The primary `api_key` (set globally or per-channel) is tried first.
 - `provider_retries` applies before each fallback attempt. With `provider_retries = 2` and `provider_backoff_ms = 500`, the runtime retries with delays of 500ms, then 1000ms.
@@ -250,7 +250,7 @@ gated_domain_categories = ["banking"]
 | Key | Default | Purpose |
 |---|---|---|
 | `enabled` | `false` | Enable emergency-stop state machine and CLI |
-| `state_file` | `~/.zeroclaw/estop-state.json` | Persistent estop state path |
+| `state_file` | `~/.naraeclaw/estop-state.json` | Persistent estop state path |
 | `require_otp_to_resume` | `true` | Require OTP validation before resume operations |
 
 Notes:
@@ -336,10 +336,10 @@ Notes:
 
 - Security-first default: NaraeClaw does **not** clone or sync `open-skills` unless `open_skills_enabled = true`.
 - Environment overrides:
-  - `ZEROCLAW_OPEN_SKILLS_ENABLED` accepts `1/0`, `true/false`, `yes/no`, `on/off`.
-  - `ZEROCLAW_OPEN_SKILLS_DIR` overrides the repository path when non-empty.
-  - `ZEROCLAW_SKILLS_PROMPT_MODE` accepts `full` or `compact`.
-- Precedence for enable flag: `ZEROCLAW_OPEN_SKILLS_ENABLED` → `skills.open_skills_enabled` in `config.toml` → default `false`.
+  - `NARAECLAW_OPEN_SKILLS_ENABLED` accepts `1/0`, `true/false`, `yes/no`, `on/off`.
+  - `NARAECLAW_OPEN_SKILLS_DIR` overrides the repository path when non-empty.
+  - `NARAECLAW_SKILLS_PROMPT_MODE` accepts `full` or `compact`.
+- Precedence for enable flag: `NARAECLAW_OPEN_SKILLS_ENABLED` → `skills.open_skills_enabled` in `config.toml` → default `false`.
 - `prompt_injection_mode = "compact"` is recommended on low-context local models to reduce startup prompt size while keeping skill files available on demand.
 - Skill loading and `naraeclaw skills install` both apply a static security audit. Skills that contain symlinks, script-like files, high-risk shell payload snippets, or unsafe markdown link traversal are rejected.
 
@@ -500,10 +500,10 @@ Notes:
 | `port` | `42617` | gateway listen port |
 | `require_pairing` | `true` | require pairing before bearer auth |
 | `allow_public_bind` | `false` | block accidental public exposure |
-| `path_prefix` | _(none)_ | URL path prefix for reverse-proxy deployments (e.g. `"/zeroclaw"`) |
+| `path_prefix` | _(none)_ | URL path prefix for reverse-proxy deployments (e.g. `"/naraeclaw"`) |
 
 When deploying behind a reverse proxy that maps NaraeClaw to a sub-path,
-set `path_prefix` to that sub-path (e.g. `"/zeroclaw"`). All gateway
+set `path_prefix` to that sub-path (e.g. `"/naraeclaw"`). All gateway
 routes will be served under this prefix. The value must start with `/`
 and must not end with `/`.
 
@@ -750,7 +750,7 @@ Native Nextcloud Talk bot integration (webhook receive + OCS send API).
 | `app_token` | Yes | Bot app token used for OCS bearer auth |
 | `webhook_secret` | Optional | Enables webhook signature verification |
 | `allowed_users` | Recommended | Allowed Nextcloud actor IDs (`[]` = deny all, `"*"` = allow all) |
-| `bot_name` | Optional | Display name of the bot in Nextcloud Talk (e.g. `"zeroclaw"`). Used to filter out the bot's own messages and prevent feedback loops. |
+| `bot_name` | Optional | Display name of the bot in Nextcloud Talk (e.g. `"naraeclaw"`). Used to filter out the bot's own messages and prevent feedback loops. |
 
 Notes:
 
