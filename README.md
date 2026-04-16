@@ -71,5 +71,11 @@ naraeclaw agent
 
 ## 라이선스 및 출처
 
-이 프로젝트는 [ZeroClaw](https://github.com/zeroclaw-labs/zeroclaw)의 포크입니다.  
-라이선스: MIT OR Apache-2.0
+나래클로는 [ZeroClaw](https://github.com/zeroclaw-labs/zeroclaw)의 포크입니다.
+
+- 라이선스: `MIT OR Apache-2.0`
+- 원본 프로젝트: ZeroClaw, Copyright 2025 ZeroClaw Labs
+- 포크 및 변경분: NaraeClaw contributors
+- 자세한 고지: [NOTICE](NOTICE), [LICENSE-MIT](LICENSE-MIT), [LICENSE-APACHE](LICENSE-APACHE)
+
+NaraeClaw는 공식 ZeroClaw 프로젝트가 아니며, upstream 프로젝트와의 제휴나 보증을 의미하지 않습니다.
