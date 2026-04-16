@@ -3186,7 +3186,7 @@ impl Channel for TelegramChannel {
                 if error_code == 409 {
                     tracing::warn!(
                         "Telegram polling conflict (409): {description}. \
-Ensure only one `zeroclaw` process is using this bot token."
+Ensure only one `naraeclaw` process is using this bot token."
                     );
                     // Back off for 35 seconds — longer than Telegram's 30-second poll
                     // timeout — so any competing session (e.g. a stale connection from
@@ -3635,7 +3635,7 @@ mod tests {
     #[test]
     fn telegram_extract_bind_code_supports_bot_mention() {
         assert_eq!(
-            TelegramChannel::extract_bind_code("/bind@zeroclaw_bot 654321"),
+            TelegramChannel::extract_bind_code("/bind@naraeclaw_bot 654321"),
             Some("654321")
         );
     }

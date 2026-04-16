@@ -35,5 +35,5 @@ SOP run state is queried from in-agent tools:
 ## 3. Metrics
 
 - `/metrics` exposes observer metrics when `[observability] backend = "prometheus"`.
-- Current exported names are `zeroclaw_*` families (general runtime metrics).
+- Current exported names are `naraeclaw_*` families (general runtime metrics).
 - SOP-specific aggregates are available through `sop_status` with `include_metrics: true`.
