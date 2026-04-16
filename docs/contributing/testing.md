@@ -9,7 +9,6 @@ NaraeClaw keeps tests in three automated levels plus shared fixtures/support.
 | **Unit** | Single function/struct | Everything mocked | `#[cfg(test)]` blocks in `src/**/*.rs` or separate `src/**/tests.rs` files |
 | **Component** | One subsystem within its own boundary | Subsystem real, everything else mocked | `tests/component/` |
 | **Integration** | Multiple internal components wired together | Real internals, external APIs mocked | `tests/integration/` |
-| **System** | Full request-to-response across internal boundaries | External APIs mocked | `tests/system/` |
 
 ## Directory Structure
 
@@ -18,7 +17,6 @@ NaraeClaw keeps tests in three automated levels plus shared fixtures/support.
 | `src/**/*.rs` | Unit | Co-located `#[cfg(test)]` blocks or separate `tests.rs` files alongside source | `cargo test --lib` |
 | `tests/component/` | Component | One subsystem, real implementation, mocked boundaries | `cargo test --test component` |
 | `tests/integration/` | Integration | Multiple internal components wired together | `cargo test --test integration` |
-| `tests/system/` | System | Full channel-agent-channel flow | `cargo test --test system` |
 | `tests/support/` | Shared support | Mock providers, channels, tools, helpers, and trace assertions | imported by test binaries |
 | `tests/fixtures/` | Fixtures | Static test data such as media files and JSON traces | loaded by tests |
 
@@ -51,7 +49,6 @@ cargo test --test integration agent
 
 1. Testing one subsystem in isolation? Use `tests/component/`.
 2. Testing multiple components together? Use `tests/integration/`.
-3. Testing full message flow? Use `tests/system/`.
 4. Avoid tests that require real external services or personal credentials. Prefer mocks, local fixtures, and `wiremock`.
 
 After creating a test file, add it to the appropriate `mod.rs` and use shared infrastructure from `tests/support/`.
