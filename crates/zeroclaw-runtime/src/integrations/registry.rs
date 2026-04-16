@@ -1030,10 +1030,8 @@ mod tests {
     #[test]
     fn regional_provider_aliases_activate_expected_ai_integrations() {
         let entries = all_integrations();
-        let mut config = Config {
-            default_provider: Some("minimax-cn".to_string()),
-            ..Config::default()
-        };
+        let mut config = Config::default();
+        config.default_provider = Some("minimax-cn".to_string());
 
         let minimax = entries.iter().find(|e| e.name == "MiniMax").unwrap();
         assert!(matches!(

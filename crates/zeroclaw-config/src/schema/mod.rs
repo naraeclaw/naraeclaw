@@ -127,12 +127,10 @@ impl Default for Config {
             proxy: ProxyConfig::default(),
             identity: IdentityConfig::default(),
             cost: CostConfig::default(),
-            peripherals: PeripheralsConfig::default(),
             delegate: DelegateToolConfig::default(),
             agents: HashMap::new(),
             swarms: HashMap::new(),
             hooks: HooksConfig::default(),
-            hardware: HardwareConfig::default(),
             query_classification: QueryClassificationConfig::default(),
             transcription: TranscriptionConfig::default(),
             tts: TtsConfig::default(),
@@ -1866,7 +1864,6 @@ macro_rules! impl_enum_prop_kind {
 }
 impl_enum_prop_kind!(
     SwarmStrategy,
-    HardwareTransport,
     McpTransport,
     ToolFilterGroupMode,
     SkillsPromptInjectionMode,
@@ -2417,12 +2414,10 @@ auto_save = true
             pacing: PacingConfig::default(),
             identity: IdentityConfig::default(),
             cost: CostConfig::default(),
-            peripherals: PeripheralsConfig::default(),
             delegate: DelegateToolConfig::default(),
             agents: HashMap::new(),
             swarms: HashMap::new(),
             hooks: HooksConfig::default(),
-            hardware: HardwareConfig::default(),
             transcription: TranscriptionConfig::default(),
             tts: TtsConfig::default(),
             mcp: McpConfig::default(),
@@ -2942,12 +2937,10 @@ default_temperature = 0.7
             pacing: PacingConfig::default(),
             identity: IdentityConfig::default(),
             cost: CostConfig::default(),
-            peripherals: PeripheralsConfig::default(),
             delegate: DelegateToolConfig::default(),
             agents: HashMap::new(),
             swarms: HashMap::new(),
             hooks: HooksConfig::default(),
-            hardware: HardwareConfig::default(),
             transcription: TranscriptionConfig::default(),
             tts: TtsConfig::default(),
             mcp: McpConfig::default(),
@@ -5394,44 +5387,6 @@ default_model = "persisted-profile"
         assert!(!g.trust_forwarded_headers);
         assert_eq!(g.rate_limit_max_keys, 10_000);
         assert_eq!(g.idempotency_max_keys, 10_000);
-    }
-
-    // ── Peripherals config ───────────────────────────────────────
-
-    #[test]
-    async fn peripherals_config_default_disabled() {
-        let p = PeripheralsConfig::default();
-        assert!(!p.enabled);
-        assert!(p.boards.is_empty());
-    }
-
-    #[test]
-    async fn peripheral_board_config_defaults() {
-        let b = PeripheralBoardConfig::default();
-        assert!(b.board.is_empty());
-        assert_eq!(b.transport, "serial");
-        assert!(b.path.is_none());
-        assert_eq!(b.baud, 115_200);
-    }
-
-    #[test]
-    async fn peripherals_config_toml_roundtrip() {
-        let p = PeripheralsConfig {
-            enabled: true,
-            boards: vec![PeripheralBoardConfig {
-                board: "nucleo-f401re".into(),
-                transport: "serial".into(),
-                path: Some("/dev/ttyACM0".into()),
-                baud: 115_200,
-            }],
-            datasheet_dir: None,
-        };
-        let toml_str = toml::to_string(&p).unwrap();
-        let parsed: PeripheralsConfig = toml::from_str(&toml_str).unwrap();
-        assert!(parsed.enabled);
-        assert_eq!(parsed.boards.len(), 1);
-        assert_eq!(parsed.boards[0].board, "nucleo-f401re");
-        assert_eq!(parsed.boards[0].path.as_deref(), Some("/dev/ttyACM0"));
     }
 
     // ── LINE ──────────────────────────────────────────────────

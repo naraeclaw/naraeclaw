@@ -1,4 +1,4 @@
-# Network Deployment — ZeroClaw on Raspberry Pi and Local Network
+# Network Deployment — NaraeClaw on a Server or Local Network
 
 This document covers deploying ZeroClaw on a Raspberry Pi or other host on your local network, with Telegram and optional webhook channels.
 
@@ -20,20 +20,17 @@ This document covers deploying ZeroClaw on a Raspberry Pi or other host on your 
 
 ---
 
-## 2. ZeroClaw on Raspberry Pi
+## 2. NaraeClaw on a Server
 
 ### 2.1 Prerequisites
 
-- Raspberry Pi (3/4/5) with Raspberry Pi OS
-- USB peripherals (Arduino, Nucleo) if using serial transport
-- Optional: `rppal` for native GPIO (`peripheral-rpi` feature)
+- Linux server or local machine
+- Network access to your chosen messaging provider or webhook tunnel
 
 ### 2.2 Install
 
 ```bash
-# Build for RPi (or cross-compile from host)
-cargo build --release --features hardware
-
+cargo build --release
 # Or install via your preferred method
 ```
 
@@ -42,20 +39,6 @@ cargo build --release --features hardware
 Edit `~/.zeroclaw/config.toml`:
 
 ```toml
-[peripherals]
-enabled = true
-
-[[peripherals.boards]]
-board = "rpi-gpio"
-transport = "native"
-
-# Or Arduino over USB
-[[peripherals.boards]]
-board = "arduino-uno"
-transport = "serial"
-path = "/dev/ttyACM0"
-baud = 115200
-
 [channels_config.telegram]
 bot_token = "YOUR_BOT_TOKEN"
 allowed_users = []
@@ -190,10 +173,10 @@ Configure Cloudflare Tunnel to forward to `127.0.0.1:42617`, then set your webho
 
 ---
 
-## 6. Checklist: RPi Deployment
+## 6. Checklist: Server Deployment
 
-- [ ] Build with `--features hardware` (and `peripheral-rpi` if using native GPIO)
-- [ ] Configure `[peripherals]` and `[channels_config.telegram]`
+- [ ] Build or install the `naraeclaw` binary
+- [ ] Configure `[channels_config.telegram]` or your selected channel
 - [ ] Run `zeroclaw daemon --host 127.0.0.1 --port 42617` (Telegram works without 0.0.0.0)
 - [ ] For LAN access: `--host 0.0.0.0` + `allow_public_bind = true` in config
 - [ ] For webhooks: use Tailscale, ngrok, or Cloudflare tunnel
@@ -301,5 +284,3 @@ sudo zeroclaw service uninstall
 
 - [channels-reference.md](../reference/api/channels-reference.md) — Channel configuration overview
 - [matrix-e2ee-guide.md](../security/matrix-e2ee-guide.md) — Matrix setup and encrypted-room troubleshooting
-- [hardware-peripherals-design.md](../hardware/hardware-peripherals-design.md) — Peripherals design
-- [adding-boards-and-tools.md](../contributing/adding-boards-and-tools.md) — Hardware setup and adding boards

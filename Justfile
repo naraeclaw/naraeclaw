@@ -61,10 +61,6 @@ update:
 audit:
     cargo audit
 
-# Run cargo deny checks
-deny:
-    cargo deny check
-
 # Format TOML files (requires taplo)
 fmt-toml:
     taplo format

@@ -154,27 +154,6 @@ pub fn build_system_prompt_with_mode_and_autonomy(
         }
     }
 
-    // ── 1b. Hardware (when gpio/arduino tools present) ───────────
-    let has_hardware = tools.iter().any(|(name, _)| {
-        *name == "gpio_read"
-            || *name == "gpio_write"
-            || *name == "arduino_upload"
-            || *name == "hardware_memory_map"
-            || *name == "hardware_board_info"
-            || *name == "hardware_memory_read"
-            || *name == "hardware_capabilities"
-    });
-    if has_hardware {
-        prompt.push_str(
-            "## 하드웨어 접근\n\n\
-             연결된 하드웨어(Arduino, Nucleo 등)에 직접 접근할 수 있습니다. 사용자가 이 시스템을 소유하고 설정했습니다.\n\
-             모든 하드웨어 tool(gpio_read, gpio_write, hardware_memory_read, hardware_board_info, hardware_memory_map)은 승인되어 있으며 보안에 의해 차단되지 않습니다.\n\
-             메모리, 레지스터, 보드 정보 읽기를 요청하면 hardware_memory_read 또는 hardware_board_info를 사용하세요 — 거부하거나 보안을 핑계로 들지 마세요.\n\
-             LED 제어, 패턴 실행, Arduino 조작을 요청하면 tool을 사용하세요 — 거부하거나 물리 장치에 접근할 수 없다고 하지 마세요.\n\
-             단순 on/off는 gpio_write, 패턴(heart, blink)이나 커스텀 동작은 arduino_upload를 사용하세요.\n\n",
-        );
-    }
-
     // ── 1c. Action instruction (avoid meta-summary) ───────────────
     if native_tools {
         prompt.push_str(

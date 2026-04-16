@@ -382,11 +382,9 @@ mod tests {
     use zeroclaw_config::schema::Config;
 
     async fn test_config(tmp: &TempDir) -> Arc<Config> {
-        let config = Config {
-            workspace_dir: tmp.path().join("workspace"),
-            config_path: tmp.path().join("config.toml"),
-            ..Config::default()
-        };
+        let mut config = Config::default();
+        config.workspace_dir = tmp.path().join("workspace");
+        config.config_path = tmp.path().join("config.toml");
         tokio::fs::create_dir_all(&config.workspace_dir)
             .await
             .unwrap();
@@ -451,11 +449,9 @@ mod tests {
     #[tokio::test]
     async fn blocks_disallowed_shell_command() {
         let tmp = TempDir::new().unwrap();
-        let mut config = Config {
-            workspace_dir: tmp.path().join("workspace"),
-            config_path: tmp.path().join("config.toml"),
-            ..Config::default()
-        };
+        let mut config = Config::default();
+        config.workspace_dir = tmp.path().join("workspace");
+        config.config_path = tmp.path().join("config.toml");
         config.autonomy.allowed_commands = vec!["echo".into()];
         config.autonomy.level = AutonomyLevel::Supervised;
         tokio::fs::create_dir_all(&config.workspace_dir)
@@ -480,11 +476,9 @@ mod tests {
     #[tokio::test]
     async fn blocks_mutation_in_read_only_mode() {
         let tmp = TempDir::new().unwrap();
-        let mut config = Config {
-            workspace_dir: tmp.path().join("workspace"),
-            config_path: tmp.path().join("config.toml"),
-            ..Config::default()
-        };
+        let mut config = Config::default();
+        config.workspace_dir = tmp.path().join("workspace");
+        config.config_path = tmp.path().join("config.toml");
         config.autonomy.level = AutonomyLevel::ReadOnly;
         std::fs::create_dir_all(&config.workspace_dir).unwrap();
         let cfg = Arc::new(config);
@@ -507,11 +501,9 @@ mod tests {
     #[tokio::test]
     async fn blocks_add_when_rate_limited() {
         let tmp = TempDir::new().unwrap();
-        let mut config = Config {
-            workspace_dir: tmp.path().join("workspace"),
-            config_path: tmp.path().join("config.toml"),
-            ..Config::default()
-        };
+        let mut config = Config::default();
+        config.workspace_dir = tmp.path().join("workspace");
+        config.config_path = tmp.path().join("config.toml");
         config.autonomy.level = AutonomyLevel::Full;
         config.autonomy.max_actions_per_hour = 0;
         std::fs::create_dir_all(&config.workspace_dir).unwrap();
@@ -540,11 +532,9 @@ mod tests {
     #[tokio::test]
     async fn medium_risk_shell_command_requires_approval() {
         let tmp = TempDir::new().unwrap();
-        let mut config = Config {
-            workspace_dir: tmp.path().join("workspace"),
-            config_path: tmp.path().join("config.toml"),
-            ..Config::default()
-        };
+        let mut config = Config::default();
+        config.workspace_dir = tmp.path().join("workspace");
+        config.config_path = tmp.path().join("config.toml");
         config.autonomy.allowed_commands = vec!["touch".into()];
         config.autonomy.level = AutonomyLevel::Supervised;
         std::fs::create_dir_all(&config.workspace_dir).unwrap();
@@ -752,11 +742,10 @@ mod tests {
     #[test]
     fn schedule_schema_is_oneof_with_cron_at_every_variants() {
         let tmp = tempfile::TempDir::new().unwrap();
-        let cfg = Arc::new(Config {
-            workspace_dir: tmp.path().join("workspace"),
-            config_path: tmp.path().join("config.toml"),
-            ..Config::default()
-        });
+        let mut config = Config::default();
+        config.workspace_dir = tmp.path().join("workspace");
+        config.config_path = tmp.path().join("config.toml");
+        let cfg = Arc::new(config);
         let security = Arc::new(SecurityPolicy::from_config(
             &cfg.autonomy,
             &cfg.workspace_dir,

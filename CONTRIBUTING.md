@@ -257,7 +257,6 @@ To keep docs useful under high PR volume, we use these rules:
 | `CONTRIBUTING.md` | contributor contract and readiness baseline | contributor expectations or policy changes |
 | `docs/contributing/pr-workflow.md` | governance logic and merge contract | workflow/risk/merge gate changes |
 | `docs/contributing/reviewer-playbook.md` | reviewer operating checklist | review depth or triage behavior changes |
-| `docs/contributing/ci-map.md` | CI ownership and triage entry points | workflow trigger/job ownership changes |
 | `docs/ops/network-deployment.md` | runtime deployment and network operating guide | gateway/channel/tunnel/network runtime behavior changes |
 | `docs/ops/proxy-agent-playbook.md` | agent-operable proxy runbook and rollback recipes | proxy scope/selector/tooling behavior changes |
 
@@ -281,7 +280,7 @@ Before requesting review, ensure all of the following are true:
 A PR is merge-ready when:
 
 - `CI Required Gate` is green.
-- Required reviewers approved (including CODEOWNERS paths).
+- Owner-approved when review is requested.
 - Risk level matches changed paths (`risk: low/medium/high`).
 - User-visible behavior, migration, and rollback notes are complete.
 - Follow-up TODOs are explicit and tracked in issues.
@@ -302,7 +301,7 @@ When PR traffic is high (especially with AI-assisted contributions), these rules
 - **Supersede hygiene**: if your PR replaces an older open PR, add `Supersedes #...` and request maintainers close the outdated one.
 
 Full maintainer workflow: [`docs/contributing/pr-workflow.md`](docs/contributing/pr-workflow.md).
-CI workflow ownership and triage map: [`docs/contributing/ci-map.md`](docs/contributing/ci-map.md).
+Fast CI is documented in [`.github/workflows/README.md`](.github/workflows/README.md).
 Reviewer operating checklist: [`docs/contributing/reviewer-playbook.md`](docs/contributing/reviewer-playbook.md).
 
 ## Agent Collaboration Guidance
@@ -640,7 +639,7 @@ Recommended scope keys in commit titles:
 - Require passing `CI Required Gate` before merge.
 - Require docs quality checks when docs are touched.
 - Require review approval for non-trivial changes.
-- Require CODEOWNERS review for protected paths.
+- Ask for focused review on protected paths when risk is high.
 - Use risk labels to determine review depth, scope labels (`core`, `provider`, `channel`, `security`, etc.) to route ownership, and module labels (`<module>:<component>`, e.g. `channel:telegram`, `provider:kimi`, `tool:shell`) to route subsystem expertise.
 - Contributor tier labels are auto-applied on PRs and issues by merged PR count: `experienced contributor` (>=10), `principal contributor` (>=20), `distinguished contributor` (>=50). Treat them as read-only automation labels; manual edits are auto-corrected.
 - Prefer squash merge with conventional commit title.

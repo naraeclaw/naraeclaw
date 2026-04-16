@@ -40,7 +40,6 @@
 - [../CONTRIBUTING.md](../CONTRIBUTING.md)
 - [contributing/pr-workflow.md](contributing/pr-workflow.md)
 - [contributing/reviewer-playbook.md](contributing/reviewer-playbook.md)
-- [contributing/ci-map.md](contributing/ci-map.md)
 
 ### 보안 / 안정성
 

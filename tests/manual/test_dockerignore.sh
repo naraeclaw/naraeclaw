@@ -48,7 +48,6 @@ MUST_EXCLUDE=(
     "*.db-journal"
     ".DS_Store"
     ".github"
-    "deny.toml"
     "LICENSE"
     ".env"
     ".tmp_*"
@@ -116,7 +115,6 @@ CONTEXT_FILES=$(find . -type f \
     ! -name '*.db-journal' \
     ! -name '.DS_Store' \
     ! -path './.github/*' \
-    ! -name 'deny.toml' \
     ! -name 'LICENSE' \
     ! -name '.env' \
     ! -name '.env.*' \

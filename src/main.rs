@@ -84,10 +84,6 @@ mod channels;
 #[cfg(feature = "agent-runtime")]
 mod cli_input;
 mod commands;
-#[cfg(feature = "agent-runtime")]
-mod rag {
-    pub use zeroclaw::rag::*;
-}
 mod config;
 #[cfg(feature = "agent-runtime")]
 mod cost;
@@ -99,8 +95,6 @@ mod daemon;
 mod doctor;
 #[cfg(feature = "gateway")]
 mod gateway;
-#[cfg(feature = "agent-runtime")]
-mod hardware;
 #[cfg(feature = "agent-runtime")]
 mod health;
 #[cfg(feature = "agent-runtime")]
@@ -122,8 +116,6 @@ mod multimodal;
 mod observability;
 #[cfg(feature = "agent-runtime")]
 mod onboard;
-#[cfg(feature = "agent-runtime")]
-mod peripherals;
 #[cfg(feature = "agent-runtime")]
 mod platform;
 #[cfg(feature = "plugins-wasm")]
@@ -156,8 +148,8 @@ use config::Config;
 
 // Re-export so binary modules can use crate::<CommandEnum> while keeping a single source of truth.
 pub use zeroclaw::{
-    ChannelCommands, CronCommands, GatewayCommands, HardwareCommands, IntegrationCommands,
-    MigrateCommands, PeripheralCommands, ServiceCommands, SkillCommands, SopCommands,
+    ChannelCommands, CronCommands, GatewayCommands, IntegrationCommands, MigrateCommands,
+    ServiceCommands, SkillCommands, SopCommands,
 };
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, ValueEnum)]
@@ -249,8 +241,7 @@ AI 에이전트 루프를 시작합니다.
 사용 예:
   naraeclaw agent                              # 대화형 세션
   naraeclaw agent -m \"오늘 로그 요약해줘\"       # 단일 메시지
-  naraeclaw agent -p anthropic --model claude-sonnet-4-20250514
-  naraeclaw agent --peripheral nucleo-f401re:/dev/ttyACM0")]
+  naraeclaw agent -p anthropic --model claude-sonnet-4-20250514")]
     Agent {
         /// 단일 메시지 모드 (대화형 세션 없이 메시지 하나만 전송)
         #[arg(short, long)]
@@ -271,10 +262,6 @@ AI 에이전트 루프를 시작합니다.
         /// Temperature (0.0 - 2.0, 기본값: 설정파일의 default_temperature)
         #[arg(short, long, value_parser = parse_temperature)]
         temperature: Option<f64>,
-
-        /// 연결할 하드웨어 (board:path 형식, 예: nucleo-f401re:/dev/ttyACM0)
-        #[arg(long)]
-        peripheral: Vec<String>,
     },
 
     /// 게이트웨이 서버 시작/관리 (webhook, websocket)
@@ -472,41 +459,6 @@ cron 표현식은 표준 5필드 형식을 사용합니다: 'min hour day month 
     Auth {
         #[command(subcommand)]
         auth_command: AuthCommands,
-    },
-
-    /// USB 하드웨어 탐색 및 정보 조회
-    #[command(long_about = "\
-USB 하드웨어를 탐색하고 정보를 조회합니다.
-
-연결된 USB 장치를 열거하고, 알려진 개발 보드(STM32 Nucleo, Arduino, ESP32)를
-식별하며, probe-rs / ST-Link를 통해 칩 정보를 조회합니다.
-
-사용 예:
-  naraeclaw hardware discover
-  naraeclaw hardware introspect /dev/ttyACM0
-  naraeclaw hardware info --chip STM32F401RETx")]
-    Hardware {
-        #[command(subcommand)]
-        hardware_command: zeroclaw::HardwareCommands,
-    },
-
-    /// 하드웨어 주변기기 관리 (STM32, RPi GPIO 등)
-    #[command(long_about = "\
-하드웨어 주변기기를 관리합니다.
-
-에이전트에 도구(GPIO, 센서, 액추에이터)를 노출하는 하드웨어 보드를
-추가, 목록 확인, 플래시, 설정합니다.
-지원 보드: nucleo-f401re, rpi-gpio, esp32, arduino-uno.
-
-사용 예:
-  naraeclaw peripheral list
-  naraeclaw peripheral add nucleo-f401re /dev/ttyACM0
-  naraeclaw peripheral add rpi-gpio native
-  naraeclaw peripheral flash --port /dev/cu.usbmodem12345
-  naraeclaw peripheral flash-nucleo")]
-    Peripheral {
-        #[command(subcommand)]
-        peripheral_command: zeroclaw::PeripheralCommands,
     },
 
     /// 에이전트 메모리 관리 (목록, 조회, 통계, 삭제)
@@ -1194,7 +1146,6 @@ async fn main() -> Result<()> {
             provider,
             model,
             temperature,
-            peripheral,
         } => {
             let final_temperature = temperature.unwrap_or(config.default_temperature);
 
@@ -1208,7 +1159,7 @@ async fn main() -> Result<()> {
                 provider,
                 model,
                 final_temperature,
-                peripheral,
+                Vec::new(),
                 true,
                 session_state_file,
                 None,
@@ -1354,14 +1305,6 @@ async fn main() -> Result<()> {
             #[cfg(feature = "agent-runtime")]
             zeroclaw_runtime::agent::loop_::register_cli_channel_fn(Box::new(|| {
                 Box::new(zeroclaw_channels::cli::CliChannel::new())
-            }));
-
-            // Wire peripheral tools from zeroclaw-hardware
-            #[cfg(feature = "hardware")]
-            zeroclaw_runtime::agent::loop_::register_peripheral_tools_fn(Box::new(|config| {
-                Box::pin(async move {
-                    zeroclaw_hardware::peripherals::create_peripheral_tools(&config).await
-                })
             }));
 
             // Wire cron delivery to the channels orchestrator
@@ -1547,17 +1490,6 @@ async fn main() -> Result<()> {
                     }
                 );
             }
-            println!();
-            println!("Peripherals:");
-            println!(
-                "  Enabled:   {}",
-                if config.peripherals.enabled {
-                    "yes"
-                } else {
-                    "no"
-                }
-            );
-            println!("  Boards:    {}", config.peripherals.boards.len());
 
             Ok(())
         }
@@ -1679,18 +1611,6 @@ async fn main() -> Result<()> {
         }
 
         Commands::Auth { auth_command } => handle_auth_command(auth_command, &config).await,
-
-        Commands::Hardware { hardware_command } => {
-            hardware::handle_command(hardware_command.clone(), &config)
-        }
-
-        Commands::Peripheral { peripheral_command } => {
-            Box::pin(peripherals::handle_command(
-                peripheral_command.clone(),
-                &config,
-            ))
-            .await
-        }
 
         Commands::Desktop {
             install: do_install,
@@ -2042,212 +1962,10 @@ async fn main() -> Result<()> {
     }
 }
 
-/// Build wizard callbacks that wire downstream crate functionality into the onboarding wizard.
+/// Build wizard callbacks for optional onboarding integrations.
 #[cfg(feature = "agent-runtime")]
 fn build_wizard_callbacks() -> onboard::WizardCallbacks {
     onboard::WizardCallbacks {
-        #[cfg(feature = "hardware")]
-        hardware_setup: Some(Box::new(|| {
-            use console::style;
-            use dialoguer::{Confirm, Select};
-
-            println!(
-                "  {} {}",
-                style("ℹ").dim(),
-                style("NaraeClaw can talk to physical hardware (LEDs, sensors, motors).").dim()
-            );
-            println!(
-                "  {} {}",
-                style("ℹ").dim(),
-                style("Scanning for connected devices...").dim()
-            );
-            println!();
-
-            let devices = zeroclaw_hardware::discover_hardware();
-
-            if devices.is_empty() {
-                println!(
-                    "  {} {}",
-                    style("ℹ").dim(),
-                    style("No hardware devices detected on this system.").dim()
-                );
-                println!(
-                    "  {} {}",
-                    style("ℹ").dim(),
-                    style("You can enable hardware later in config.toml under [hardware].").dim()
-                );
-            } else {
-                println!(
-                    "  {} {} device(s) found:",
-                    style("✓").green().bold(),
-                    devices.len()
-                );
-                for device in &devices {
-                    let detail = device
-                        .detail
-                        .as_deref()
-                        .map(|d| format!(" ({d})"))
-                        .unwrap_or_default();
-                    let path = device
-                        .device_path
-                        .as_deref()
-                        .map(|p| format!(" → {p}"))
-                        .unwrap_or_default();
-                    println!(
-                        "    {} {}{}{} [{}]",
-                        style("›").cyan(),
-                        style(&device.name).green(),
-                        style(&detail).dim(),
-                        style(&path).dim(),
-                        style(device.transport.to_string()).cyan()
-                    );
-                }
-            }
-            println!();
-
-            let options = vec![
-                "🚀 Native — direct GPIO on this Linux board (Raspberry Pi, Orange Pi, etc.)",
-                "🔌 Tethered — control an Arduino/ESP32/Nucleo plugged into USB",
-                "🔬 Debug Probe — flash/read MCUs via SWD/JTAG (probe-rs)",
-                "☁️  Software Only — no hardware access (default)",
-            ];
-
-            let recommended = zeroclaw_hardware::recommended_wizard_default(&devices);
-
-            let choice = Select::new()
-                .with_prompt("  How should NaraeClaw interact with the physical world?")
-                .items(&options)
-                .default(recommended)
-                .interact()?;
-
-            let mut hw_config = zeroclaw_hardware::config_from_wizard_choice(choice, &devices);
-
-            use zeroclaw_config::schema::HardwareTransport;
-
-            // Serial: pick a port if multiple found
-            if hw_config.transport_mode() == HardwareTransport::Serial {
-                let serial_devices: Vec<&zeroclaw_hardware::DiscoveredDevice> = devices
-                    .iter()
-                    .filter(|d| d.transport == HardwareTransport::Serial)
-                    .collect();
-
-                if serial_devices.len() > 1 {
-                    let port_labels: Vec<String> = serial_devices
-                        .iter()
-                        .map(|d| {
-                            format!(
-                                "{} ({})",
-                                d.device_path.as_deref().unwrap_or("unknown"),
-                                d.name
-                            )
-                        })
-                        .collect();
-
-                    let port_idx = Select::new()
-                        .with_prompt("  Multiple serial devices found — select one")
-                        .items(&port_labels)
-                        .default(0)
-                        .interact()?;
-
-                    hw_config.serial_port = serial_devices[port_idx].device_path.clone();
-                } else if serial_devices.is_empty() {
-                    let manual_port: String = dialoguer::Input::new()
-                        .with_prompt("  Serial port path (e.g. /dev/ttyUSB0)")
-                        .default("/dev/ttyUSB0".into())
-                        .interact_text()?;
-                    hw_config.serial_port = Some(manual_port);
-                }
-
-                // Baud rate
-                let baud_options = vec![
-                    "115200 (default, recommended)",
-                    "9600 (legacy Arduino)",
-                    "57600",
-                    "230400",
-                    "Custom",
-                ];
-                let baud_idx = Select::new()
-                    .with_prompt("  Serial baud rate")
-                    .items(&baud_options)
-                    .default(0)
-                    .interact()?;
-
-                hw_config.baud_rate = match baud_idx {
-                    1 => 9600,
-                    2 => 57600,
-                    3 => 230_400,
-                    4 => {
-                        let custom: String = dialoguer::Input::new()
-                            .with_prompt("  Custom baud rate")
-                            .default("115200".into())
-                            .interact_text()?;
-                        custom.parse::<u32>().unwrap_or(115_200)
-                    }
-                    _ => 115_200,
-                };
-            }
-
-            // Probe: ask for target chip
-            if hw_config.transport_mode() == HardwareTransport::Probe
-                && hw_config.probe_target.is_none()
-            {
-                let target: String = dialoguer::Input::new()
-                    .with_prompt("  Target MCU chip (e.g. STM32F411CEUx, nRF52840_xxAA)")
-                    .default("STM32F411CEUx".into())
-                    .interact_text()?;
-                hw_config.probe_target = Some(target);
-            }
-
-            // Datasheet RAG
-            if hw_config.enabled {
-                let datasheets = Confirm::new()
-                    .with_prompt(
-                        "  Enable datasheet RAG? (index PDF schematics for AI pin lookups)",
-                    )
-                    .default(true)
-                    .interact()?;
-                hw_config.workspace_datasheets = datasheets;
-            }
-
-            // Summary
-            if hw_config.enabled {
-                let transport_label = match hw_config.transport_mode() {
-                    HardwareTransport::Native => "Native GPIO".to_string(),
-                    HardwareTransport::Serial => format!(
-                        "Serial → {} @ {} baud",
-                        hw_config.serial_port.as_deref().unwrap_or("?"),
-                        hw_config.baud_rate
-                    ),
-                    HardwareTransport::Probe => format!(
-                        "Probe (SWD/JTAG) → {}",
-                        hw_config.probe_target.as_deref().unwrap_or("?")
-                    ),
-                    HardwareTransport::None => "Software Only".to_string(),
-                };
-
-                println!(
-                    "  {} Hardware: {} | datasheets: {}",
-                    style("✓").green().bold(),
-                    style(&transport_label).green(),
-                    if hw_config.workspace_datasheets {
-                        style("on").green().to_string()
-                    } else {
-                        style("off").dim().to_string()
-                    }
-                );
-            } else {
-                println!(
-                    "  {} Hardware: {}",
-                    style("✓").green().bold(),
-                    style("disabled (software only)").dim()
-                );
-            }
-
-            Ok(hw_config)
-        })),
-        #[cfg(not(feature = "hardware"))]
-        hardware_setup: None,
-
         #[cfg(feature = "channel-nostr")]
         nostr_validate_key: Some(Box::new(|key: &str| {
             let keys = nostr_sdk::Keys::parse(key)

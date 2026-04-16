@@ -12,7 +12,7 @@ This document defines how ZeroClaw handles high PR volume while maintaining:
 Related references:
 
 - [`docs/README.md`](../README.md) for documentation taxonomy and navigation.
-- [`ci-map.md`](./ci-map.md) for per-workflow ownership, triggers, and triage flow.
+- [`.github/workflows/README.md`](../../.github/workflows/README.md) for the active fast CI workflow.
 - [`reviewer-playbook.md`](./reviewer-playbook.md) for day-to-day reviewer execution.
 
 ## 0. Summary
@@ -44,7 +44,7 @@ Go to:
 
 Go to:
 
-- [ci-map.md](./ci-map.md)
+- [`.github/workflows/README.md`](../../.github/workflows/README.md)
 - [Section 4.2](#42-step-b-validation)
 
 ### 1.3 High-risk path touched
@@ -98,9 +98,8 @@ Maintain these branch protection rules on `master`:
 - Require status checks before merge.
 - Require check `CI Required Gate`.
 - Require pull request reviews before merge.
-- Require CODEOWNERS review for protected paths.
+- Request owner review for protected paths when risk is high.
 - For `.github/workflows/**`, require owner approval via `CI Required Gate` (`WORKFLOW_OWNER_LOGINS`) and keep branch/ruleset bypass limited to org owners.
-- Default workflow-owner allowlist is configured via the `WORKFLOW_OWNER_LOGINS` repository variable (see CODEOWNERS for current maintainers).
 - Dismiss stale approvals when new commits are pushed.
 - Restrict force-push on protected branches.
 - All contributor PRs target `master` directly.
@@ -155,7 +154,7 @@ Maintain these branch protection rules on `master`:
 ### 5.2 Definition of Done (DoD) merge-ready
 
 - `CI Required Gate` is green.
-- Required reviewers approved (including CODEOWNERS paths).
+- Required reviewers approved when review is requested.
 - Risk class labels match touched paths.
 - Migration/compatibility impact is documented.
 - Rollback path is concrete and fast.
@@ -353,9 +352,8 @@ This keeps context loss low and avoids repeated deep dives.
 ## 15. Related Docs
 
 - [README.md](../README.md) — documentation taxonomy and navigation.
-- [ci-map.md](./ci-map.md) — CI workflow ownership and triage map.
+- [`.github/workflows/README.md`](../../.github/workflows/README.md) — active fast CI workflow.
 - [reviewer-playbook.md](./reviewer-playbook.md) — reviewer execution model.
-- [actions-source-policy.md](./actions-source-policy.md) — action source allowlist policy.
 
 ---
 

@@ -149,7 +149,7 @@ Some conditions here.
 1. **Check readings** — Read sensor data and confirm.
    - tools: gpio_read, memory_store
 
-2. **Close valve** — Set GPIO pin 5 LOW.
+2. **Stop service** — Disable the affected endpoint.
    - tools: gpio_write, gpio_read
    - requires_confirmation: true
 
@@ -390,9 +390,9 @@ type = "manual"
 
     #[test]
     fn extract_bold_title_with_dash() {
-        let (title, body) = extract_bold_title("**Close valve** — Set GPIO pin LOW.").unwrap();
+        let (title, body) = extract_bold_title("**Stop service** — Disable endpoint.").unwrap();
         assert_eq!(title, "Close valve");
-        assert_eq!(body, "Set GPIO pin LOW.");
+        assert_eq!(body, "Disable endpoint.");
     }
 
     #[test]

@@ -157,11 +157,9 @@ mod tests {
     use zeroclaw_config::schema::Config;
 
     async fn test_config(tmp: &TempDir) -> Arc<Config> {
-        let config = Config {
-            workspace_dir: tmp.path().join("workspace"),
-            config_path: tmp.path().join("config.toml"),
-            ..Config::default()
-        };
+        let mut config = Config::default();
+        config.workspace_dir = tmp.path().join("workspace");
+        config.config_path = tmp.path().join("config.toml");
         tokio::fs::create_dir_all(&config.workspace_dir)
             .await
             .unwrap();
@@ -206,11 +204,9 @@ mod tests {
     #[tokio::test]
     async fn blocks_run_in_read_only_mode() {
         let tmp = TempDir::new().unwrap();
-        let mut config = Config {
-            workspace_dir: tmp.path().join("workspace"),
-            config_path: tmp.path().join("config.toml"),
-            ..Config::default()
-        };
+        let mut config = Config::default();
+        config.workspace_dir = tmp.path().join("workspace");
+        config.config_path = tmp.path().join("config.toml");
         std::fs::create_dir_all(&config.workspace_dir).unwrap();
         let job = cron::add_job(&config, "*/5 * * * *", "echo run-now").unwrap();
         config.autonomy.level = AutonomyLevel::ReadOnly;
@@ -225,11 +221,9 @@ mod tests {
     #[tokio::test]
     async fn shell_run_requires_approval_for_medium_risk() {
         let tmp = TempDir::new().unwrap();
-        let mut config = Config {
-            workspace_dir: tmp.path().join("workspace"),
-            config_path: tmp.path().join("config.toml"),
-            ..Config::default()
-        };
+        let mut config = Config::default();
+        config.workspace_dir = tmp.path().join("workspace");
+        config.config_path = tmp.path().join("config.toml");
         config.autonomy.level = AutonomyLevel::Supervised;
         config.autonomy.allowed_commands = vec!["touch".into()];
         std::fs::create_dir_all(&config.workspace_dir).unwrap();
@@ -263,11 +257,9 @@ mod tests {
     #[tokio::test]
     async fn blocks_run_when_rate_limited() {
         let tmp = TempDir::new().unwrap();
-        let mut config = Config {
-            workspace_dir: tmp.path().join("workspace"),
-            config_path: tmp.path().join("config.toml"),
-            ..Config::default()
-        };
+        let mut config = Config::default();
+        config.workspace_dir = tmp.path().join("workspace");
+        config.config_path = tmp.path().join("config.toml");
         config.autonomy.level = AutonomyLevel::Full;
         config.autonomy.max_actions_per_hour = 0;
         std::fs::create_dir_all(&config.workspace_dir).unwrap();

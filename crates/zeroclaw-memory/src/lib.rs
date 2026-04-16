@@ -509,10 +509,8 @@ mod tests {
 
     #[test]
     fn effective_backend_name_prefers_storage_override() {
-        let storage = StorageProviderConfig {
-            provider: "qdrant".into(),
-            ..StorageProviderConfig::default()
-        };
+        let mut storage = StorageProviderConfig::default();
+        storage.provider = "qdrant".into();
 
         assert_eq!(
             effective_memory_backend_name("sqlite", Some(&storage)),

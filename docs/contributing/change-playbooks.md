@@ -25,17 +25,14 @@ For complete code examples of each extension trait, see [extension-examples.md](
 
 ## Adding a Peripheral
 
-- Implement `Peripheral` in `src/peripherals/`.
-- Peripherals expose `tools()` — each tool delegates to the hardware (GPIO, sensors, etc.).
 - Register board type in config schema if needed.
-- See `docs/hardware/hardware-peripherals-design.md` for protocol and firmware notes.
 
 ## Security / Runtime / Gateway Changes
 
 - Include threat/risk notes and rollback strategy.
 - Add/update tests or validation evidence for failure modes and boundaries.
 - Keep observability useful but non-sensitive.
-- For `.github/workflows/**` changes, include Actions allowlist impact in PR notes and update `docs/contributing/actions-source-policy.md` when sources change.
+- For `.github/workflows/**` changes, keep `.github/workflows/README.md` aligned with the active workflow set.
 
 ## Docs System / README / IA Changes
 

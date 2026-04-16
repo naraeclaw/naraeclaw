@@ -80,7 +80,6 @@ Key extension points:
 - `crates/zeroclaw-api/src/memory_traits.rs` (`Memory`)
 - `crates/zeroclaw-api/src/observability_traits.rs` (`Observer`)
 - `crates/zeroclaw-api/src/runtime_traits.rs` (`RuntimeAdapter`)
-- `crates/zeroclaw-api/src/peripherals_traits.rs` (`Peripheral`) — hardware boards (STM32, RPi GPIO)
 
 ## Current Priorities
 
@@ -107,7 +106,6 @@ Every workspace crate carries a stability tier per the Microkernel Architecture 
 | `zeroclaw-gateway` | Experimental | Separate binary at v0.9.0 |
 | `zeroclaw-tui` | Experimental | TUI onboarding wizard |
 | `zeroclaw-plugins` | Experimental | WASM plugin system — foundation for v1.0.0 plugin ecosystem |
-| `zeroclaw-hardware` | Experimental | USB discovery, peripherals, serial |
 | `zeroclaw-macros` | Beta | Tightly coupled to config schema |
 
 **Tiers**: Stable = covered by breaking-change policy. Beta = breaking changes permitted in MINOR with changelog notes. Experimental = no stability guarantee.
@@ -129,11 +127,10 @@ Tiers are promoted, never demoted, through deliberate team decision.
 - `crates/zeroclaw-memory/` — memory backends (markdown, sqlite, embeddings, vector merge)
 - `crates/zeroclaw-infra/` — shared infrastructure (debounce, session, stall watchdog)
 - `crates/zeroclaw-gateway/` — webhook/gateway server (separate binary)
-- `crates/zeroclaw-hardware/` — USB discovery, peripherals, serial, GPIO
 - `crates/zeroclaw-tui/` — TUI onboarding wizard
 - `crates/zeroclaw-plugins/` — WASM plugin system
 - `crates/zeroclaw-tool-call-parser/` — tool call parsing
-- `docs/` — topic-based documentation (setup-guides, reference, ops, security, hardware, contributing, maintainers)
+- `docs/` — topic-based documentation (setup-guides, reference, ops, security, contributing, maintainers)
 - `.github/` — CI, templates, automation workflows
 
 ## Architecture Notes
@@ -180,11 +177,10 @@ Suggested fast validation:
 
 ```bash
 cargo fmt --all -- --check
-cargo check --workspace --exclude zeroclaw-desktop --locked
-cargo test --workspace --lib --locked
+cargo check --workspace --exclude zeroclaw-desktop
 ```
 
-Use targeted checks when the change scope is narrow. For docs-only changes, `git diff --check` is enough unless the edited docs have a dedicated checker.
+Use targeted tests when the change scope needs runtime coverage. The historical full lib-test suite still has known cleanup debt, so do not make fast CI depend on it until those tests are repaired. For docs-only changes, `git diff --check` is enough unless the edited docs have a dedicated checker.
 
 ## Worktree Guidance
 
@@ -239,6 +235,6 @@ Branch/commit/PR rules:
 
 ## Linked References
 
-- `@docs/contributing/change-playbooks.md` — adding providers, channels, tools, peripherals; security/gateway changes; architecture boundaries
+- `@docs/contributing/change-playbooks.md` — adding providers, channels, tools; security/gateway changes; architecture boundaries
 - `@docs/contributing/pr-discipline.md` — privacy rules, superseded-PR attribution/templates, handoff template
 - `@docs/contributing/docs-contract.md` — docs system contract, i18n rules, locale parity

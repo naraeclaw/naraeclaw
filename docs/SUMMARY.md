@@ -35,7 +35,6 @@
 - [기여 가이드](contributing/README.md)
 - [PR 워크플로우](contributing/pr-workflow.md)
 - [테스트](contributing/testing.md)
-- [릴리즈 프로세스](contributing/release-process.md)
 
 ## 프로젝트 현황
 

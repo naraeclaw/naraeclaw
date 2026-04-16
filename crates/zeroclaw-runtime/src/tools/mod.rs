@@ -63,9 +63,6 @@ pub use zeroclaw_tools::gemini_cli::GeminiCliTool;
 pub use zeroclaw_tools::git_operations::GitOperationsTool;
 pub use zeroclaw_tools::glob_search::GlobSearchTool;
 pub use zeroclaw_tools::google_workspace::GoogleWorkspaceTool;
-pub use zeroclaw_tools::hardware_board_info::HardwareBoardInfoTool;
-pub use zeroclaw_tools::hardware_memory_map::HardwareMemoryMapTool;
-pub use zeroclaw_tools::hardware_memory_read::HardwareMemoryReadTool;
 pub use zeroclaw_tools::http_request::HttpRequestTool;
 pub use zeroclaw_tools::image_gen::ImageGenTool;
 pub use zeroclaw_tools::image_info::ImageInfoTool;
@@ -861,11 +858,10 @@ mod tests {
     use zeroclaw_config::schema::{BrowserConfig, Config, MemoryConfig};
 
     fn test_config(tmp: &TempDir) -> Config {
-        Config {
-            workspace_dir: tmp.path().join("workspace"),
-            config_path: tmp.path().join("config.toml"),
-            ..Config::default()
-        }
+        let mut config = Config::default();
+        config.workspace_dir = tmp.path().join("workspace");
+        config.config_path = tmp.path().join("config.toml");
+        config
     }
 
     #[test]
