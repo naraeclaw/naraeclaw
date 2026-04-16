@@ -304,8 +304,6 @@ fn runtime_config_store() -> &'static Mutex<HashMap<PathBuf, RuntimeConfigState>
 
 const SYSTEMD_STATUS_ARGS: [&str; 3] = ["--user", "is-active", "naraeclaw.service"];
 const SYSTEMD_RESTART_ARGS: [&str; 3] = ["--user", "restart", "naraeclaw.service"];
-const OPENRC_STATUS_ARGS: [&str; 2] = ["naraeclaw", "status"];
-const OPENRC_RESTART_ARGS: [&str; 2] = ["naraeclaw", "restart"];
 
 #[derive(Clone, Copy)]
 #[allow(clippy::struct_excessive_bools)]
@@ -3826,25 +3824,6 @@ fn maybe_restart_managed_daemon_service() -> Result<bool> {
     }
 
     if cfg!(target_os = "linux") {
-        // OpenRC (system-wide) takes precedence over systemd (user-level)
-        let openrc_init_script = PathBuf::from("/etc/init.d/naraeclaw");
-        if openrc_init_script.exists()
-            && let Ok(status_output) = Command::new("rc-service").args(OPENRC_STATUS_ARGS).output()
-        {
-            // rc-service exits 0 if running, non-zero otherwise
-            if status_output.status.success() {
-                let restart_output = Command::new("rc-service")
-                    .args(OPENRC_RESTART_ARGS)
-                    .output()
-                    .context("Failed to restart OpenRC daemon service")?;
-                if !restart_output.status.success() {
-                    let stderr = String::from_utf8_lossy(&restart_output.stderr);
-                    anyhow::bail!("rc-service restart failed: {}", stderr.trim());
-                }
-                return Ok(true);
-            }
-        }
-
         // Systemd (user-level)
         let home = directories::UserDirs::new()
             .map(|u| u.home_dir().to_path_buf())
@@ -10240,12 +10219,6 @@ This is an example JSON object for profile settings."#;
             SYSTEMD_RESTART_ARGS,
             ["--user", "restart", "naraeclaw.service"]
         );
-    }
-
-    #[test]
-    fn maybe_restart_daemon_openrc_args_regression() {
-        assert_eq!(OPENRC_STATUS_ARGS, ["naraeclaw", "status"]);
-        assert_eq!(OPENRC_RESTART_ARGS, ["naraeclaw", "restart"]);
     }
 
     #[test]

@@ -12,7 +12,7 @@ pub struct DockerSandbox {
 impl Default for DockerSandbox {
     fn default() -> Self {
         Self {
-            image: "alpine:latest".to_string(),
+            image: "debian:bookworm-slim".to_string(),
         }
     }
 }
@@ -106,7 +106,7 @@ mod tests {
     #[test]
     fn docker_sandbox_default_image() {
         let sandbox = DockerSandbox::default();
-        assert_eq!(sandbox.image, "alpine:latest");
+        assert_eq!(sandbox.image, "debian:bookworm-slim");
     }
 
     #[test]
@@ -182,7 +182,7 @@ mod tests {
             .collect();
 
         assert!(
-            args.contains(&"alpine:latest".to_string()),
+            args.contains(&"debian:bookworm-slim".to_string()),
             "must include the container image"
         );
         assert!(

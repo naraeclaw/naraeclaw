@@ -2749,14 +2749,6 @@ fn render_optional_apps(frame: &mut Frame, area: Rect) {
                     "  - macOS app (system + notifications)",
                     theme::body_style(),
                 )),
-                Line::from(Span::styled(
-                    "  - iOS app (camera/canvas)",
-                    theme::body_style(),
-                )),
-                Line::from(Span::styled(
-                    "  - Android app (camera/canvas)",
-                    theme::body_style(),
-                )),
                 Line::from(""),
             ],
         },
@@ -2817,7 +2809,7 @@ fn render_control_ui(frame: &mut Frame, area: Rect, app: &App) {
         ]));
         lines.push(Line::from(""));
         lines.push(Line::from(Span::styled(
-            "  Also works with: Docker, macOS app, iOS/Android",
+            "  Also works with: Docker and the macOS app",
             theme::dim_style(),
         )));
     } else {

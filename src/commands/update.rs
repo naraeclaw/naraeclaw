@@ -291,7 +291,7 @@ async fn validate_binary(path: &Path) -> Result<()> {
 
 /// Read the binary header and verify its architecture matches the host.
 ///
-/// On Linux/FreeBSD this reads the ELF header; on macOS the Mach-O header.
+/// On Linux this reads the ELF header; on macOS the Mach-O header.
 /// If the binary is for a different architecture, returns a descriptive error
 /// instead of the opaque "Exec format error (os error 8)".
 async fn check_binary_arch(path: &Path) -> Result<()> {
@@ -330,7 +330,6 @@ fn detect_arch_from_header(header: &[u8]) -> Option<&'static str> {
             0xB7 => "aarch64",
             0x03 => "x86",
             0x28 => "arm",
-            0xF3 => "riscv",
             _ => "unknown-elf",
         });
     }
@@ -439,7 +438,7 @@ mod tests {
     #[test]
     fn find_asset_url_picks_correct_gnu_over_other_linux_assets() {
         let release = make_release(&[
-            "naraeclaw-aarch64-unknown-linux-musl.tar.gz",
+            "naraeclaw-aarch64-unknown-linux-gnu.debug.tar.gz",
             "naraeclaw-aarch64-unknown-linux-gnu.tar.gz",
             "naraeclaw-x86_64-unknown-linux-gnu.tar.gz",
             "naraeclaw-x86_64-apple-darwin.tar.gz",

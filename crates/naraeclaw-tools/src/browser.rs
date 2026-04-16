@@ -458,7 +458,7 @@ impl BrowserTool {
         };
         let mut cmd = Command::new(agent_browser_bin);
 
-        // When running as a service (systemd/OpenRC), the process may lack
+        // When running as a service (systemd), the process may lack
         // HOME which browsers need for profile directories.
         if is_service_environment() {
             ensure_browser_env(&mut cmd);
@@ -1485,7 +1485,7 @@ mod native_backend {
                 args.push(Value::String("--disable-gpu".to_string()));
             }
 
-            // When running as a service (systemd/OpenRC), the browser sandbox
+            // When running as a service (systemd), the browser sandbox
             // fails because the process lacks a user namespace / session.
             // --no-sandbox and --disable-dev-shm-usage are required in this context.
             if super::is_service_environment() {
@@ -2145,17 +2145,13 @@ fn is_non_global_v6(v6: std::net::Ipv6Addr) -> bool {
 }
 
 /// Detect whether the current process is running inside a service environment
-/// (e.g. systemd, OpenRC, or launchd) where the browser sandbox and
+/// (e.g. systemd or launchd) where the browser sandbox and
 /// environment setup may be restricted.
 fn is_service_environment() -> bool {
     if std::env::var_os("INVOCATION_ID").is_some() {
         return true;
     }
     if std::env::var_os("JOURNAL_STREAM").is_some() {
-        return true;
-    }
-    #[cfg(target_os = "linux")]
-    if std::path::Path::new("/run/openrc").exists() && std::env::var_os("HOME").is_none() {
         return true;
     }
     #[cfg(target_os = "linux")]

@@ -329,8 +329,8 @@ heartbeat 모니터, cron 스케줄러를 포함한 전체 런타임을 실행�
 
     /// OS 서비스 생명주기 관리 (launchd/systemd user service)
     Service {
-        /// 초기화 시스템 선택: auto (자동 감지), systemd, openrc
-        #[arg(long, default_value = "auto", value_parser = ["auto", "systemd", "openrc"])]
+        /// 초기화 시스템 선택: auto (자동 감지), systemd
+        #[arg(long, default_value = "auto", value_parser = ["auto", "systemd"])]
         service_init: String,
 
         #[command(subcommand)]

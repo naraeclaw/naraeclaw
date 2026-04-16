@@ -152,25 +152,11 @@ pub fn detect_platform() -> &'static str {
     {
         "linux"
     }
-    #[cfg(target_os = "android")]
-    {
-        "android"
-    }
-    #[cfg(target_os = "ios")]
-    {
-        "ios"
-    }
     #[cfg(target_os = "windows")]
     {
         "windows"
     }
-    #[cfg(not(any(
-        target_os = "macos",
-        target_os = "linux",
-        target_os = "android",
-        target_os = "ios",
-        target_os = "windows"
-    )))]
+    #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
     {
         "unknown"
     }
@@ -231,7 +217,7 @@ mod tests {
     #[test]
     fn detect_platform_returns_known_value() {
         let platform = detect_platform();
-        let known = ["macos", "linux", "android", "ios", "windows", "unknown"];
+        let known = ["macos", "linux", "windows", "unknown"];
         assert!(
             known.contains(&platform),
             "Platform '{}' is not in the known set",
