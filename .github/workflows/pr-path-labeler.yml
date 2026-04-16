@@ -1,19 +1,17 @@
-name: PR Path Labeler
+name: PR Path Labeler (Manual)
 
+# Disabled by default during fast development mode.
+# Re-enable pull_request_target when label automation becomes useful again.
 on:
-  pull_request_target:
-    types: [opened, synchronize, reopened]
+  workflow_dispatch:
 
 permissions:
   contents: read
   pull-requests: write
 
 jobs:
-  label:
-    name: Apply path labels
+  noop:
+    name: Labeler disabled
     runs-on: ubuntu-latest
-    timeout-minutes: 5
     steps:
-      - uses: actions/labeler@8558fd74291d67161a8a78ce36a881fa63b766a9 # v5
-        with:
-          sync-labels: true
+      - run: echo "PR path labeler is disabled during fast development mode."

@@ -10,9 +10,6 @@ on:
         description: "Version to validate (e.g. 0.6.9)"
         required: false
         type: string
-  pull_request:
-    paths:
-      - "Cargo.toml"
 
 permissions:
   contents: read

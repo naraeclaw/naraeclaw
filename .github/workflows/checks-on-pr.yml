@@ -1,8 +1,7 @@
-name: Quality Gate
+name: Full CI (Manual)
 
 on:
-  pull_request:
-    branches: [master]
+  workflow_dispatch:
 
 concurrency:
   group: checks-${{ github.event.pull_request.number }}

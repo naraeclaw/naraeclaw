@@ -1,10 +1,7 @@
-name: Auto-sync crates.io
+name: Publish crates.io (Manual)
 
 on:
-  push:
-    branches: [master]
-    paths:
-      - "Cargo.toml"
+  workflow_dispatch:
 
 concurrency:
   group: publish-crates-auto
