@@ -1517,7 +1517,7 @@ pub struct QdrantConfig {
     #[serde(default)]
     pub url: Option<String>,
     /// Qdrant collection name for storing memories.
-    /// Falls back to `QDRANT_COLLECTION` env var, or default "zeroclaw_memories".
+    /// Falls back to `QDRANT_COLLECTION` env var, or default "naraeclaw_memories".
     #[serde(default = "default_qdrant_collection")]
     pub collection: String,
     /// Optional API key for Qdrant Cloud or secured instances.
@@ -1527,7 +1527,7 @@ pub struct QdrantConfig {
 }
 
 pub fn default_qdrant_collection() -> String {
-    "zeroclaw_memories".into()
+    "naraeclaw_memories".into()
 }
 
 impl Default for QdrantConfig {
@@ -1823,7 +1823,7 @@ pub struct ObservabilityConfig {
     #[serde(default)]
     pub otel_endpoint: Option<String>,
 
-    /// Service name reported to the OTel collector. Defaults to "zeroclaw".
+    /// Service name reported to the OTel collector. Defaults to "naraeclaw".
     #[serde(default)]
     pub otel_service_name: Option<String>,
 
@@ -2319,7 +2319,7 @@ impl ChannelConfig for BlueskyConfig {
 #[prefix = "voice-wake"]
 pub struct VoiceWakeConfig {
     /// Wake word phrase to listen for (case-insensitive substring match).
-    /// Default: `"hey zeroclaw"`.
+    /// Default: `"hey naraeclaw"`.
     #[serde(default = "default_voice_wake_word")]
     pub wake_word: String,
     /// Silence timeout in milliseconds — how long to wait after the last
@@ -2338,7 +2338,7 @@ pub struct VoiceWakeConfig {
 
 #[cfg(feature = "voice-wake")]
 pub fn default_voice_wake_word() -> String {
-    "hey zeroclaw".into()
+    "hey naraeclaw".into()
 }
 
 #[cfg(feature = "voice-wake")]

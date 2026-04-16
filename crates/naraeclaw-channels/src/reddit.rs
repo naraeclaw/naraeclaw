@@ -60,7 +60,7 @@ struct RedditItemData {
 
 const REDDIT_API_BASE: &str = "https://oauth.reddit.com";
 const REDDIT_TOKEN_URL: &str = "https://www.reddit.com/api/v1/access_token";
-const USER_AGENT: &str = "zeroclaw:channel:v0.1.0 (by /u/zeroclaw-bot)";
+const USER_AGENT: &str = "naraeclaw:channel:v0.1.0 (by /u/naraeclaw-bot)";
 /// Reddit enforces 60 requests per minute.
 const POLL_INTERVAL: Duration = Duration::from_secs(5);
 

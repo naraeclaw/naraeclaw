@@ -69,7 +69,7 @@ impl McpServer {
                 "protocolVersion": MCP_PROTOCOL_VERSION,
                 "capabilities": {},
                 "clientInfo": {
-                    "name": "zeroclaw",
+                    "name": "naraeclaw",
                     "version": env!("CARGO_PKG_VERSION")
                 }
             }),

@@ -225,7 +225,7 @@ impl AcpServer {
         Ok(serde_json::json!({
             "protocolVersion": "1.0",
             "serverInfo": {
-                "name": "zeroclaw-acp",
+                "name": "naraeclaw-acp",
                 "version": env!("CARGO_PKG_VERSION"),
             },
             "capabilities": {

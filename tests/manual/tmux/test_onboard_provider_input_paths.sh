@@ -3,8 +3,8 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
-BIN_PATH="${1:-$ROOT_DIR/target/debug/zeroclaw}"
-TMP_ROOT="/tmp/zeroclaw-tmux-onboard-$$"
+BIN_PATH="${1:-$ROOT_DIR/target/debug/naraeclaw}"
+TMP_ROOT="/tmp/naraeclaw-tmux-onboard-$$"
 
 cleanup() {
   tmux kill-session -t "zc_full_$$_custom" >/dev/null 2>&1 || true
@@ -19,8 +19,8 @@ if ! command -v tmux >/dev/null 2>&1; then
 fi
 
 if [[ ! -x "$BIN_PATH" ]]; then
-  echo "Building zeroclaw..."
-  cargo build --bin zeroclaw >/dev/null
+  echo "Building naraeclaw..."
+  cargo build --bin naraeclaw >/dev/null
 fi
 
 mkdir -p "$TMP_ROOT"
