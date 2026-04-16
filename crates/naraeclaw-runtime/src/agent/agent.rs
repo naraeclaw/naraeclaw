@@ -1641,14 +1641,12 @@ mod tests {
         let workspace_dir = tmp.path().join("workspace");
         std::fs::create_dir_all(&workspace_dir).unwrap();
 
-        let mut config = naraeclaw_config::schema::Config {
-            workspace_dir,
-            config_path: tmp.path().join("config.toml"),
-            api_key: Some("test-key".to_string()),
-            default_provider: Some(format!("custom:http://{addr}")),
-            default_model: Some("test-model".to_string()),
-            ..naraeclaw_config::schema::Config::default()
-        };
+        let mut config = naraeclaw_config::schema::Config::default();
+        config.workspace_dir = workspace_dir;
+        config.config_path = tmp.path().join("config.toml");
+        config.api_key = Some("test-key".to_string());
+        config.default_provider = Some(format!("custom:http://{addr}"));
+        config.default_model = Some("test-model".to_string());
         config.memory.backend = "none".to_string();
         config.memory.auto_save = false;
         config.extra_headers.insert(

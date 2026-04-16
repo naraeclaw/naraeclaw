@@ -118,8 +118,6 @@ mod observability;
 mod onboard;
 #[cfg(feature = "agent-runtime")]
 mod platform;
-#[cfg(feature = "plugins-wasm")]
-mod plugins;
 mod providers;
 #[cfg(feature = "agent-runtime")]
 mod security;
@@ -592,13 +590,6 @@ Enum 필드는 값 생략 시 대화형 선택을 제공합니다.
         #[command(subcommand)]
         props_command: PropsCommands,
     },
-
-    /// Manage WASM plugins
-    #[cfg(feature = "plugins-wasm")]
-    Plugin {
-        #[command(subcommand)]
-        plugin_command: PluginCommands,
-    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -637,28 +628,6 @@ enum PropsCommands {
     Complete {
         /// Partial path to complete
         partial: Option<String>,
-    },
-}
-
-#[cfg(feature = "plugins-wasm")]
-#[derive(Subcommand, Debug)]
-enum PluginCommands {
-    /// List installed plugins
-    List,
-    /// Install a plugin from a directory or URL
-    Install {
-        /// Path to plugin directory or manifest
-        source: String,
-    },
-    /// Remove an installed plugin
-    Remove {
-        /// Plugin name
-        name: String,
-    },
-    /// Show information about a plugin
-    Info {
-        /// Plugin name
-        name: String,
     },
 }
 
@@ -1914,56 +1883,6 @@ async fn main() -> Result<()> {
                     if entry.name.starts_with(prefix) {
                         println!("{}", entry.name);
                     }
-                }
-                Ok(())
-            }
-        },
-
-        #[cfg(feature = "plugins-wasm")]
-        Commands::Plugin { plugin_command } => match plugin_command {
-            PluginCommands::List => {
-                let host = naraeclaw::plugins::host::PluginHost::new(&config.workspace_dir)?;
-                let plugins = host.list_plugins();
-                if plugins.is_empty() {
-                    println!("No plugins installed.");
-                } else {
-                    println!("Installed plugins:");
-                    for p in &plugins {
-                        println!(
-                            "  {} v{} — {}",
-                            p.name,
-                            p.version,
-                            p.description.as_deref().unwrap_or("(no description)")
-                        );
-                    }
-                }
-                Ok(())
-            }
-            PluginCommands::Install { source } => {
-                let mut host = naraeclaw::plugins::host::PluginHost::new(&config.workspace_dir)?;
-                host.install(&source)?;
-                println!("Plugin installed from {source}");
-                Ok(())
-            }
-            PluginCommands::Remove { name } => {
-                let mut host = naraeclaw::plugins::host::PluginHost::new(&config.workspace_dir)?;
-                host.remove(&name)?;
-                println!("Plugin '{name}' removed.");
-                Ok(())
-            }
-            PluginCommands::Info { name } => {
-                let host = naraeclaw::plugins::host::PluginHost::new(&config.workspace_dir)?;
-                match host.get_plugin(&name) {
-                    Some(info) => {
-                        println!("Plugin: {} v{}", info.name, info.version);
-                        if let Some(desc) = &info.description {
-                            println!("Description: {desc}");
-                        }
-                        println!("Capabilities: {:?}", info.capabilities);
-                        println!("Permissions: {:?}", info.permissions);
-                        println!("WASM: {}", info.wasm_path.display());
-                    }
-                    None => println!("Plugin '{name}' not found."),
                 }
                 Ok(())
             }

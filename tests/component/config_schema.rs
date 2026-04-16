@@ -137,14 +137,12 @@ fn gateway_config_idempotency_defaults() {
 
 #[test]
 fn gateway_config_toml_roundtrip() {
-    let gw = GatewayConfig {
-        port: 8080,
-        host: "0.0.0.0".into(),
-        require_pairing: false,
-        pair_rate_limit_per_minute: 5,
-        path_prefix: Some("/zeroclaw".into()),
-        ..Default::default()
-    };
+    let mut gw = GatewayConfig::default();
+    gw.port = 8080;
+    gw.host = "0.0.0.0".into();
+    gw.require_pairing = false;
+    gw.pair_rate_limit_per_minute = 5;
+    gw.path_prefix = Some("/zeroclaw".into());
 
     let toml_str = toml::to_string(&gw).expect("gateway config should serialize");
     let parsed: GatewayConfig = toml::from_str(&toml_str).expect("should deserialize back");
@@ -483,7 +481,7 @@ allowed_numbers = ["*"]
     let parsed: Config = toml::from_str(toml_str)
         .expect("top-level [cli] section with [channels_config.whatsapp] should parse");
     assert!(parsed.channels_config.whatsapp.is_some());
-    let wa = parsed.channels_config.whatsapp.unwrap();
+    let wa = parsed.channels_config.whatsapp.as_ref().unwrap();
     assert_eq!(
         wa.session_path.as_deref(),
         Some("~/.naraeclaw/state/whatsapp-web/session.db")

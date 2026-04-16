@@ -1884,6 +1884,8 @@ impl_enum_prop_kind!(
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::field_reassign_with_default)]
+
     use super::*;
     use std::io;
     #[cfg(unix)]
@@ -2365,16 +2367,13 @@ auto_save = true
                 slack: None,
                 mattermost: None,
                 webhook: None,
-                imessage: None,
                 matrix: None,
                 signal: None,
                 whatsapp: None,
-                linq: None,
                 wati: None,
                 nextcloud_talk: None,
                 email: None,
                 gmail_push: None,
-                irc: None,
                 line: None,
                 twitter: None,
                 #[cfg(feature = "channel-nostr")]
@@ -3119,42 +3118,6 @@ default_temperature = 0.7
         assert!(parsed.guild_id.is_none());
     }
 
-    // ── iMessage / Matrix config ────────────────────────────
-
-    #[test]
-    async fn imessage_config_serde() {
-        let ic = IMessageConfig {
-            enabled: true,
-            allowed_contacts: vec!["+1234567890".into(), "user@icloud.com".into()],
-        };
-        let json = serde_json::to_string(&ic).unwrap();
-        let parsed: IMessageConfig = serde_json::from_str(&json).unwrap();
-        assert_eq!(parsed.allowed_contacts.len(), 2);
-        assert_eq!(parsed.allowed_contacts[0], "+1234567890");
-    }
-
-    #[test]
-    async fn imessage_config_empty_contacts() {
-        let ic = IMessageConfig {
-            enabled: true,
-            allowed_contacts: vec![],
-        };
-        let json = serde_json::to_string(&ic).unwrap();
-        let parsed: IMessageConfig = serde_json::from_str(&json).unwrap();
-        assert!(parsed.allowed_contacts.is_empty());
-    }
-
-    #[test]
-    async fn imessage_config_wildcard() {
-        let ic = IMessageConfig {
-            enabled: true,
-            allowed_contacts: vec!["*".into()],
-        };
-        let toml_str = toml::to_string(&ic).unwrap();
-        let parsed: IMessageConfig = toml::from_str(&toml_str).unwrap();
-        assert_eq!(parsed.allowed_contacts, vec!["*"]);
-    }
-
     #[test]
     async fn matrix_config_serde() {
         let mc = MatrixConfig {
@@ -3273,73 +3236,8 @@ allowed_users = ["@ops:matrix.org"]
     }
 
     #[test]
-    async fn channels_config_with_imessage_and_matrix() {
-        let c = ChannelsConfig {
-            cli: true,
-            telegram: None,
-            discord: None,
-            discord_history: None,
-            slack: None,
-            mattermost: None,
-            webhook: None,
-            imessage: Some(IMessageConfig {
-                enabled: true,
-                allowed_contacts: vec!["+1".into()],
-            }),
-            matrix: Some(MatrixConfig {
-                enabled: true,
-                homeserver: "https://m.org".into(),
-                access_token: "tok".into(),
-                user_id: None,
-                device_id: None,
-                room_id: "!r:m".into(),
-                allowed_users: vec!["@u:m".into()],
-                allowed_rooms: vec![],
-                interrupt_on_new_message: false,
-                stream_mode: StreamMode::default(),
-                draft_update_interval_ms: 1500,
-                multi_message_delay_ms: 800,
-                recovery_key: None,
-            }),
-            signal: None,
-            whatsapp: None,
-            linq: None,
-            wati: None,
-            nextcloud_talk: None,
-            email: None,
-            gmail_push: None,
-            irc: None,
-            line: None,
-            twitter: None,
-            #[cfg(feature = "channel-nostr")]
-            nostr: None,
-            clawdtalk: None,
-            reddit: None,
-            bluesky: None,
-            voice_call: None,
-            #[cfg(feature = "voice-wake")]
-            voice_wake: None,
-            mqtt: None,
-            message_timeout_secs: 300,
-            ack_reactions: true,
-            show_tool_calls: true,
-            session_persistence: true,
-            session_backend: default_session_backend(),
-            session_ttl_hours: 0,
-            debounce_ms: 0,
-        };
-        let toml_str = toml::to_string_pretty(&c).unwrap();
-        let parsed: ChannelsConfig = toml::from_str(&toml_str).unwrap();
-        assert!(parsed.imessage.is_some());
-        assert!(parsed.matrix.is_some());
-        assert_eq!(parsed.imessage.unwrap().allowed_contacts, vec!["+1"]);
-        assert_eq!(parsed.matrix.unwrap().homeserver, "https://m.org");
-    }
-
-    #[test]
-    async fn channels_config_default_has_no_imessage_matrix() {
+    async fn channels_config_default_has_no_matrix() {
         let c = ChannelsConfig::default();
-        assert!(c.imessage.is_none());
         assert!(c.matrix.is_none());
     }
 
@@ -3656,7 +3554,6 @@ channel_ids = ["C123", "D456"]
             slack: None,
             mattermost: None,
             webhook: None,
-            imessage: None,
             matrix: None,
             signal: None,
             whatsapp: Some(WhatsAppConfig {
@@ -3678,12 +3575,10 @@ channel_ids = ["C123", "D456"]
                 group_mention_patterns: vec![],
                 proxy_url: None,
             }),
-            linq: None,
             wati: None,
             nextcloud_talk: None,
             email: None,
             gmail_push: None,
-            irc: None,
             line: None,
             twitter: None,
             #[cfg(feature = "channel-nostr")]

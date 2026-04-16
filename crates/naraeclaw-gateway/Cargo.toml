@@ -16,7 +16,6 @@ naraeclaw-providers.workspace = true
 naraeclaw-channels = { workspace = true, default-features = true, features = ["channel-email", "channel-telegram"] }
 naraeclaw-runtime.workspace = true
 naraeclaw-tools.workspace = true
-naraeclaw-plugins = { workspace = true, optional = true }
 
 # HTTP server
 axum = { version = "0.8", default-features = false, features = ["http1", "json", "tokio", "query", "ws", "macros"] }
@@ -71,9 +70,7 @@ tokio = { version = "1.52", features = ["rt-multi-thread", "macros"] }
 
 [features]
 default = []
-plugins-wasm = ["dep:naraeclaw-plugins"]
 webauthn = ["naraeclaw-runtime/webauthn"]
 observability-prometheus = ["naraeclaw-runtime/observability-prometheus"]
-channel-linq = ["naraeclaw-channels/channel-linq"]
 channel-nostr = ["naraeclaw-channels/channel-nostr"]
 channel-wati = ["naraeclaw-channels/channel-wati"]

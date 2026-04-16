@@ -214,14 +214,12 @@ mod tests {
         let ca_key_clone = rcgen::KeyPair::from_pem(&ca_key.serialize_pem()).unwrap();
         let mut ca_params = rcgen::CertificateParams::new(vec!["Test CA".into()]).unwrap();
         ca_params.is_ca = rcgen::IsCa::Ca(rcgen::BasicConstraints::Unconstrained);
-        let ca = ca_params.self_signed(&ca_key_clone).unwrap();
+        let ca_issuer = rcgen::Issuer::from_params(&ca_params, &ca_key_clone);
 
         let mut server_params = rcgen::CertificateParams::new(vec!["localhost".into()]).unwrap();
         server_params.is_ca = rcgen::IsCa::NoCa;
         let server_key = rcgen::KeyPair::generate().unwrap();
-        let server_cert = server_params
-            .signed_by(&server_key, &ca, &ca_key_clone)
-            .unwrap();
+        let server_cert = server_params.signed_by(&server_key, &ca_issuer).unwrap();
         let _ = ca_cert_pem;
         (server_cert.pem(), server_key.serialize_pem())
     }

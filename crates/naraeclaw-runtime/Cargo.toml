@@ -13,7 +13,6 @@ naraeclaw-config.workspace = true
 naraeclaw-providers.workspace = true
 naraeclaw-memory.workspace = true
 naraeclaw-tools.workspace = true
-naraeclaw-plugins = { workspace = true, optional = true }
 naraeclaw-tool-call-parser.workspace = true
 anyhow = "1.0"
 async-trait = "0.1"
@@ -96,7 +95,6 @@ schema-export = ["dep:schemars", "naraeclaw-config/schema-export"]
 channel-nostr = ["naraeclaw-config/channel-nostr"]
 browser-native = []
 rag-pdf = ["dep:pdf-extract"]
-plugins-wasm = ["dep:naraeclaw-plugins"]
 webauthn = []
 sandbox-bubblewrap = []
 

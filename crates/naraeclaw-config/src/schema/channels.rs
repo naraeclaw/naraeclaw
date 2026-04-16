@@ -55,9 +55,6 @@ pub struct ChannelsConfig {
     /// Webhook channel configuration.
     #[nested]
     pub webhook: Option<WebhookConfig>,
-    /// iMessage channel configuration (macOS only).
-    #[nested]
-    pub imessage: Option<IMessageConfig>,
     /// Matrix channel configuration.
     #[nested]
     pub matrix: Option<MatrixConfig>,
@@ -67,9 +64,6 @@ pub struct ChannelsConfig {
     /// WhatsApp channel configuration (Cloud API or Web mode).
     #[nested]
     pub whatsapp: Option<WhatsAppConfig>,
-    /// Linq Partner API channel configuration.
-    #[nested]
-    pub linq: Option<LinqConfig>,
     /// WATI WhatsApp Business API channel configuration.
     #[nested]
     pub wati: Option<WatiConfig>,
@@ -82,9 +76,6 @@ pub struct ChannelsConfig {
     /// Gmail Pub/Sub push notification channel configuration.
     #[nested]
     pub gmail_push: Option<crate::scattered_types::GmailPushConfig>,
-    /// IRC channel configuration.
-    #[nested]
-    pub irc: Option<IrcConfig>,
     /// LINE Messaging API channel configuration.
     #[nested]
     pub line: Option<LineConfig>,
@@ -195,10 +186,6 @@ impl ChannelsConfig {
                 self.mattermost.is_some(),
             ),
             (
-                Box::new(ConfigWrapper::new(self.imessage.as_ref())),
-                self.imessage.is_some(),
-            ),
-            (
                 Box::new(ConfigWrapper::new(self.matrix.as_ref())),
                 self.matrix.is_some(),
             ),
@@ -209,10 +196,6 @@ impl ChannelsConfig {
             (
                 Box::new(ConfigWrapper::new(self.whatsapp.as_ref())),
                 self.whatsapp.is_some(),
-            ),
-            (
-                Box::new(ConfigWrapper::new(self.linq.as_ref())),
-                self.linq.is_some(),
             ),
             (
                 Box::new(ConfigWrapper::new(self.wati.as_ref())),
@@ -229,10 +212,6 @@ impl ChannelsConfig {
             (
                 Box::new(ConfigWrapper::new(self.gmail_push.as_ref())),
                 self.gmail_push.is_some(),
-            ),
-            (
-                Box::new(ConfigWrapper::new(self.irc.as_ref())),
-                self.irc.is_some()
             ),
             #[cfg(feature = "channel-nostr")]
             (
@@ -291,16 +270,13 @@ impl Default for ChannelsConfig {
             slack: None,
             mattermost: None,
             webhook: None,
-            imessage: None,
             matrix: None,
             signal: None,
             whatsapp: None,
-            linq: None,
             wati: None,
             nextcloud_talk: None,
             email: None,
             gmail_push: None,
-            irc: None,
             line: None,
             twitter: None,
             #[cfg(feature = "channel-nostr")]
@@ -676,27 +652,6 @@ impl ChannelConfig for WebhookConfig {
     }
 }
 
-/// iMessage channel configuration (macOS only).
-#[derive(Debug, Clone, Default, Serialize, Deserialize, Configurable)]
-#[cfg_attr(feature = "schema-export", derive(schemars::JsonSchema))]
-#[prefix = "channels.imessage"]
-pub struct IMessageConfig {
-    /// Whether this channel is active (must be explicitly enabled). Default: false.
-    #[serde(default)]
-    pub enabled: bool,
-    /// Allowed iMessage contacts (phone numbers or email addresses). Empty = deny all.
-    pub allowed_contacts: Vec<String>,
-}
-
-impl ChannelConfig for IMessageConfig {
-    fn name() -> &'static str {
-        "iMessage"
-    }
-    fn desc() -> &'static str {
-        "macOS only"
-    }
-}
-
 /// Matrix channel configuration.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, Configurable)]
 #[cfg_attr(feature = "schema-export", derive(schemars::JsonSchema))]
@@ -920,36 +875,6 @@ impl ChannelConfig for WhatsAppConfig {
     }
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize, Configurable)]
-#[cfg_attr(feature = "schema-export", derive(schemars::JsonSchema))]
-#[prefix = "channels.linq"]
-pub struct LinqConfig {
-    /// Whether this channel is active (must be explicitly enabled). Default: false.
-    #[serde(default)]
-    pub enabled: bool,
-    /// Linq Partner API token (Bearer auth)
-    #[secret]
-    pub api_token: String,
-    /// Phone number to send from (E.164 format)
-    pub from_phone: String,
-    /// Webhook signing secret for signature verification
-    #[serde(default)]
-    #[secret]
-    pub signing_secret: Option<String>,
-    /// Allowed sender handles (phone numbers) or "*" for all
-    #[serde(default)]
-    pub allowed_senders: Vec<String>,
-}
-
-impl ChannelConfig for LinqConfig {
-    fn name() -> &'static str {
-        "Linq"
-    }
-    fn desc() -> &'static str {
-        "iMessage/RCS/SMS via Linq API"
-    }
-}
-
 /// WATI WhatsApp Business API channel configuration.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, Configurable)]
 #[cfg_attr(feature = "schema-export", derive(schemars::JsonSchema))]
@@ -1167,55 +1092,6 @@ pub fn default_mqtt_qos() -> u8 {
 
 pub fn default_mqtt_keep_alive_secs() -> u64 {
     30
-}
-
-/// IRC channel configuration.
-#[derive(Debug, Clone, Default, Serialize, Deserialize, Configurable)]
-#[cfg_attr(feature = "schema-export", derive(schemars::JsonSchema))]
-#[prefix = "channels.irc"]
-pub struct IrcConfig {
-    /// Whether this channel is active (must be explicitly enabled). Default: false.
-    #[serde(default)]
-    pub enabled: bool,
-    /// IRC server hostname
-    pub server: String,
-    /// IRC server port (default: 6697 for TLS)
-    #[serde(default = "default_irc_port")]
-    pub port: u16,
-    /// Bot nickname
-    pub nickname: String,
-    /// Username (defaults to nickname if not set)
-    pub username: Option<String>,
-    /// Channels to join on connect
-    #[serde(default)]
-    pub channels: Vec<String>,
-    /// Allowed nicknames (case-insensitive) or "*" for all
-    #[serde(default)]
-    pub allowed_users: Vec<String>,
-    /// Server password (for bouncers like ZNC)
-    #[secret]
-    pub server_password: Option<String>,
-    /// NickServ IDENTIFY password
-    #[secret]
-    pub nickserv_password: Option<String>,
-    /// SASL PLAIN password (IRCv3)
-    #[secret]
-    pub sasl_password: Option<String>,
-    /// Verify TLS certificate (default: true)
-    pub verify_tls: Option<bool>,
-}
-
-impl ChannelConfig for IrcConfig {
-    fn name() -> &'static str {
-        "IRC"
-    }
-    fn desc() -> &'static str {
-        "IRC over TLS"
-    }
-}
-
-pub fn default_irc_port() -> u16 {
-    6697
 }
 
 /// DM (1:1 chat) access policy for the LINE channel.

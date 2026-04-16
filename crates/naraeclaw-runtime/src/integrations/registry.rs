@@ -81,18 +81,6 @@ pub fn all_integrations() -> Vec<IntegrationEntry> {
             },
         },
         IntegrationEntry {
-            name: "iMessage",
-            description: "macOS AppleScript bridge",
-            category: IntegrationCategory::Chat,
-            status_fn: |c| {
-                if c.channels_config.imessage.is_some() {
-                    IntegrationStatus::Active
-                } else {
-                    IntegrationStatus::Available
-                }
-            },
-        },
-        IntegrationEntry {
             name: "Microsoft Teams",
             description: "Enterprise chat support",
             category: IntegrationCategory::Chat,
@@ -725,7 +713,7 @@ pub fn all_integrations() -> Vec<IntegrationEntry> {
 mod tests {
     use super::*;
     use naraeclaw_config::schema::Config;
-    use naraeclaw_config::schema::{IMessageConfig, MatrixConfig, StreamMode, TelegramConfig};
+    use naraeclaw_config::schema::{MatrixConfig, StreamMode, TelegramConfig};
 
     #[test]
     fn registry_has_entries() {
@@ -811,29 +799,6 @@ mod tests {
         let tg = entries.iter().find(|e| e.name == "Telegram").unwrap();
         assert!(matches!(
             (tg.status_fn)(&config),
-            IntegrationStatus::Available
-        ));
-    }
-
-    #[test]
-    fn imessage_active_when_configured() {
-        let mut config = Config::default();
-        config.channels_config.imessage = Some(IMessageConfig {
-            enabled: true,
-            allowed_contacts: vec!["*".into()],
-        });
-        let entries = all_integrations();
-        let im = entries.iter().find(|e| e.name == "iMessage").unwrap();
-        assert!(matches!((im.status_fn)(&config), IntegrationStatus::Active));
-    }
-
-    #[test]
-    fn imessage_available_when_not_configured() {
-        let config = Config::default();
-        let entries = all_integrations();
-        let im = entries.iter().find(|e| e.name == "iMessage").unwrap();
-        assert!(matches!(
-            (im.status_fn)(&config),
             IntegrationStatus::Available
         ));
     }

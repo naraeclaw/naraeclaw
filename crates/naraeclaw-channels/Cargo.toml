@@ -86,13 +86,10 @@ channel-discord = []
 channel-slack = []
 channel-signal = []
 channel-mattermost = []
-channel-irc = []
-channel-imessage = []
 channel-bluesky = []
 channel-twitter = []
 channel-reddit = []
 channel-notion = []
-channel-linq = []
 channel-wati = []
 channel-nextcloud = []
 channel-clawdtalk = []
@@ -103,9 +100,8 @@ channel-acp-server = []
 
 # Optional channel bundles for non-default integrations.
 channels-social = ["channel-bluesky", "channel-twitter", "channel-reddit"]
-channels-legacy = ["channel-irc", "channel-imessage", "channel-linq"]
 channels-full = [
-    "channels-social", "channels-legacy",
+    "channels-social",
     "channel-clawdtalk", "channel-voice-call",
 ]
 
