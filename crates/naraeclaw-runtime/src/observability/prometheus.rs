@@ -56,13 +56,16 @@ impl PrometheusObserver {
         let registry = Registry::new();
 
         let agent_starts = IntCounterVec::new(
-            prometheus::Opts::new("zeroclaw_agent_starts_total", "Total agent invocations"),
+            prometheus::Opts::new("naraeclaw_agent_starts_total", "Total agent invocations"),
             &["provider", "model"],
         )
         .expect("valid metric");
 
         let llm_requests = IntCounterVec::new(
-            prometheus::Opts::new("zeroclaw_llm_requests_total", "Total LLM provider requests"),
+            prometheus::Opts::new(
+                "naraeclaw_llm_requests_total",
+                "Total LLM provider requests",
+            ),
             &["provider", "model", "success"],
         )
         .expect("valid metric");
@@ -86,42 +89,45 @@ impl PrometheusObserver {
         .expect("valid metric");
 
         let tool_calls = IntCounterVec::new(
-            prometheus::Opts::new("zeroclaw_tool_calls_total", "Total tool calls"),
+            prometheus::Opts::new("naraeclaw_tool_calls_total", "Total tool calls"),
             &["tool", "success"],
         )
         .expect("valid metric");
 
         let channel_messages = IntCounterVec::new(
-            prometheus::Opts::new("zeroclaw_channel_messages_total", "Total channel messages"),
+            prometheus::Opts::new("naraeclaw_channel_messages_total", "Total channel messages"),
             &["channel", "direction"],
         )
         .expect("valid metric");
 
         let heartbeat_ticks =
-            prometheus::IntCounter::new("zeroclaw_heartbeat_ticks_total", "Total heartbeat ticks")
+            prometheus::IntCounter::new("naraeclaw_heartbeat_ticks_total", "Total heartbeat ticks")
                 .expect("valid metric");
 
         let errors = IntCounterVec::new(
-            prometheus::Opts::new("zeroclaw_errors_total", "Total errors by component"),
+            prometheus::Opts::new("naraeclaw_errors_total", "Total errors by component"),
             &["component"],
         )
         .expect("valid metric");
 
         let cache_hits = IntCounterVec::new(
-            prometheus::Opts::new("zeroclaw_cache_hits_total", "Total response cache hits"),
+            prometheus::Opts::new("naraeclaw_cache_hits_total", "Total response cache hits"),
             &["cache_type"],
         )
         .expect("valid metric");
 
         let cache_misses = IntCounterVec::new(
-            prometheus::Opts::new("zeroclaw_cache_misses_total", "Total response cache misses"),
+            prometheus::Opts::new(
+                "naraeclaw_cache_misses_total",
+                "Total response cache misses",
+            ),
             &["cache_type"],
         )
         .expect("valid metric");
 
         let cache_tokens_saved = IntCounterVec::new(
             prometheus::Opts::new(
-                "zeroclaw_cache_tokens_saved_total",
+                "naraeclaw_cache_tokens_saved_total",
                 "Total tokens saved by response cache",
             ),
             &["cache_type"],
@@ -130,7 +136,7 @@ impl PrometheusObserver {
 
         let agent_duration = HistogramVec::new(
             HistogramOpts::new(
-                "zeroclaw_agent_duration_seconds",
+                "naraeclaw_agent_duration_seconds",
                 "Agent invocation duration in seconds",
             )
             .buckets(vec![0.1, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0, 60.0]),
@@ -140,7 +146,7 @@ impl PrometheusObserver {
 
         let tool_duration = HistogramVec::new(
             HistogramOpts::new(
-                "zeroclaw_tool_duration_seconds",
+                "naraeclaw_tool_duration_seconds",
                 "Tool execution duration in seconds",
             )
             .buckets(vec![0.01, 0.05, 0.1, 0.5, 1.0, 5.0, 10.0]),
@@ -150,7 +156,7 @@ impl PrometheusObserver {
 
         let request_latency = Histogram::with_opts(
             HistogramOpts::new(
-                "zeroclaw_request_latency_seconds",
+                "naraeclaw_request_latency_seconds",
                 "Request latency in seconds",
             )
             .buckets(vec![0.01, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]),
@@ -164,26 +170,26 @@ impl PrometheusObserver {
         .expect("valid metric");
 
         let active_sessions = GaugeVec::new(
-            prometheus::Opts::new("zeroclaw_active_sessions", "Number of active sessions"),
+            prometheus::Opts::new("naraeclaw_active_sessions", "Number of active sessions"),
             &[],
         )
         .expect("valid metric");
 
         let queue_depth = GaugeVec::new(
-            prometheus::Opts::new("zeroclaw_queue_depth", "Message queue depth"),
+            prometheus::Opts::new("naraeclaw_queue_depth", "Message queue depth"),
             &[],
         )
         .expect("valid metric");
 
         let hand_runs = IntCounterVec::new(
-            prometheus::Opts::new("zeroclaw_hand_runs_total", "Total hand runs by outcome"),
+            prometheus::Opts::new("naraeclaw_hand_runs_total", "Total hand runs by outcome"),
             &["hand", "success"],
         )
         .expect("valid metric");
 
         let hand_duration = HistogramVec::new(
             HistogramOpts::new(
-                "zeroclaw_hand_duration_seconds",
+                "naraeclaw_hand_duration_seconds",
                 "Hand run duration in seconds",
             )
             .buckets(vec![0.1, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0, 60.0]),
@@ -193,7 +199,7 @@ impl PrometheusObserver {
 
         let hand_findings = IntCounterVec::new(
             prometheus::Opts::new(
-                "zeroclaw_hand_findings_total",
+                "naraeclaw_hand_findings_total",
                 "Total findings produced by hand runs",
             ),
             &["hand"],
@@ -201,14 +207,14 @@ impl PrometheusObserver {
         .expect("valid metric");
 
         let deployments_total = IntCounterVec::new(
-            prometheus::Opts::new("zeroclaw_deployments_total", "Total deployments by status"),
+            prometheus::Opts::new("naraeclaw_deployments_total", "Total deployments by status"),
             &["status"],
         )
         .expect("valid metric");
 
         let deployment_lead_time = Histogram::with_opts(
             HistogramOpts::new(
-                "zeroclaw_deployment_lead_time_seconds",
+                "naraeclaw_deployment_lead_time_seconds",
                 "Deployment lead time from commit to deploy in seconds",
             )
             .buckets(vec![
@@ -218,14 +224,14 @@ impl PrometheusObserver {
         .expect("valid metric");
 
         let deployment_failure_rate = prometheus::Gauge::new(
-            "zeroclaw_deployment_failure_rate",
+            "naraeclaw_deployment_failure_rate",
             "Ratio of failed deployments to total deployments",
         )
         .expect("valid metric");
 
         let recovery_time = Histogram::with_opts(
             HistogramOpts::new(
-                "zeroclaw_recovery_time_seconds",
+                "naraeclaw_recovery_time_seconds",
                 "Time to recover from a failed deployment in seconds",
             )
             .buckets(vec![
@@ -235,7 +241,7 @@ impl PrometheusObserver {
         .expect("valid metric");
 
         let mttr =
-            prometheus::Gauge::new("zeroclaw_mttr_seconds", "Mean time to recovery in seconds")
+            prometheus::Gauge::new("naraeclaw_mttr_seconds", "Mean time to recovery in seconds")
                 .expect("valid metric");
 
         // Register all metrics
@@ -600,10 +606,10 @@ mod tests {
         obs.record_metric(&ObserverMetric::RequestLatency(Duration::from_millis(250)));
 
         let output = obs.encode();
-        assert!(output.contains("zeroclaw_agent_starts_total"));
-        assert!(output.contains("zeroclaw_tool_calls_total"));
-        assert!(output.contains("zeroclaw_heartbeat_ticks_total"));
-        assert!(output.contains("zeroclaw_request_latency_seconds"));
+        assert!(output.contains("naraeclaw_agent_starts_total"));
+        assert!(output.contains("naraeclaw_tool_calls_total"));
+        assert!(output.contains("naraeclaw_heartbeat_ticks_total"));
+        assert!(output.contains("naraeclaw_request_latency_seconds"));
     }
 
     #[test]
@@ -615,7 +621,7 @@ mod tests {
         }
 
         let output = obs.encode();
-        assert!(output.contains("zeroclaw_heartbeat_ticks_total 3"));
+        assert!(output.contains("naraeclaw_heartbeat_ticks_total 3"));
     }
 
     #[test]
@@ -639,8 +645,8 @@ mod tests {
         });
 
         let output = obs.encode();
-        assert!(output.contains(r#"zeroclaw_tool_calls_total{success="true",tool="shell"} 2"#));
-        assert!(output.contains(r#"zeroclaw_tool_calls_total{success="false",tool="shell"} 1"#));
+        assert!(output.contains(r#"naraeclaw_tool_calls_total{success="true",tool="shell"} 2"#));
+        assert!(output.contains(r#"naraeclaw_tool_calls_total{success="false",tool="shell"} 1"#));
     }
 
     #[test]
@@ -660,8 +666,8 @@ mod tests {
         });
 
         let output = obs.encode();
-        assert!(output.contains(r#"zeroclaw_errors_total{component="provider"} 2"#));
-        assert!(output.contains(r#"zeroclaw_errors_total{component="channels"} 1"#));
+        assert!(output.contains(r#"naraeclaw_errors_total{component="provider"} 2"#));
+        assert!(output.contains(r#"naraeclaw_errors_total{component="channels"} 1"#));
     }
 
     #[test]
@@ -699,7 +705,7 @@ mod tests {
 
         let output = obs.encode();
         assert!(output.contains(
-            r#"zeroclaw_llm_requests_total{model="claude-sonnet",provider="openrouter",success="true"} 2"#
+            r#"naraeclaw_llm_requests_total{model="claude-sonnet",provider="openrouter",success="true"} 2"#
         ));
         assert!(output.contains(
             r#"naraeclaw_tokens_input_total{model="claude-sonnet",provider="openrouter"} 300"#
@@ -730,10 +736,10 @@ mod tests {
         });
 
         let output = obs.encode();
-        assert!(output.contains(r#"zeroclaw_hand_runs_total{hand="review",success="true"} 2"#));
-        assert!(output.contains(r#"zeroclaw_hand_runs_total{hand="review",success="false"} 1"#));
-        assert!(output.contains(r#"zeroclaw_hand_findings_total{hand="review"} 4"#));
-        assert!(output.contains("zeroclaw_hand_duration_seconds"));
+        assert!(output.contains(r#"naraeclaw_hand_runs_total{hand="review",success="true"} 2"#));
+        assert!(output.contains(r#"naraeclaw_hand_runs_total{hand="review",success="false"} 1"#));
+        assert!(output.contains(r#"naraeclaw_hand_findings_total{hand="review"} 4"#));
+        assert!(output.contains("naraeclaw_hand_duration_seconds"));
     }
 
     #[test]
@@ -758,10 +764,10 @@ mod tests {
         });
 
         let output = obs.encode();
-        assert!(output.contains("zeroclaw_hand_duration_seconds"));
-        assert!(output.contains(r#"zeroclaw_hand_findings_total{hand="scan"} 5"#));
-        assert!(output.contains(r#"zeroclaw_hand_runs_total{hand="scan",success="true"} 1"#));
-        assert!(output.contains(r#"zeroclaw_hand_runs_total{hand="scan",success="false"} 1"#));
+        assert!(output.contains("naraeclaw_hand_duration_seconds"));
+        assert!(output.contains(r#"naraeclaw_hand_findings_total{hand="scan"} 5"#));
+        assert!(output.contains(r#"naraeclaw_hand_runs_total{hand="scan",success="true"} 1"#));
+        assert!(output.contains(r#"naraeclaw_hand_runs_total{hand="scan",success="false"} 1"#));
     }
 
     #[test]
@@ -780,7 +786,7 @@ mod tests {
 
         let output = obs.encode();
         assert!(output.contains(
-            r#"zeroclaw_llm_requests_total{model="llama3",provider="ollama",success="false"} 1"#
+            r#"naraeclaw_llm_requests_total{model="llama3",provider="ollama",success="false"} 1"#
         ));
         // Token counters should not appear (no data recorded)
         assert!(!output.contains("naraeclaw_tokens_input_total{"));
@@ -805,8 +811,8 @@ mod tests {
         });
 
         let output = obs.encode();
-        assert!(output.contains(r#"zeroclaw_deployments_total{status="success"} 2"#));
-        assert!(output.contains(r#"zeroclaw_deployments_total{status="failure"} 1"#));
+        assert!(output.contains(r#"naraeclaw_deployments_total{status="success"} 2"#));
+        assert!(output.contains(r#"naraeclaw_deployments_total{status="failure"} 1"#));
     }
 
     #[test]
@@ -824,7 +830,7 @@ mod tests {
 
         let output = obs.encode();
         // 1 failure out of 2 total = 0.5
-        assert!(output.contains("zeroclaw_deployment_failure_rate 0.5"));
+        assert!(output.contains("naraeclaw_deployment_failure_rate 0.5"));
     }
 
     #[test]
@@ -837,9 +843,9 @@ mod tests {
         obs.record_metric(&ObserverMetric::RecoveryTime(Duration::from_secs(600)));
 
         let output = obs.encode();
-        assert!(output.contains("zeroclaw_deployment_lead_time_seconds"));
-        assert!(output.contains("zeroclaw_recovery_time_seconds"));
-        assert!(output.contains("zeroclaw_mttr_seconds 600"));
+        assert!(output.contains("naraeclaw_deployment_lead_time_seconds"));
+        assert!(output.contains("naraeclaw_recovery_time_seconds"));
+        assert!(output.contains("naraeclaw_mttr_seconds 600"));
     }
 
     #[test]

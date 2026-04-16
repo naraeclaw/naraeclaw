@@ -304,8 +304,8 @@ fn runtime_config_store() -> &'static Mutex<HashMap<PathBuf, RuntimeConfigState>
 
 const SYSTEMD_STATUS_ARGS: [&str; 3] = ["--user", "is-active", "naraeclaw.service"];
 const SYSTEMD_RESTART_ARGS: [&str; 3] = ["--user", "restart", "naraeclaw.service"];
-const OPENRC_STATUS_ARGS: [&str; 2] = ["zeroclaw", "status"];
-const OPENRC_RESTART_ARGS: [&str; 2] = ["zeroclaw", "restart"];
+const OPENRC_STATUS_ARGS: [&str; 2] = ["naraeclaw", "status"];
+const OPENRC_RESTART_ARGS: [&str; 2] = ["naraeclaw", "restart"];
 
 #[derive(Clone, Copy)]
 #[allow(clippy::struct_excessive_bools)]
@@ -3827,7 +3827,7 @@ fn maybe_restart_managed_daemon_service() -> Result<bool> {
 
     if cfg!(target_os = "linux") {
         // OpenRC (system-wide) takes precedence over systemd (user-level)
-        let openrc_init_script = PathBuf::from("/etc/init.d/zeroclaw");
+        let openrc_init_script = PathBuf::from("/etc/init.d/naraeclaw");
         if openrc_init_script.exists()
             && let Ok(status_output) = Command::new("rc-service").args(OPENRC_STATUS_ARGS).output()
         {
@@ -10244,8 +10244,8 @@ This is an example JSON object for profile settings."#;
 
     #[test]
     fn maybe_restart_daemon_openrc_args_regression() {
-        assert_eq!(OPENRC_STATUS_ARGS, ["zeroclaw", "status"]);
-        assert_eq!(OPENRC_RESTART_ARGS, ["zeroclaw", "restart"]);
+        assert_eq!(OPENRC_STATUS_ARGS, ["naraeclaw", "status"]);
+        assert_eq!(OPENRC_RESTART_ARGS, ["naraeclaw", "restart"]);
     }
 
     #[test]
@@ -11229,7 +11229,7 @@ This is an example JSON object for profile settings."#;
 
     #[test]
     fn is_stop_command_matches_with_bot_suffix() {
-        assert!(is_stop_command("/stop@zeroclaw_bot"));
+        assert!(is_stop_command("/stop@naraeclaw_bot"));
     }
 
     #[test]
