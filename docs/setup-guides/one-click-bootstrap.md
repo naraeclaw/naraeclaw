@@ -1,6 +1,6 @@
 # One-Click Bootstrap
 
-This page defines the fastest supported path to install and initialize ZeroClaw.
+This page defines the fastest supported path to install and initialize NaraeClaw.
 
 Last verified: **February 20, 2026**.
 
@@ -50,7 +50,7 @@ To bypass pre-built flow and force source compilation:
 
 ## Dual-mode bootstrap
 
-Default behavior is **app-only** (build/install ZeroClaw) and expects existing Rust toolchain.
+Default behavior is **app-only** (build/install NaraeClaw) and expects existing Rust toolchain.
 
 For fresh machines, enable environment bootstrap explicitly:
 
@@ -84,8 +84,8 @@ If you run Option B outside a repository checkout, the install script automatica
 ./install.sh --docker
 ```
 
-This builds a local ZeroClaw image and launches onboarding inside a container while
-persisting config/workspace to `./.zeroclaw-docker`.
+This builds a local NaraeClaw image and launches onboarding inside a container while
+persisting config/workspace to `./.naraeclaw-docker`.
 
 Container CLI defaults to `docker`. If Docker CLI is unavailable and `podman` exists,
 the installer auto-falls back to `podman`. You can also set `ZEROCLAW_CONTAINER_CLI`
@@ -101,7 +101,7 @@ it pulls `ghcr.io/zeroclaw-labs/zeroclaw:latest` and tags it locally before runn
 ### Stopping and restarting a Docker/Podman container
 
 After `./install.sh --docker` finishes, the container exits. Your config and workspace
-are persisted in the data directory (default: `./.zeroclaw-docker`, or `~/.zeroclaw-docker`
+are persisted in the data directory (default: `./.naraeclaw-docker`, or `~/.naraeclaw-docker`
 when bootstrapping via `curl | bash`). You can override this path with `ZEROCLAW_DOCKER_DATA_DIR`.
 
 **Do not re-run `install.sh`** to restart -- it will rebuild the image and re-run onboarding.
@@ -109,8 +109,8 @@ Instead, start a new container from the existing image and mount the persisted d
 
 #### Using the repository docker-compose.yml
 
-The simplest way to run ZeroClaw long-term in Docker/Podman is with the provided
-`docker-compose.yml` at the repository root. It uses a named volume (`zeroclaw-data`)
+The simplest way to run NaraeClaw long-term in Docker/Podman is with the provided
+`docker-compose.yml` at the repository root. It uses a named volume (`naraeclaw-data`)
 and sets `restart: unless-stopped` so the container survives reboots.
 
 ```bash
@@ -128,17 +128,17 @@ Replace `docker` with `podman` if you use Podman.
 
 #### Manual container run (using install.sh data directory)
 
-If you installed via `./install.sh --docker` and want to reuse the `.zeroclaw-docker`
+If you installed via `./install.sh --docker` and want to reuse the `.naraeclaw-docker`
 data directory without compose:
 
 ```bash
 # Docker
 docker run -d --name zeroclaw \
   --restart unless-stopped \
-  -v "$PWD/.zeroclaw-docker/.zeroclaw:/zeroclaw-data/.zeroclaw" \
-  -v "$PWD/.zeroclaw-docker/workspace:/zeroclaw-data/workspace" \
-  -e HOME=/zeroclaw-data \
-  -e ZEROCLAW_WORKSPACE=/zeroclaw-data/workspace \
+  -v "$PWD/.naraeclaw-docker/.naraeclaw:/naraeclaw-data/.naraeclaw" \
+  -v "$PWD/.naraeclaw-docker/workspace:/naraeclaw-data/workspace" \
+  -e HOME=/naraeclaw-data \
+  -e NARAECLAW_WORKSPACE=/naraeclaw-data/workspace \
   -p 42617:42617 \
   zeroclaw-bootstrap:local \
   gateway
@@ -148,10 +148,10 @@ podman run -d --name zeroclaw \
   --restart unless-stopped \
   --userns keep-id \
   --user "$(id -u):$(id -g)" \
-  -v "$PWD/.zeroclaw-docker/.zeroclaw:/zeroclaw-data/.zeroclaw:Z" \
-  -v "$PWD/.zeroclaw-docker/workspace:/zeroclaw-data/workspace:Z" \
-  -e HOME=/zeroclaw-data \
-  -e ZEROCLAW_WORKSPACE=/zeroclaw-data/workspace \
+  -v "$PWD/.naraeclaw-docker/.naraeclaw:/naraeclaw-data/.naraeclaw:Z" \
+  -v "$PWD/.naraeclaw-docker/workspace:/naraeclaw-data/workspace:Z" \
+  -e HOME=/naraeclaw-data \
+  -e NARAECLAW_WORKSPACE=/naraeclaw-data/workspace \
   -p 42617:42617 \
   zeroclaw-bootstrap:local \
   gateway
@@ -169,11 +169,11 @@ docker start zeroclaw
 # View logs
 docker logs -f zeroclaw
 
-# Remove the container (data in volumes/.zeroclaw-docker is preserved)
+# Remove the container (data in volumes/.naraeclaw-docker is preserved)
 docker rm zeroclaw
 
 # Check health
-docker exec zeroclaw zeroclaw status
+docker exec zeroclaw naraeclaw status
 ```
 
 #### Environment variables
@@ -185,15 +185,15 @@ or ensure they are already saved in the persisted `config.toml`:
 docker run -d --name zeroclaw \
   -e API_KEY="sk-..." \
   -e PROVIDER="openrouter" \
-  -v "$PWD/.zeroclaw-docker/.zeroclaw:/zeroclaw-data/.zeroclaw" \
-  -v "$PWD/.zeroclaw-docker/workspace:/zeroclaw-data/workspace" \
+  -v "$PWD/.naraeclaw-docker/.naraeclaw:/naraeclaw-data/.naraeclaw" \
+  -v "$PWD/.naraeclaw-docker/workspace:/naraeclaw-data/workspace" \
   -p 42617:42617 \
   zeroclaw-bootstrap:local \
   gateway
 ```
 
 If you already ran `onboard` during the initial install, your API key and provider are
-saved in `.zeroclaw-docker/.zeroclaw/config.toml` and do not need to be passed again.
+saved in `.naraeclaw-docker/.naraeclaw/config.toml` and do not need to be passed again.
 
 ### Quick onboarding (non-interactive)
 

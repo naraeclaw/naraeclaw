@@ -28,7 +28,7 @@ zeroclaw-macros = { path = "crates/zeroclaw-macros", version = "0.6.9" }
 zeroize = { version = "1", features = ["derive"] }
 
 [package]
-name = "naraeclawlabs"
+name = "naraeclaw"
 version.workspace = true
 edition.workspace = true
 authors = []

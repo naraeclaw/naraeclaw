@@ -1,6 +1,6 @@
 # Mattermost Integration Guide
 
-ZeroClaw supports native integration with Mattermost via its REST API v4. This integration is ideal for self-hosted, private, or air-gapped environments where sovereign communication is a requirement.
+NaraeClaw supports native integration with Mattermost via its REST API v4. This integration is ideal for self-hosted, private, or air-gapped environments where sovereign communication is a requirement.
 
 ## Prerequisites
 
@@ -43,14 +43,14 @@ mention_only = true
 
 ## Threaded Conversations
 
-ZeroClaw supports Mattermost threads in both modes:
-- If a user sends a message in an existing thread, ZeroClaw always replies within that same thread.
+NaraeClaw supports Mattermost threads in both modes:
+- If a user sends a message in an existing thread, NaraeClaw always replies within that same thread.
 - If `thread_replies = true` (default), top-level messages are answered by threading on that post.
 - If `thread_replies = false`, top-level messages are answered at channel root level.
 
 ## Mention-Only Mode
 
-When `mention_only = true`, ZeroClaw applies an extra filter after `allowed_users` authorization:
+When `mention_only = true`, NaraeClaw applies an extra filter after `allowed_users` authorization:
 
 - Messages without an explicit bot mention are ignored.
 - Messages with `@bot_username` are processed.

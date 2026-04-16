@@ -1,4 +1,4 @@
-# Development Environment for ZeroClaw Agentic Testing
+# Development Environment for NaraeClaw Agentic Testing
 #
 # Use this for:
 # - Running the agent in a sandboxed environment
@@ -20,7 +20,7 @@ services:
     container_name: zeroclaw-dev
     restart: unless-stopped
     environment:
-      - ZEROCLAW_GATEWAY_PORT=42617
+      - NARAECLAW_GATEWAY_PORT=42617
       - SANDBOX_HOST=zeroclaw-sandbox
     secrets:
       - source: zeroclaw_env
@@ -33,12 +33,12 @@ services:
           . /run/secrets/zeroclaw_env
           set +a
         fi
-        exec zeroclaw gateway start --port "${ZEROCLAW_GATEWAY_PORT:-42617}" --host "[::]"
+        exec naraeclaw gateway start --port "${NARAECLAW_GATEWAY_PORT:-42617}" --host "[::]"
     volumes:
-      # Mount single config file (avoids shadowing other files in .zeroclaw)
-      - ../target/.zeroclaw/config.toml:/zeroclaw-data/.zeroclaw/config.toml
+      # Mount single config file (avoids shadowing other files in .naraeclaw)
+      - ../target/.naraeclaw/config.toml:/naraeclaw-data/.naraeclaw/config.toml
       # Mount shared workspace
-      - ../playground:/zeroclaw-data/workspace
+      - ../playground:/naraeclaw-data/workspace
     ports:
       - "127.0.0.1:42617:42617"
     networks:

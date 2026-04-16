@@ -1,4 +1,4 @@
-# Justfile - Convenient command runner for ZeroClaw development
+# Justfile - Convenient command runner for NaraeClaw development
 # https://github.com/casey/just
 
 # Default recipe to display help

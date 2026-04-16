@@ -9,7 +9,7 @@
 //!
 //! # Feature gate
 //! This module is only compiled when `--features runtime-wasm` is enabled.
-//! The default ZeroClaw binary excludes it to maintain the 4.6 MB size target.
+//! The default NaraeClaw binary excludes it to maintain the 4.6 MB size target.
 
 use super::traits::RuntimeAdapter;
 use zeroclaw_config::schema::WasmRuntimeConfig;

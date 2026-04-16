@@ -3,7 +3,7 @@ name = "zeroclaw-plugins"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "WASM plugin system for ZeroClaw — host, manifests, signatures, execution bridge."
+description = "WASM plugin system for NaraeClaw — host, manifests, signatures, execution bridge."
 publish = false
 
 [dependencies]

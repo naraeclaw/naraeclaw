@@ -68,17 +68,22 @@ static RUNTIME_PROXY_CONFIG: OnceLock<RwLock<ProxyConfig>> = OnceLock::new();
 static RUNTIME_PROXY_CLIENT_CACHE: OnceLock<RwLock<HashMap<String, reqwest::Client>>> =
     OnceLock::new();
 
+fn app_env(suffix: &str) -> std::result::Result<String, std::env::VarError> {
+    std::env::var(format!("NARAECLAW_{suffix}"))
+        .or_else(|_| std::env::var(format!("ZEROCLAW_{suffix}")))
+}
+
 // ── Config impl ──────────────────────────────────────────────────
 
 impl Default for Config {
     fn default() -> Self {
         let home =
             UserDirs::new().map_or_else(|| PathBuf::from("."), |u| u.home_dir().to_path_buf());
-        let zeroclaw_dir = home.join(".zeroclaw");
+        let naraeclaw_dir = home.join(".naraeclaw");
 
         Self {
-            workspace_dir: zeroclaw_dir.join("workspace"),
-            config_path: zeroclaw_dir.join("config.toml"),
+            workspace_dir: naraeclaw_dir.join("workspace"),
+            config_path: naraeclaw_dir.join("config.toml"),
             api_key: None,
             api_url: None,
             api_path: None,
@@ -345,7 +350,7 @@ pub fn resolve_config_dir_for_workspace(workspace_dir: &Path) -> (PathBuf, PathB
 
     let legacy_config_dir = workspace_dir
         .parent()
-        .map(|parent| parent.join(".zeroclaw"));
+        .map(|parent| parent.join(".naraeclaw"));
     if let Some(legacy_dir) = legacy_config_dir
         && legacy_dir.join("config.toml").exists()
     {
@@ -363,9 +368,9 @@ pub fn resolve_config_dir_for_workspace(workspace_dir: &Path) -> (PathBuf, PathB
 /// This mirrors the same precedence used by `Config::load_or_init()`:
 /// `NARAECLAW_CONFIG_DIR`/`ZEROCLAW_CONFIG_DIR` > `NARAECLAW_WORKSPACE`/`ZEROCLAW_WORKSPACE` > active workspace marker > defaults.
 pub async fn resolve_runtime_dirs_for_onboarding() -> Result<(PathBuf, PathBuf)> {
-    let (default_zeroclaw_dir, default_workspace_dir) = default_config_and_workspace_dirs()?;
+    let (default_config_dir, default_workspace_dir) = default_config_and_workspace_dirs()?;
     let (config_dir, workspace_dir, _) =
-        resolve_runtime_config_dirs(&default_zeroclaw_dir, &default_workspace_dir).await?;
+        resolve_runtime_config_dirs(&default_config_dir, &default_workspace_dir).await?;
     Ok((config_dir, workspace_dir))
 }
 
@@ -418,48 +423,48 @@ fn expand_tilde_path(path: &str) -> PathBuf {
 }
 
 async fn resolve_runtime_config_dirs(
-    default_zeroclaw_dir: &Path,
+    default_config_dir: &Path,
     default_workspace_dir: &Path,
 ) -> Result<(PathBuf, PathBuf, ConfigResolutionSource)> {
     if let Ok(custom_config_dir) =
-        std::env::var("NARAECLAW_CONFIG_DIR").or_else(|_| std::env::var("ZEROCLAW_CONFIG_DIR"))
+        std::env::var("NARAECLAW_CONFIG_DIR").or_else(|_| app_env("CONFIG_DIR"))
     {
         let custom_config_dir = custom_config_dir.trim();
         if !custom_config_dir.is_empty() {
-            let zeroclaw_dir = expand_tilde_path(custom_config_dir);
+            let config_dir = expand_tilde_path(custom_config_dir);
             return Ok((
-                zeroclaw_dir.clone(),
-                zeroclaw_dir.join("workspace"),
+                config_dir.clone(),
+                config_dir.join("workspace"),
                 ConfigResolutionSource::EnvConfigDir,
             ));
         }
     }
 
     if let Ok(custom_workspace) =
-        std::env::var("NARAECLAW_WORKSPACE").or_else(|_| std::env::var("ZEROCLAW_WORKSPACE"))
+        std::env::var("NARAECLAW_WORKSPACE").or_else(|_| app_env("WORKSPACE"))
         && !custom_workspace.is_empty()
     {
         let expanded = expand_tilde_path(&custom_workspace);
-        let (zeroclaw_dir, workspace_dir) = resolve_config_dir_for_workspace(&expanded);
+        let (config_dir, workspace_dir) = resolve_config_dir_for_workspace(&expanded);
         return Ok((
-            zeroclaw_dir,
+            config_dir,
             workspace_dir,
             ConfigResolutionSource::EnvWorkspace,
         ));
     }
 
-    if let Some((zeroclaw_dir, workspace_dir)) =
-        load_persisted_workspace_dirs(default_zeroclaw_dir).await?
+    if let Some((config_dir, workspace_dir)) =
+        load_persisted_workspace_dirs(default_config_dir).await?
     {
         return Ok((
-            zeroclaw_dir,
+            config_dir,
             workspace_dir,
             ConfigResolutionSource::ActiveWorkspaceMarker,
         ));
     }
 
     Ok((
-        default_zeroclaw_dir.to_path_buf(),
+        default_config_dir.to_path_buf(),
         default_workspace_dir.to_path_buf(),
         ConfigResolutionSource::DefaultConfigDir,
     ))
@@ -468,7 +473,7 @@ async fn resolve_runtime_config_dirs(
 fn config_dir_creation_error(path: &Path) -> String {
     format!(
         "Failed to create config directory: {}. If running as an OpenRC service, \
-         ensure this path is writable by user 'zeroclaw'.",
+         ensure this path is writable by user 'naraeclaw'.",
         path.display()
     )
 }
@@ -492,13 +497,18 @@ fn has_ollama_cloud_credential(config_api_key: Option<&str>) -> bool {
         return true;
     }
 
-    ["OLLAMA_API_KEY", "ZEROCLAW_API_KEY", "API_KEY"]
-        .iter()
-        .any(|name| {
-            std::env::var(name)
-                .ok()
-                .is_some_and(|value| !value.trim().is_empty())
-        })
+    [
+        "OLLAMA_API_KEY",
+        "NARAECLAW_API_KEY",
+        "ZEROCLAW_API_KEY",
+        "API_KEY",
+    ]
+    .iter()
+    .any(|name| {
+        std::env::var(name)
+            .ok()
+            .is_some_and(|value| !value.trim().is_empty())
+    })
 }
 
 /// Parse the `ZEROCLAW_EXTRA_HEADERS` environment variable value.
@@ -558,7 +568,7 @@ fn read_codex_openai_api_key() -> Option<String> {
 
 /// Ensure that essential bootstrap files exist in the workspace directory.
 ///
-/// When the workspace is created outside of `zeroclaw onboard` (e.g., non-tty
+/// When the workspace is created outside of `naraeclaw onboard` (e.g., non-tty
 /// daemon/cron sessions), these files would otherwise be missing. This function
 /// creates sensible defaults that allow the agent to operate with a basic identity.
 async fn ensure_bootstrap_files(workspace_dir: &Path) -> Result<()> {
@@ -566,7 +576,7 @@ async fn ensure_bootstrap_files(workspace_dir: &Path) -> Result<()> {
         (
             "IDENTITY.md",
             "# IDENTITY.md — Who Am I?\n\n\
-             I am ZeroClaw, an autonomous AI agent.\n\n\
+             I am NaraeClaw, an autonomous AI agent.\n\n\
              ## Traits\n\
              - Helpful, precise, and safety-conscious\n\
              - I prioritize clarity and correctness\n",
@@ -574,7 +584,7 @@ async fn ensure_bootstrap_files(workspace_dir: &Path) -> Result<()> {
         (
             "SOUL.md",
             "# SOUL.md — Who You Are\n\n\
-             You are ZeroClaw, an autonomous AI agent.\n\n\
+             You are NaraeClaw, an autonomous AI agent.\n\n\
              ## Core Principles\n\
              - Be helpful and accurate\n\
              - Respect user intent and boundaries\n\
@@ -634,16 +644,16 @@ impl Config {
     }
 
     pub async fn load_or_init() -> Result<Self> {
-        let (default_zeroclaw_dir, default_workspace_dir) = default_config_and_workspace_dirs()?;
+        let (default_config_dir, default_workspace_dir) = default_config_and_workspace_dirs()?;
 
-        let (zeroclaw_dir, workspace_dir, resolution_source) =
-            resolve_runtime_config_dirs(&default_zeroclaw_dir, &default_workspace_dir).await?;
+        let (config_dir, workspace_dir, resolution_source) =
+            resolve_runtime_config_dirs(&default_config_dir, &default_workspace_dir).await?;
 
-        let config_path = zeroclaw_dir.join("config.toml");
+        let config_path = config_dir.join("config.toml");
 
-        fs::create_dir_all(&zeroclaw_dir)
+        fs::create_dir_all(&config_dir)
             .await
-            .with_context(|| config_dir_creation_error(&zeroclaw_dir))?;
+            .with_context(|| config_dir_creation_error(&config_dir))?;
         fs::create_dir_all(&workspace_dir)
             .await
             .context("Failed to create workspace directory")?;
@@ -717,7 +727,7 @@ impl Config {
             // Set computed paths that are skipped during serialization
             config.config_path = config_path.clone();
             config.workspace_dir = workspace_dir;
-            let store = crate::secrets::SecretStore::new(&zeroclaw_dir, config.secrets.encrypt);
+            let store = crate::secrets::SecretStore::new(&config_dir, config.secrets.encrypt);
             // Decrypt all #[secret]-annotated fields via Configurable derive
             config.decrypt_secrets(&store)?;
 
@@ -1327,7 +1337,7 @@ impl Config {
     /// Apply environment variable overrides to config
     pub fn apply_env_overrides(&mut self) {
         // API Key: ZEROCLAW_API_KEY or API_KEY (generic)
-        if let Ok(key) = std::env::var("ZEROCLAW_API_KEY").or_else(|_| std::env::var("API_KEY"))
+        if let Ok(key) = app_env("API_KEY").or_else(|_| std::env::var("API_KEY"))
             && !key.is_empty()
         {
             self.api_key = Some(key);
@@ -1352,12 +1362,12 @@ impl Config {
         // 1) ZEROCLAW_PROVIDER always wins when set.
         // 2) ZEROCLAW_MODEL_PROVIDER/MODEL_PROVIDER (Codex app-server style).
         // 3) Legacy PROVIDER is honored only when config still uses default provider.
-        if let Ok(provider) = std::env::var("ZEROCLAW_PROVIDER") {
+        if let Ok(provider) = app_env("PROVIDER") {
             if !provider.is_empty() {
                 self.default_provider = Some(provider);
             }
         } else if let Ok(provider) =
-            std::env::var("ZEROCLAW_MODEL_PROVIDER").or_else(|_| std::env::var("MODEL_PROVIDER"))
+            app_env("MODEL_PROVIDER").or_else(|_| std::env::var("MODEL_PROVIDER"))
         {
             if !provider.is_empty() {
                 self.default_provider = Some(provider);
@@ -1373,14 +1383,14 @@ impl Config {
         }
 
         // Model: ZEROCLAW_MODEL or MODEL
-        if let Ok(model) = std::env::var("ZEROCLAW_MODEL").or_else(|_| std::env::var("MODEL"))
+        if let Ok(model) = app_env("MODEL").or_else(|_| std::env::var("MODEL"))
             && !model.is_empty()
         {
             self.default_model = Some(model);
         }
 
         // Provider HTTP timeout: ZEROCLAW_PROVIDER_TIMEOUT_SECS
-        if let Ok(timeout_secs) = std::env::var("ZEROCLAW_PROVIDER_TIMEOUT_SECS")
+        if let Ok(timeout_secs) = app_env("PROVIDER_TIMEOUT_SECS")
             && let Ok(timeout_secs) = timeout_secs.parse::<u64>()
             && timeout_secs > 0
         {
@@ -1390,7 +1400,7 @@ impl Config {
         // Extra provider headers: ZEROCLAW_EXTRA_HEADERS
         // Format: "Key:Value,Key2:Value2"
         // Env var headers override config file headers with the same name.
-        if let Ok(raw) = std::env::var("ZEROCLAW_EXTRA_HEADERS") {
+        if let Ok(raw) = app_env("EXTRA_HEADERS") {
             for header in parse_extra_headers_env(&raw) {
                 self.extra_headers.insert(header.0, header.1);
             }
@@ -1400,7 +1410,7 @@ impl Config {
         self.apply_named_model_provider_profile();
 
         // Workspace directory: ZEROCLAW_WORKSPACE
-        if let Ok(workspace) = std::env::var("ZEROCLAW_WORKSPACE")
+        if let Ok(workspace) = app_env("WORKSPACE")
             && !workspace.is_empty()
         {
             let expanded = expand_tilde_path(&workspace);
@@ -1409,7 +1419,7 @@ impl Config {
         }
 
         // Open-skills opt-in flag: ZEROCLAW_OPEN_SKILLS_ENABLED
-        if let Ok(flag) = std::env::var("ZEROCLAW_OPEN_SKILLS_ENABLED")
+        if let Ok(flag) = app_env("OPEN_SKILLS_ENABLED")
             && !flag.trim().is_empty()
         {
             match flag.trim().to_ascii_lowercase().as_str() {
@@ -1422,7 +1432,7 @@ impl Config {
         }
 
         // Open-skills directory override: ZEROCLAW_OPEN_SKILLS_DIR
-        if let Ok(path) = std::env::var("ZEROCLAW_OPEN_SKILLS_DIR") {
+        if let Ok(path) = app_env("OPEN_SKILLS_DIR") {
             let trimmed = path.trim();
             if !trimmed.is_empty() {
                 self.skills.open_skills_dir = Some(trimmed.to_string());
@@ -1430,7 +1440,7 @@ impl Config {
         }
 
         // Skills script-file audit override: ZEROCLAW_SKILLS_ALLOW_SCRIPTS
-        if let Ok(flag) = std::env::var("ZEROCLAW_SKILLS_ALLOW_SCRIPTS")
+        if let Ok(flag) = app_env("SKILLS_ALLOW_SCRIPTS")
             && !flag.trim().is_empty()
         {
             match flag.trim().to_ascii_lowercase().as_str() {
@@ -1443,7 +1453,7 @@ impl Config {
         }
 
         // Skills prompt mode override: ZEROCLAW_SKILLS_PROMPT_MODE
-        if let Ok(mode) = std::env::var("ZEROCLAW_SKILLS_PROMPT_MODE")
+        if let Ok(mode) = app_env("SKILLS_PROMPT_MODE")
             && !mode.trim().is_empty()
         {
             if let Some(parsed) = parse_skills_prompt_injection_mode(&mode) {
@@ -1456,32 +1466,31 @@ impl Config {
         }
 
         // Gateway port: ZEROCLAW_GATEWAY_PORT or PORT
-        if let Ok(port_str) =
-            std::env::var("ZEROCLAW_GATEWAY_PORT").or_else(|_| std::env::var("PORT"))
+        if let Ok(port_str) = app_env("GATEWAY_PORT").or_else(|_| std::env::var("PORT"))
             && let Ok(port) = port_str.parse::<u16>()
         {
             self.gateway.port = port;
         }
 
         // Gateway host: ZEROCLAW_GATEWAY_HOST or HOST
-        if let Ok(host) = std::env::var("ZEROCLAW_GATEWAY_HOST").or_else(|_| std::env::var("HOST"))
+        if let Ok(host) = app_env("GATEWAY_HOST").or_else(|_| std::env::var("HOST"))
             && !host.is_empty()
         {
             self.gateway.host = host;
         }
 
         // Allow public bind: ZEROCLAW_ALLOW_PUBLIC_BIND
-        if let Ok(val) = std::env::var("ZEROCLAW_ALLOW_PUBLIC_BIND") {
+        if let Ok(val) = app_env("ALLOW_PUBLIC_BIND") {
             self.gateway.allow_public_bind = val == "1" || val.eq_ignore_ascii_case("true");
         }
 
         // Require pairing: ZEROCLAW_REQUIRE_PAIRING
-        if let Ok(val) = std::env::var("ZEROCLAW_REQUIRE_PAIRING") {
+        if let Ok(val) = app_env("REQUIRE_PAIRING") {
             self.gateway.require_pairing = val == "1" || val.eq_ignore_ascii_case("true");
         }
 
         // Web dist dir: ZEROCLAW_WEB_DIST_DIR
-        if let Ok(path) = std::env::var("ZEROCLAW_WEB_DIST_DIR") {
+        if let Ok(path) = app_env("WEB_DIST_DIR") {
             let trimmed = path.trim();
             if !trimmed.is_empty() {
                 self.gateway.web_dist_dir = Some(trimmed.to_string());
@@ -1489,7 +1498,7 @@ impl Config {
         }
 
         // Temperature: ZEROCLAW_TEMPERATURE
-        if let Ok(temp_str) = std::env::var("ZEROCLAW_TEMPERATURE") {
+        if let Ok(temp_str) = app_env("TEMPERATURE") {
             match temp_str.parse::<f64>() {
                 Ok(temp) if TEMPERATURE_RANGE.contains(&temp) => {
                     self.default_temperature = temp;
@@ -1511,8 +1520,8 @@ impl Config {
         }
 
         // Reasoning override: ZEROCLAW_REASONING_ENABLED or REASONING_ENABLED
-        if let Ok(flag) = std::env::var("ZEROCLAW_REASONING_ENABLED")
-            .or_else(|_| std::env::var("REASONING_ENABLED"))
+        if let Ok(flag) =
+            app_env("REASONING_ENABLED").or_else(|_| std::env::var("REASONING_ENABLED"))
         {
             let normalized = flag.trim().to_ascii_lowercase();
             match normalized.as_str() {
@@ -1522,9 +1531,9 @@ impl Config {
             }
         }
 
-        if let Ok(raw) = std::env::var("ZEROCLAW_REASONING_EFFORT")
+        if let Ok(raw) = app_env("REASONING_EFFORT")
             .or_else(|_| std::env::var("REASONING_EFFORT"))
-            .or_else(|_| std::env::var("ZEROCLAW_CODEX_REASONING_EFFORT"))
+            .or_else(|_| app_env("CODEX_REASONING_EFFORT"))
         {
             match normalize_reasoning_effort(&raw) {
                 Ok(effort) => self.runtime.reasoning_effort = Some(effort),
@@ -1533,15 +1542,15 @@ impl Config {
         }
 
         // Web search enabled: ZEROCLAW_WEB_SEARCH_ENABLED or WEB_SEARCH_ENABLED
-        if let Ok(enabled) = std::env::var("ZEROCLAW_WEB_SEARCH_ENABLED")
-            .or_else(|_| std::env::var("WEB_SEARCH_ENABLED"))
+        if let Ok(enabled) =
+            app_env("WEB_SEARCH_ENABLED").or_else(|_| std::env::var("WEB_SEARCH_ENABLED"))
         {
             self.web_search.enabled = enabled == "1" || enabled.eq_ignore_ascii_case("true");
         }
 
         // Web search provider: ZEROCLAW_WEB_SEARCH_PROVIDER or WEB_SEARCH_PROVIDER
-        if let Ok(provider) = std::env::var("ZEROCLAW_WEB_SEARCH_PROVIDER")
-            .or_else(|_| std::env::var("WEB_SEARCH_PROVIDER"))
+        if let Ok(provider) =
+            app_env("WEB_SEARCH_PROVIDER").or_else(|_| std::env::var("WEB_SEARCH_PROVIDER"))
         {
             let provider = provider.trim();
             if !provider.is_empty() {
@@ -1550,9 +1559,7 @@ impl Config {
         }
 
         // Brave API key: ZEROCLAW_BRAVE_API_KEY or BRAVE_API_KEY
-        if let Ok(api_key) =
-            std::env::var("ZEROCLAW_BRAVE_API_KEY").or_else(|_| std::env::var("BRAVE_API_KEY"))
-        {
+        if let Ok(api_key) = app_env("BRAVE_API_KEY").or_else(|_| std::env::var("BRAVE_API_KEY")) {
             let api_key = api_key.trim();
             if !api_key.is_empty() {
                 self.web_search.brave_api_key = Some(api_key.to_string());
@@ -1560,8 +1567,8 @@ impl Config {
         }
 
         // SearXNG instance URL: ZEROCLAW_SEARXNG_INSTANCE_URL or SEARXNG_INSTANCE_URL
-        if let Ok(instance_url) = std::env::var("ZEROCLAW_SEARXNG_INSTANCE_URL")
-            .or_else(|_| std::env::var("SEARXNG_INSTANCE_URL"))
+        if let Ok(instance_url) =
+            app_env("SEARXNG_INSTANCE_URL").or_else(|_| std::env::var("SEARXNG_INSTANCE_URL"))
         {
             let instance_url = instance_url.trim();
             if !instance_url.is_empty() {
@@ -1570,8 +1577,8 @@ impl Config {
         }
 
         // Web search max results: ZEROCLAW_WEB_SEARCH_MAX_RESULTS or WEB_SEARCH_MAX_RESULTS
-        if let Ok(max_results) = std::env::var("ZEROCLAW_WEB_SEARCH_MAX_RESULTS")
-            .or_else(|_| std::env::var("WEB_SEARCH_MAX_RESULTS"))
+        if let Ok(max_results) =
+            app_env("WEB_SEARCH_MAX_RESULTS").or_else(|_| std::env::var("WEB_SEARCH_MAX_RESULTS"))
             && let Ok(max_results) = max_results.parse::<usize>()
             && (1..=10).contains(&max_results)
         {
@@ -1579,8 +1586,8 @@ impl Config {
         }
 
         // Web search timeout: ZEROCLAW_WEB_SEARCH_TIMEOUT_SECS or WEB_SEARCH_TIMEOUT_SECS
-        if let Ok(timeout_secs) = std::env::var("ZEROCLAW_WEB_SEARCH_TIMEOUT_SECS")
-            .or_else(|_| std::env::var("WEB_SEARCH_TIMEOUT_SECS"))
+        if let Ok(timeout_secs) =
+            app_env("WEB_SEARCH_TIMEOUT_SECS").or_else(|_| std::env::var("WEB_SEARCH_TIMEOUT_SECS"))
             && let Ok(timeout_secs) = timeout_secs.parse::<u64>()
             && timeout_secs > 0
         {
@@ -1588,7 +1595,7 @@ impl Config {
         }
 
         // Storage provider key (optional backend override): ZEROCLAW_STORAGE_PROVIDER
-        if let Ok(provider) = std::env::var("ZEROCLAW_STORAGE_PROVIDER") {
+        if let Ok(provider) = app_env("STORAGE_PROVIDER") {
             let provider = provider.trim();
             if !provider.is_empty() {
                 self.storage.provider.config.provider = provider.to_string();
@@ -1596,7 +1603,7 @@ impl Config {
         }
 
         // Storage connection URL (for remote backends): ZEROCLAW_STORAGE_DB_URL
-        if let Ok(db_url) = std::env::var("ZEROCLAW_STORAGE_DB_URL") {
+        if let Ok(db_url) = app_env("STORAGE_DB_URL") {
             let db_url = db_url.trim();
             if !db_url.is_empty() {
                 self.storage.provider.config.db_url = Some(db_url.to_string());
@@ -1604,14 +1611,14 @@ impl Config {
         }
 
         // Storage connect timeout: ZEROCLAW_STORAGE_CONNECT_TIMEOUT_SECS
-        if let Ok(timeout_secs) = std::env::var("ZEROCLAW_STORAGE_CONNECT_TIMEOUT_SECS")
+        if let Ok(timeout_secs) = app_env("STORAGE_CONNECT_TIMEOUT_SECS")
             && let Ok(timeout_secs) = timeout_secs.parse::<u64>()
             && timeout_secs > 0
         {
             self.storage.provider.config.connect_timeout_secs = Some(timeout_secs);
         }
         // Proxy enabled flag: ZEROCLAW_PROXY_ENABLED
-        let explicit_proxy_enabled = std::env::var("ZEROCLAW_PROXY_ENABLED")
+        let explicit_proxy_enabled = app_env("PROXY_ENABLED")
             .ok()
             .as_deref()
             .and_then(tools::parse_proxy_enabled);
@@ -1621,27 +1628,19 @@ impl Config {
 
         // Proxy URLs: ZEROCLAW_* wins, then generic *PROXY vars.
         let mut proxy_url_overridden = false;
-        if let Ok(proxy_url) =
-            std::env::var("ZEROCLAW_HTTP_PROXY").or_else(|_| std::env::var("HTTP_PROXY"))
-        {
+        if let Ok(proxy_url) = app_env("HTTP_PROXY").or_else(|_| std::env::var("HTTP_PROXY")) {
             self.proxy.http_proxy = normalize_proxy_url_option(Some(&proxy_url));
             proxy_url_overridden = true;
         }
-        if let Ok(proxy_url) =
-            std::env::var("ZEROCLAW_HTTPS_PROXY").or_else(|_| std::env::var("HTTPS_PROXY"))
-        {
+        if let Ok(proxy_url) = app_env("HTTPS_PROXY").or_else(|_| std::env::var("HTTPS_PROXY")) {
             self.proxy.https_proxy = normalize_proxy_url_option(Some(&proxy_url));
             proxy_url_overridden = true;
         }
-        if let Ok(proxy_url) =
-            std::env::var("ZEROCLAW_ALL_PROXY").or_else(|_| std::env::var("ALL_PROXY"))
-        {
+        if let Ok(proxy_url) = app_env("ALL_PROXY").or_else(|_| std::env::var("ALL_PROXY")) {
             self.proxy.all_proxy = normalize_proxy_url_option(Some(&proxy_url));
             proxy_url_overridden = true;
         }
-        if let Ok(no_proxy) =
-            std::env::var("ZEROCLAW_NO_PROXY").or_else(|_| std::env::var("NO_PROXY"))
-        {
+        if let Ok(no_proxy) = app_env("NO_PROXY").or_else(|_| std::env::var("NO_PROXY")) {
             self.proxy.no_proxy = normalize_no_proxy_list(vec![no_proxy]);
         }
 
@@ -1653,7 +1652,7 @@ impl Config {
         }
 
         // Proxy scope and service selectors.
-        if let Ok(scope_raw) = std::env::var("ZEROCLAW_PROXY_SCOPE") {
+        if let Ok(scope_raw) = app_env("PROXY_SCOPE") {
             if let Some(scope) = tools::parse_proxy_scope(&scope_raw) {
                 self.proxy.scope = scope;
             } else {
@@ -1664,7 +1663,7 @@ impl Config {
             }
         }
 
-        if let Ok(services_raw) = std::env::var("ZEROCLAW_PROXY_SERVICES") {
+        if let Ok(services_raw) = app_env("PROXY_SERVICES") {
             self.proxy.services = normalize_service_list(vec![services_raw]);
         }
 
@@ -1689,15 +1688,15 @@ impl Config {
             return Ok(self.config_path.clone());
         }
 
-        let (default_zeroclaw_dir, default_workspace_dir) = default_config_and_workspace_dirs()?;
-        let (zeroclaw_dir, _workspace_dir, source) =
-            resolve_runtime_config_dirs(&default_zeroclaw_dir, &default_workspace_dir).await?;
+        let (default_config_dir, default_workspace_dir) = default_config_and_workspace_dirs()?;
+        let (config_dir, _workspace_dir, source) =
+            resolve_runtime_config_dirs(&default_config_dir, &default_workspace_dir).await?;
         let file_name = self
             .config_path
             .file_name()
             .filter(|name| !name.is_empty())
             .unwrap_or_else(|| std::ffi::OsStr::new("config.toml"));
-        let resolved = zeroclaw_dir.join(file_name);
+        let resolved = config_dir.join(file_name);
         tracing::warn!(
             path = %self.config_path.display(),
             resolved = %resolved.display(),
@@ -1711,10 +1710,10 @@ impl Config {
         // Encrypt secrets before serialization
         let mut config_to_save = self.clone();
         let config_path = self.resolve_config_path_for_save().await?;
-        let zeroclaw_dir = config_path
+        let config_dir = config_path
             .parent()
             .context("Config path must have a parent directory")?;
-        let store = crate::secrets::SecretStore::new(zeroclaw_dir, self.secrets.encrypt);
+        let store = crate::secrets::SecretStore::new(config_dir, self.secrets.encrypt);
 
         // Encrypt all #[secret]-annotated fields via Configurable derive
         config_to_save.encrypt_secrets(&store)?;
@@ -1913,7 +1912,7 @@ mod tests {
     async fn expand_tilde_path_expands_tilde_when_home_set() {
         // This test verifies that tilde expansion works when HOME is set.
         // In normal environments, HOME is set, so ~ should expand.
-        let path = expand_tilde_path("~/.zeroclaw");
+        let path = expand_tilde_path("~/.naraeclaw");
         // The path should not literally start with '~' if HOME is set
         // (it should be expanded to the actual home directory)
         if std::env::var("HOME").is_ok() {
@@ -3604,7 +3603,7 @@ channel_ids = ["C123", "D456"]
             phone_number_id: Some("123".into()),
             verify_token: Some("ver".into()),
             app_secret: None,
-            session_path: Some("~/.zeroclaw/state/whatsapp-web/session.db".into()),
+            session_path: Some("~/.naraeclaw/state/whatsapp-web/session.db".into()),
             pair_phone: None,
             pair_code: None,
             allowed_numbers: vec!["+1".into()],
@@ -3629,7 +3628,7 @@ channel_ids = ["C123", "D456"]
             phone_number_id: None,
             verify_token: None,
             app_secret: None,
-            session_path: Some("~/.zeroclaw/state/whatsapp-web/session.db".into()),
+            session_path: Some("~/.naraeclaw/state/whatsapp-web/session.db".into()),
             pair_phone: None,
             pair_code: None,
             allowed_numbers: vec![],
@@ -4609,7 +4608,7 @@ requires_openai_auth = true
         let temp_home =
             std::env::temp_dir().join(format!("zeroclaw_test_home_{}", uuid::Uuid::new_v4()));
         let workspace_dir = temp_home.join("custom-workspace");
-        let legacy_config_dir = temp_home.join(".zeroclaw");
+        let legacy_config_dir = temp_home.join(".naraeclaw");
         let legacy_config_path = legacy_config_dir.join("config.toml");
 
         fs::create_dir_all(&legacy_config_dir).await.unwrap();
@@ -5669,7 +5668,7 @@ gated_domain_categories = ["banking"]
 
 [security.estop]
 enabled = true
-state_file = "~/.zeroclaw/estop-state.json"
+state_file = "~/.naraeclaw/estop-state.json"
 require_otp_to_resume = true
 "#,
         );
@@ -6545,8 +6544,8 @@ require_otp_to_resume = true
     /// The TOML template baked into Docker images (Dockerfile + Dockerfile.debian).
     /// Kept here so changes to the Dockerfiles can be validated by `cargo test`.
     const DOCKER_CONFIG_TEMPLATE: &str = r#"
-workspace_dir = "/zeroclaw-data/workspace"
-config_path = "/zeroclaw-data/.zeroclaw/config.toml"
+workspace_dir = "/naraeclaw-data/workspace"
+config_path = "/naraeclaw-data/.naraeclaw/config.toml"
 api_key = ""
 default_provider = "openrouter"
 default_model = "anthropic/claude-sonnet-4-20250514"

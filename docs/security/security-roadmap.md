@@ -1,4 +1,4 @@
-# ZeroClaw Security Improvement Roadmap
+# NaraeClaw Security Improvement Roadmap
 
 > ⚠️ **Status: Proposal / Roadmap**
 >
@@ -7,7 +7,7 @@
 
 ## Current State: Strong Foundation
 
-ZeroClaw already has **excellent application-layer security**:
+NaraeClaw already has **excellent application-layer security**:
 
 ✅ Command allowlist (not blocklist)
 ✅ Path traversal protection
@@ -29,9 +29,9 @@ ZeroClaw already has **excellent application-layer security**:
 
 ---
 
-## Comparison: ZeroClaw vs PicoClaw vs Production Grade
+## Comparison: NaraeClaw vs PicoClaw vs Production Grade
 
-| Feature | PicoClaw | ZeroClaw Now | ZeroClaw + Roadmap | Production Target |
+| Feature | PicoClaw | NaraeClaw Now | NaraeClaw + Roadmap | Production Target |
 |---------|----------|--------------|-------------------|-------------------|
 | **Binary Size** | ~8MB | **3.4MB** ✅ | 3.5-4MB | < 5MB |
 | **RAM Usage** | < 10MB | **< 5MB** ✅ | < 10MB | < 20MB |
@@ -168,18 +168,18 @@ zeroclaw sandbox --test
 
 ## Summary
 
-**ZeroClaw is already more secure than PicoClaw** with:
+**NaraeClaw is already more secure than PicoClaw** with:
 - 50% smaller binary (3.4MB vs 8MB)
 - 50% less RAM (< 5MB vs < 10MB)
 - 100x faster startup (< 10ms vs < 1s)
 - Comprehensive security policy engine
 - Extensive test coverage
 
-**By implementing this roadmap**, ZeroClaw becomes:
+**By implementing this roadmap**, NaraeClaw becomes:
 - Production-grade with OS-level sandboxing
 - Resource-aware with memory/CPU guards
 - Audit-ready with tamper-evident logging
 - Enterprise-ready with configurable security levels
 
 **Estimated effort**: 4-7 weeks for full implementation
-**Value**: Transforms ZeroClaw from "safe for testing" to "safe for production"
+**Value**: Transforms NaraeClaw from "safe for testing" to "safe for production"

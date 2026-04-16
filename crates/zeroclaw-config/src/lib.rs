@@ -1,4 +1,4 @@
-//! Configuration schema, secrets, and related types for ZeroClaw.
+//! Configuration schema, secrets, and related types for NaraeClaw.
 
 pub mod autonomy;
 pub mod cost;

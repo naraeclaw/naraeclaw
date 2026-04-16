@@ -1,6 +1,6 @@
 # macOS Update and Uninstall Guide
 
-This page documents supported update and uninstall procedures for ZeroClaw on macOS (OS X).
+This page documents supported update and uninstall procedures for NaraeClaw on macOS (OS X).
 
 Last verified: **February 22, 2026**.
 
@@ -61,13 +61,13 @@ zeroclaw --version
 This prevents the daemon from continuing to run after binary removal.
 
 ```bash
-zeroclaw service stop || true
-zeroclaw service uninstall || true
+naraeclaw service stop || true
+naraeclaw service uninstall || true
 ```
 
 Service artifacts removed by `service uninstall`:
 
-- `~/Library/LaunchAgents/com.zeroclaw.daemon.plist`
+- `~/Library/LaunchAgents/com.naraeclaw.daemon.plist`
 
 ### B) Remove the binary by install method
 
@@ -89,7 +89,7 @@ rm -f ~/.cargo/bin/zeroclaw
 Only run this if you want a full cleanup of config, auth profiles, logs, and workspace state.
 
 ```bash
-rm -rf ~/.zeroclaw
+rm -rf ~/.naraeclaw
 ```
 
 ## 4) Verify uninstall completed

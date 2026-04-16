@@ -1107,7 +1107,7 @@ impl Channel for WhatsAppWebChannel {
                 .with_transport_factory(transport_factory)
                 .with_http_client(http_client)
                 .with_device_props(
-                    Some("ZeroClaw".to_string()),
+                    Some("NaraeClaw".to_string()),
                     None,
                     Some(PlatformType::Desktop),
                 )

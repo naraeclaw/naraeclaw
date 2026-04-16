@@ -1,6 +1,6 @@
 # Telegram Integration Testing Guide
 
-This guide covers testing the Telegram channel integration for ZeroClaw.
+This guide covers testing the Telegram channel integration for NaraeClaw.
 
 ## 🚀 Quick Start
 
@@ -65,7 +65,7 @@ After running automated tests, perform these manual checks:
 1. **Basic messaging**
 
     ```bash
-    zeroclaw channel start
+    naraeclaw channel start
     ```
 
     - Send "Hello bot!" in Telegram
@@ -119,7 +119,7 @@ After running automated tests, perform these manual checks:
 6. **Error logging**
 
     ```bash
-    RUST_LOG=debug zeroclaw channel start
+    RUST_LOG=debug naraeclaw channel start
     ```
 
     - Check for unexpected errors
@@ -128,7 +128,7 @@ After running automated tests, perform these manual checks:
 6. **Health check timeout**
 
     ```bash
-    time zeroclaw channel doctor
+    time naraeclaw channel doctor
     ```
 
     - Verify: Completes in <5 seconds
@@ -159,7 +159,7 @@ Solution: Check user allowlist
   1. Send message to bot
   2. Check logs for user_id
   3. Update config: allowed_users = ["YOUR_ID"]
-  4. Run: zeroclaw onboard --channels-only
+  4. Run: naraeclaw onboard --channels-only
 ```
 
 **Issue: Message splitting not working**
@@ -179,16 +179,16 @@ Solution: Verify code changes
 ./tests/telegram/test_telegram_integration.sh
 
 # 2. Configure Telegram
-zeroclaw onboard
+naraeclaw onboard
 # Select Telegram channel
 # Enter bot token (from @BotFather)
 # Enter your user ID
 
 # 3. Verify health
-zeroclaw channel doctor
+naraeclaw channel doctor
 
 # 4. Start channel
-zeroclaw channel start
+naraeclaw channel start
 
 # 5. Send test message in Telegram
 ```
@@ -203,7 +203,7 @@ zeroclaw channel start
 ./tests/telegram/test_telegram_integration.sh
 
 # 3. Manual smoke test
-zeroclaw channel start
+naraeclaw channel start
 # Send message in Telegram
 ```
 
@@ -223,10 +223,10 @@ for i in {1..100}; do
 done
 
 # 3. Monitor logs
-RUST_LOG=info zeroclaw daemon
+RUST_LOG=info naraeclaw daemon
 
 # 4. Check metrics
-zeroclaw status
+naraeclaw status
 ```
 
 ## 📊 Performance Benchmarks
@@ -235,7 +235,7 @@ Expected values after all fixes:
 
 | Metric                 | Expected   | How to Measure                   |
 | ---------------------- | ---------- | -------------------------------- |
-| Health check time      | <5s        | `time zeroclaw channel doctor`   |
+| Health check time      | <5s        | `time naraeclaw channel doctor`   |
 | First response time    | <3s        | Time from sending to receiving   |
 | Message split overhead | <50ms      | Check logs for timing            |
 | Memory usage           | <10MB      | `ps aux \| grep zeroclaw`        |
@@ -261,7 +261,7 @@ cargo test telegram --lib -- --ignored
 
 ```bash
 # Maximum logging
-RUST_LOG=trace zeroclaw channel start
+RUST_LOG=trace naraeclaw channel start
 
 # Check Telegram API directly
 curl "https://api.telegram.org/bot<TOKEN>/getMe"
@@ -338,15 +338,15 @@ git revert <commit-hash>
 cargo build --release
 
 # 4. Restart service
-zeroclaw service restart
+naraeclaw service restart
 
 # 5. Verify
-zeroclaw channel doctor
+naraeclaw channel doctor
 ```
 
 ## 📚 Additional Resources
 
 - [Telegram Bot API Documentation](https://core.telegram.org/bots/api)
-- [ZeroClaw Main README](../../README.md)
+- [NaraeClaw Main README](../../README.md)
 - [Contributing Guide](../../CONTRIBUTING.md)
 - [Issue Tracker](https://github.com/zeroclaw-labs/zeroclaw/issues)

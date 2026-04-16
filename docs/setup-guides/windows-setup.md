@@ -1,6 +1,6 @@
 # Windows Setup Guide
 
-This guide covers building and installing ZeroClaw on Windows.
+This guide covers building and installing NaraeClaw on Windows.
 
 ## Quick Start
 
@@ -58,7 +58,7 @@ Alternatively, if you have Visual Studio 2019+ installed with the C++ workload, 
 
 ## Feature Flags
 
-ZeroClaw uses Cargo feature flags to control which integrations are compiled in:
+NaraeClaw uses Cargo feature flags to control which integrations are compiled in:
 
 | Feature | Description | Default? |
 |---------|-------------|----------|
@@ -80,7 +80,7 @@ cargo build --release --locked --features channel-matrix --target x86_64-pc-wind
 ## Post-Installation
 
 1. **Restart your terminal** for PATH changes to take effect
-2. **Initialize ZeroClaw:**
+2. **Initialize NaraeClaw:**
    ```cmd
    zeroclaw init
    ```

@@ -34,7 +34,7 @@ pub fn handle_command(command: crate::SkillCommands, config: &crate::config::Con
                     "              echo '# My Skill' > ~/.zeroclaw/workspace/skills/my-skill/SKILL.md"
                 );
                 println!();
-                println!("  Or install: zeroclaw skills install <source>");
+                println!("  Or install: naraeclaw skills install <source>");
             } else {
                 println!("Installed skills ({}):", skills.len());
                 println!();

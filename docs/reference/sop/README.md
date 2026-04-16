@@ -12,7 +12,7 @@ SOPs are deterministic procedures executed by the `SopEngine`. They provide expl
 ## 1. Runtime Contract (Current)
 
 - SOP definitions are loaded from `<workspace>/sops/<sop_name>/SOP.toml` plus optional `SOP.md`.
-- CLI `zeroclaw sop` currently manages definitions only: `list`, `validate`, `show`.
+- CLI `naraeclaw sop` currently manages definitions only: `list`, `validate`, `show`.
 - SOP runs are started by event fan-in (MQTT/webhook/cron) or by the in-agent tool `sop_execute`.
 - Run progression uses tools: `sop_status`, `sop_approve`, `sop_advance`.
 - SOP audit records are persisted in the configured Memory backend under category `sop`.
@@ -53,9 +53,9 @@ graph LR
 3. Validate and inspect definitions:
 
    ```bash
-   zeroclaw sop list
-   zeroclaw sop validate
-   zeroclaw sop show deploy-prod
+   naraeclaw sop list
+   naraeclaw sop validate
+   naraeclaw sop show deploy-prod
    ```
 
 4. Trigger runs via configured event sources, or manually from an agent turn with `sop_execute`.

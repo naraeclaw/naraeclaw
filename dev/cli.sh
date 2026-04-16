@@ -50,14 +50,14 @@ function ensure_config {
 }
 
 function print_help {
-    echo -e "${YELLOW}ZeroClaw Development Environment Manager${NC}"
+    echo -e "${YELLOW}NaraeClaw Development Environment Manager${NC}"
     echo "Usage: ./dev/cli.sh [command]"
     echo ""
     echo "Commands:"
     echo -e "  ${GREEN}up${NC}      Start dev environment (Agent + Sandbox)"
     echo -e "  ${GREEN}down${NC}    Stop containers"
     echo -e "  ${GREEN}shell${NC}   Enter Sandbox (Ubuntu)"
-    echo -e "  ${GREEN}agent${NC}   Enter Agent (ZeroClaw CLI)"
+    echo -e "  ${GREEN}agent${NC}   Enter Agent (NaraeClaw CLI)"
     echo -e "  ${GREEN}logs${NC}    View logs"
     echo -e "  ${GREEN}build${NC}   Rebuild images"
     echo -e "  ${GREEN}ci${NC}      Run local CI checks in Docker (see ./dev/ci.sh)"
@@ -95,7 +95,7 @@ case "$1" in
         ;;
 
     agent)
-        echo -e "${GREEN}🤖 Entering Agent Container (ZeroClaw)... (Type 'exit' to leave)${NC}"
+        echo -e "${GREEN}🤖 Entering Agent Container (NaraeClaw)... (Type 'exit' to leave)${NC}"
         docker exec -it zeroclaw-dev /bin/bash
         ;;
 

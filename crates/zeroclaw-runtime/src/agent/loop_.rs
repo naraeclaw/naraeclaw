@@ -2395,7 +2395,7 @@ pub async fn run(
         println!("{response}");
         observer.record_event(&ObserverEvent::TurnComplete);
     } else {
-        println!("🦀 ZeroClaw Interactive Mode");
+        println!("🦀 NaraeClaw Interactive Mode");
         println!("Type /help for commands.\n");
         let cli = CLI_CHANNEL_FN
             .get()

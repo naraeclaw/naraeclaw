@@ -39,7 +39,7 @@ build_smoke_image() {
 
 print_help() {
   cat <<'EOF'
-ZeroClaw Local CI in Docker
+NaraeClaw Local CI in Docker
 
 Usage: ./dev/ci.sh <command>
 

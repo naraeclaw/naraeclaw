@@ -1,6 +1,6 @@
 # Testing Guide
 
-ZeroClaw uses a five-level testing taxonomy with filesystem-based organization.
+NaraeClaw uses a five-level testing taxonomy with filesystem-based organization.
 
 ## Testing Taxonomy
 

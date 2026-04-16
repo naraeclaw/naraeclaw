@@ -1,5 +1,5 @@
 [package]
-name = "zeroclaw-desktop"
+name = "naraeclaw-desktop"
 version = "0.1.0"
 edition = "2024"
 description = "NaraeClaw Desktop — Tauri-powered system tray app"

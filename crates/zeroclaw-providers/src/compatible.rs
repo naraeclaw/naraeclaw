@@ -2491,7 +2491,7 @@ mod tests {
             messages: vec![
                 Message {
                     role: "system".to_string(),
-                    content: MessageContent::Text("You are ZeroClaw".to_string()),
+                    content: MessageContent::Text("You are NaraeClaw".to_string()),
                 },
                 Message {
                     role: "user".to_string(),

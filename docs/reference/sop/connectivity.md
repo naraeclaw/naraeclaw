@@ -12,7 +12,7 @@ This document describes how external events trigger SOP runs.
 
 ## 1. Overview
 
-ZeroClaw routes MQTT/webhook/cron events through a unified SOP dispatcher (`dispatch_sop_event`).
+NaraeClaw routes MQTT/webhook/cron events through a unified SOP dispatcher (`dispatch_sop_event`).
 
 Key behaviors:
 
@@ -140,4 +140,4 @@ Cron expressions support 5, 6, or 7 fields.
 | **Webhook** `401 Unauthorized` | missing bearer or invalid secret | re-pair token (`POST /pair`) and verify `X-Webhook-Secret` if configured |
 | **`/sop/*` returns 404** | trigger path mismatch | ensure `SOP.toml` uses exact path (for example `/sop/deploy`) |
 | **SOP started but step not executed** | headless trigger without active agent loop | run an agent loop for `ExecuteStep`, or design run to pause on approvals |
-| **Cron not firing** | daemon not running or invalid expression | run `zeroclaw daemon`; check logs for cron parse warnings |
+| **Cron not firing** | daemon not running or invalid expression | run `naraeclaw daemon`; check logs for cron parse warnings |

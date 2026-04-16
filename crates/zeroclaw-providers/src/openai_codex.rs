@@ -14,7 +14,7 @@ const DEFAULT_CODEX_RESPONSES_URL: &str = "https://chatgpt.com/backend-api/codex
 const CODEX_RESPONSES_URL_ENV: &str = "ZEROCLAW_CODEX_RESPONSES_URL";
 const CODEX_BASE_URL_ENV: &str = "ZEROCLAW_CODEX_BASE_URL";
 const DEFAULT_CODEX_INSTRUCTIONS: &str =
-    "You are ZeroClaw, a concise and helpful coding assistant.";
+    "You are NaraeClaw, a concise and helpful coding assistant.";
 
 pub struct OpenAiCodexProvider {
     auth: AuthService,

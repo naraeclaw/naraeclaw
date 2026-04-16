@@ -2,8 +2,8 @@
 setlocal enabledelayedexpansion
 
 :: ============================================================================
-:: ZeroClaw Windows Setup Script
-:: Simplifies building and installing ZeroClaw on Windows.
+:: NaraeClaw Windows Setup Script
+:: Simplifies building and installing NaraeClaw on Windows.
 :: Usage: setup.bat [--prebuilt | --minimal | --standard | --full | --help]
 :: ============================================================================
 
@@ -32,7 +32,7 @@ if "%~1"=="--full"     set "MODE=full"     & goto :start
 :start
 echo.
 echo %BOLD%%BLUE%=========================================%RESET%
-echo %BOLD%%BLUE%  ZeroClaw Windows Setup  v%VERSION%%RESET%
+echo %BOLD%%BLUE%  NaraeClaw Windows Setup  v%VERSION%%RESET%
 echo %BOLD%%BLUE%=========================================%RESET%
 echo.
 
@@ -208,7 +208,7 @@ goto :do_build
 :: ---- Build from source ----
 :do_build
 echo.
-echo %BOLD%[3/5] Building ZeroClaw (%BUILD_DESC%)...%RESET%
+echo %BOLD%[3/5] Building NaraeClaw (%BUILD_DESC%)...%RESET%
 echo   Target: %TARGET%
 
 :: Ensure we're in the repo root (check for Cargo.toml)
@@ -280,7 +280,7 @@ if %ERRORLEVEL% EQU 0 (
 
 echo.
 echo %BOLD%%GREEN%=========================================%RESET%
-echo %BOLD%%GREEN%  ZeroClaw setup complete!%RESET%
+echo %BOLD%%GREEN%  NaraeClaw setup complete!%RESET%
 echo %BOLD%%GREEN%=========================================%RESET%
 echo.
 echo   Next steps:
@@ -299,7 +299,7 @@ goto :end
 :: ---- Help ----
 :show_help
 echo.
-echo ZeroClaw Windows Setup Script
+echo NaraeClaw Windows Setup Script
 echo.
 echo Usage: setup.bat [OPTIONS]
 echo.

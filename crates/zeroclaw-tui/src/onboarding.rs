@@ -448,7 +448,7 @@ impl App {
             .args([
                 "ps",
                 "--filter",
-                "ancestor=ghcr.io/naraeclaw-labs/naraeclaw",
+                "ancestor=ghcr.io/naraeclaw/naraeclaw",
                 "--format",
                 "{{.Names}}",
             ])
@@ -1002,7 +1002,7 @@ async fn find_docker_container() -> Option<String> {
         .args([
             "ps",
             "--filter",
-            "ancestor=ghcr.io/naraeclaw-labs/naraeclaw",
+            "ancestor=ghcr.io/naraeclaw/naraeclaw",
             "--format",
             "{{.Names}}",
         ])

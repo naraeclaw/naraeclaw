@@ -88,10 +88,11 @@ impl ToolDescriptions {
 
 /// Detect the user's preferred locale from environment variables.
 ///
-/// Checks `ZEROCLAW_LOCALE`, then `LANG`, then `LC_ALL`.
+/// Checks `NARAECLAW_LOCALE`, then `LANG`, then `LC_ALL`.
 /// Returns "en" if none are set or parseable.
 pub fn detect_locale() -> String {
-    if let Ok(val) = std::env::var("ZEROCLAW_LOCALE") {
+    if let Ok(val) = std::env::var("NARAECLAW_LOCALE").or_else(|_| std::env::var("ZEROCLAW_LOCALE"))
+    {
         let val = val.trim().to_string();
         if !val.is_empty() {
             return normalize_locale(&val);
@@ -265,15 +266,17 @@ shell = "Execute a shell command"
             .lock()
             .unwrap_or_else(|e| e.into_inner());
 
-        let saved = std::env::var("ZEROCLAW_LOCALE").ok();
+        let saved = std::env::var("NARAECLAW_LOCALE")
+            .or_else(|_| std::env::var("ZEROCLAW_LOCALE"))
+            .ok();
         let saved_lang = std::env::var("LANG").ok();
 
         // SAFETY: ENV_WRITE_MUTEX is held, serializing all env mutations.
-        unsafe { std::env::set_var("ZEROCLAW_LOCALE", "ja-JP") };
+        unsafe { std::env::set_var("NARAECLAW_LOCALE", "ja-JP") };
         assert_eq!(detect_locale(), "ja-JP");
 
         // SAFETY: ENV_WRITE_MUTEX is held, serializing all env mutations.
-        unsafe { std::env::remove_var("ZEROCLAW_LOCALE") };
+        unsafe { std::env::remove_var("NARAECLAW_LOCALE") };
         // SAFETY: ENV_WRITE_MUTEX is held, serializing all env mutations.
         unsafe { std::env::set_var("LANG", "zh_CN.UTF-8") };
         assert_eq!(detect_locale(), "zh-CN");
@@ -281,9 +284,9 @@ shell = "Execute a shell command"
         // Restore original values.
         match saved {
             // SAFETY: ENV_WRITE_MUTEX is held, serializing all env mutations.
-            Some(v) => unsafe { std::env::set_var("ZEROCLAW_LOCALE", v) },
+            Some(v) => unsafe { std::env::set_var("NARAECLAW_LOCALE", v) },
             // SAFETY: ENV_WRITE_MUTEX is held, serializing all env mutations.
-            None => unsafe { std::env::remove_var("ZEROCLAW_LOCALE") },
+            None => unsafe { std::env::remove_var("NARAECLAW_LOCALE") },
         }
         match saved_lang {
             // SAFETY: ENV_WRITE_MUTEX is held, serializing all env mutations.

@@ -203,8 +203,8 @@ function AppContent() {
     const handler = () => {
       logout();
     };
-    window.addEventListener('zeroclaw-unauthorized', handler);
-    return () => window.removeEventListener('zeroclaw-unauthorized', handler);
+    window.addEventListener('naraeclaw-unauthorized', handler);
+    return () => window.removeEventListener('naraeclaw-unauthorized', handler);
   }, [logout]);
 
   if (loading) {

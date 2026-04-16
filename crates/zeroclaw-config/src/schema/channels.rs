@@ -739,7 +739,7 @@ pub struct MatrixConfig {
     #[serde(default = "default_multi_message_delay_ms")]
     pub multi_message_delay_ms: u64,
     /// Optional Matrix recovery key for automatic E2EE key backup restore.
-    /// When set, ZeroClaw recovers room keys and cross-signing secrets on startup.
+    /// When set, NaraeClaw recovers room keys and cross-signing secrets on startup.
     #[secret]
     #[serde(default)]
     pub recovery_key: Option<String>,
@@ -896,13 +896,13 @@ pub struct WhatsAppConfig {
     /// Regex patterns for DM mention gating (case-insensitive).
     /// When non-empty, only direct messages matching at least one pattern are
     /// processed; matched fragments are stripped from the forwarded content.
-    /// Example: `["@?ZeroClaw", "\\+?15555550123"]`
+    /// Example: `["@?NaraeClaw", "\\+?15555550123"]`
     #[serde(default)]
     pub dm_mention_patterns: Vec<String>,
     /// Regex patterns for group-chat mention gating (case-insensitive).
     /// When non-empty, only group messages matching at least one pattern are
     /// processed; matched fragments are stripped from the forwarded content.
-    /// Example: `["@?ZeroClaw", "\\+?15555550123"]`
+    /// Example: `["@?NaraeClaw", "\\+?15555550123"]`
     #[serde(default)]
     pub group_mention_patterns: Vec<String>,
     /// Per-channel proxy URL (http, https, socks5, socks5h).
@@ -1226,7 +1226,7 @@ pub enum LineDmPolicy {
     /// Respond to every DM regardless of who sent it.
     Open,
     /// Require a one-time `/bind <code>` handshake before responding (default).
-    /// ZeroClaw prints the bind code on startup; send it once to unlock access.
+    /// NaraeClaw prints the bind code on startup; send it once to unlock access.
     #[default]
     Pairing,
     /// Respond only to LINE user IDs listed in `allowed_users`.

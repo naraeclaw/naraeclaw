@@ -1,4 +1,4 @@
-# Audit Logging for ZeroClaw
+# Audit Logging for NaraeClaw
 
 > ⚠️ **Status: Proposal / Roadmap**
 >
@@ -6,7 +6,7 @@
 > For current runtime behavior, see [config-reference.md](../reference/api/config-reference.md), [operations-runbook.md](../ops/operations-runbook.md), and [troubleshooting.md](../ops/troubleshooting.md).
 
 ## Problem
-ZeroClaw logs actions but lacks tamper-evident audit trails for:
+NaraeClaw logs actions but lacks tamper-evident audit trails for:
 - Who executed what command
 - When and from which channel
 - What resources were accessed

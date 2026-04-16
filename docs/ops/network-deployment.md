@@ -1,6 +1,6 @@
 # Network Deployment — NaraeClaw on a Server or Local Network
 
-This document covers deploying ZeroClaw on a Raspberry Pi or other host on your local network, with Telegram and optional webhook channels.
+This document covers deploying NaraeClaw on a Raspberry Pi or other host on your local network, with Telegram and optional webhook channels.
 
 ---
 
@@ -8,15 +8,15 @@ This document covers deploying ZeroClaw on a Raspberry Pi or other host on your 
 
 | Mode | Inbound port needed? | Use case |
 |------|----------------------|----------|
-| **Telegram polling** | No | ZeroClaw polls Telegram API; works from anywhere |
-| **Matrix sync (including E2EE)** | No | ZeroClaw syncs via Matrix client API; no inbound webhook required |
+| **Telegram polling** | No | NaraeClaw polls Telegram API; works from anywhere |
+| **Matrix sync (including E2EE)** | No | NaraeClaw syncs via Matrix client API; no inbound webhook required |
 | **Discord/Slack** | No | Same — outbound only |
 | **Nostr** | No | Connects to relays via WebSocket; outbound only |
 | **Gateway webhook** | Yes | POST /webhook, /whatsapp, /linq, /nextcloud-talk need a public URL |
 | **Gateway pairing** | Yes | If you pair clients via the gateway |
 | **Alpine/OpenRC service** | No | System-wide background service on Alpine Linux |
 
-**Key:** Telegram, Discord, Slack, and Nostr use **outbound connections** — ZeroClaw connects to external servers/relays. No port forwarding or public IP required.
+**Key:** Telegram, Discord, Slack, and Nostr use **outbound connections** — NaraeClaw connects to external servers/relays. No port forwarding or public IP required.
 
 ---
 
@@ -52,11 +52,11 @@ allow_public_bind = false
 ### 2.4 Run Daemon (Local Only)
 
 ```bash
-zeroclaw daemon --host 127.0.0.1 --port 42617
+naraeclaw daemon --host 127.0.0.1 --port 42617
 ```
 
 - Gateway binds to `127.0.0.1` — not reachable from other machines
-- Telegram channel works: ZeroClaw polls Telegram API (outbound)
+- Telegram channel works: NaraeClaw polls Telegram API (outbound)
 - No firewall or port forwarding needed
 
 ---
@@ -75,7 +75,7 @@ allow_public_bind = true
 ```
 
 ```bash
-zeroclaw daemon --host 0.0.0.0 --port 42617
+naraeclaw daemon --host 0.0.0.0 --port 42617
 ```
 
 **Security:** `allow_public_bind = true` exposes the gateway to your local network. Only use on trusted LANs.
@@ -86,7 +86,7 @@ If you need a **public URL** (e.g. WhatsApp webhook, external clients):
 
 1. Run gateway on localhost:
    ```bash
-   zeroclaw daemon --host 127.0.0.1 --port 42617
+   naraeclaw daemon --host 127.0.0.1 --port 42617
    ```
 
 2. Start a tunnel:
@@ -96,7 +96,7 @@ If you need a **public URL** (e.g. WhatsApp webhook, external clients):
    ```
    Or use `zeroclaw tunnel` (see tunnel docs).
 
-3. ZeroClaw will refuse `0.0.0.0` unless `allow_public_bind = true` or a tunnel is active.
+3. NaraeClaw will refuse `0.0.0.0` unless `allow_public_bind = true` or a tunnel is active.
 
 ---
 
@@ -104,7 +104,7 @@ If you need a **public URL** (e.g. WhatsApp webhook, external clients):
 
 Telegram uses **long-polling** by default:
 
-- ZeroClaw calls `https://api.telegram.org/bot{token}/getUpdates`
+- NaraeClaw calls `https://api.telegram.org/bot{token}/getUpdates`
 - No inbound port or public IP needed
 - Works behind NAT, on RPi, in a home lab
 
@@ -116,12 +116,12 @@ bot_token = "YOUR_BOT_TOKEN"
 allowed_users = []            # deny-by-default, bind identities explicitly
 ```
 
-Run `zeroclaw daemon` — Telegram channel starts automatically.
+Run `naraeclaw daemon` — Telegram channel starts automatically.
 
 To approve one Telegram account at runtime:
 
 ```bash
-zeroclaw channel bind-telegram <IDENTITY>
+naraeclaw channel bind-telegram <IDENTITY>
 ```
 
 `<IDENTITY>` can be a numeric Telegram user ID or a username (without `@`).
@@ -130,7 +130,7 @@ zeroclaw channel bind-telegram <IDENTITY>
 
 Telegram Bot API `getUpdates` supports only one active poller per bot token.
 
-- Keep one runtime instance for the same token (recommended: `zeroclaw daemon` service).
+- Keep one runtime instance for the same token (recommended: `naraeclaw daemon` service).
 - Do not run `cargo run -- channel start` or another bot process at the same time.
 
 If you hit this error:
@@ -177,7 +177,7 @@ Configure Cloudflare Tunnel to forward to `127.0.0.1:42617`, then set your webho
 
 - [ ] Build or install the `naraeclaw` binary
 - [ ] Configure `[channels_config.telegram]` or your selected channel
-- [ ] Run `zeroclaw daemon --host 127.0.0.1 --port 42617` (Telegram works without 0.0.0.0)
+- [ ] Run `naraeclaw daemon --host 127.0.0.1 --port 42617` (Telegram works without 0.0.0.0)
 - [ ] For LAN access: `--host 0.0.0.0` + `allow_public_bind = true` in config
 - [ ] For webhooks: use Tailscale, ngrok, or Cloudflare tunnel
 
@@ -185,7 +185,7 @@ Configure Cloudflare Tunnel to forward to `127.0.0.1:42617`, then set your webho
 
 ## 7. OpenRC (Alpine Linux Service)
 
-ZeroClaw supports OpenRC for Alpine Linux and other distributions using the OpenRC init system. OpenRC services run **system-wide** and require root/sudo.
+NaraeClaw supports OpenRC for Alpine Linux and other distributions using the OpenRC init system. OpenRC services run **system-wide** and require root/sudo.
 
 ### 7.1 Prerequisites
 
@@ -197,7 +197,7 @@ ZeroClaw supports OpenRC for Alpine Linux and other distributions using the Open
 
 ```bash
 # Install service (OpenRC is auto-detected on Alpine)
-sudo zeroclaw service install
+sudo naraeclaw service install
 ```
 
 This creates:
@@ -209,7 +209,7 @@ This creates:
 
 Manual config copy is usually not required.
 
-`sudo zeroclaw service install` automatically prepares `/etc/zeroclaw`, migrates existing runtime state from your user setup when available, and sets ownership/permissions for the `zeroclaw` service user.
+`sudo naraeclaw service install` automatically prepares `/etc/zeroclaw`, migrates existing runtime state from your user setup when available, and sets ownership/permissions for the `zeroclaw` service user.
 
 If no prior runtime state is available to migrate, create `/etc/zeroclaw/config.toml` before starting the service.
 
@@ -223,7 +223,7 @@ sudo rc-update add zeroclaw default
 sudo rc-service zeroclaw start
 
 # Check status
-sudo rc-service zeroclaw status
+sudo rc-service naraeclaw status
 ```
 
 ### 7.5 Manage Service
@@ -232,9 +232,9 @@ sudo rc-service zeroclaw status
 |---------|-------------|
 | `sudo rc-service zeroclaw start` | Start the daemon |
 | `sudo rc-service zeroclaw stop` | Stop the daemon |
-| `sudo rc-service zeroclaw status` | Check service status |
+| `sudo rc-service naraeclaw status` | Check service status |
 | `sudo rc-service zeroclaw restart` | Restart the daemon |
-| `sudo zeroclaw service status` | ZeroClaw status wrapper (uses `/etc/zeroclaw` config) |
+| `sudo naraeclaw service status` | NaraeClaw status wrapper (uses `/etc/zeroclaw` config) |
 
 ### 7.6 Logs
 
@@ -259,7 +259,7 @@ sudo rc-service zeroclaw stop
 sudo rc-update del zeroclaw default
 
 # Remove init script
-sudo zeroclaw service uninstall
+sudo naraeclaw service uninstall
 ```
 
 ### 7.8 Notes
@@ -272,10 +272,10 @@ sudo zeroclaw service uninstall
 
 ### 7.9 Checklist: Alpine/OpenRC Deployment
 
-- [ ] Install: `sudo zeroclaw service install`
+- [ ] Install: `sudo naraeclaw service install`
 - [ ] Enable: `sudo rc-update add zeroclaw default`
 - [ ] Start: `sudo rc-service zeroclaw start`
-- [ ] Verify: `sudo rc-service zeroclaw status`
+- [ ] Verify: `sudo rc-service naraeclaw status`
 - [ ] Check logs: `/var/log/zeroclaw/error.log`
 
 ---

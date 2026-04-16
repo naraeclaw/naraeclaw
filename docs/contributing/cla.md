@@ -3,7 +3,7 @@
 NaraeClaw accepts contributions under the same dual-license model used by the
 repository: **MIT OR Apache-2.0**.
 
-This document replaces the upstream ZeroClaw Labs CLA text for this fork. It is
+This document replaces the upstream NaraeClaw Labs CLA text for this fork. It is
 not a separate signature process and does not transfer ownership of your work.
 
 ## Contribution License
@@ -41,7 +41,7 @@ contribution.
 
 ## Fork Attribution
 
-NaraeClaw is a fork of ZeroClaw. Upstream attribution is preserved in `NOTICE`,
+NaraeClaw is a fork derived from ZeroClaw. Upstream attribution is preserved in `NOTICE`,
 `LICENSE-MIT`, and repository history. New NaraeClaw contributions are attributed
 through commit history and release metadata.
 

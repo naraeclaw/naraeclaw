@@ -9,9 +9,9 @@ use zeroclaw_macros::Configurable;
 
 // ── Top-level config ──────────────────────────────────────────────
 
-/// Top-level ZeroClaw configuration, loaded from `config.toml`.
+/// Top-level NaraeClaw configuration, loaded from `config.toml`.
 ///
-/// Resolution order: `ZEROCLAW_WORKSPACE` env → `active_workspace.toml` marker → `~/.naraeclaw/config.toml`.
+/// Resolution order: `NARAECLAW_WORKSPACE` env → `active_workspace.toml` marker → `~/.naraeclaw/config.toml`.
 #[derive(Debug, Clone, Serialize, Deserialize, Configurable)]
 #[cfg_attr(feature = "schema-export", derive(schemars::JsonSchema))]
 pub struct Config {
@@ -21,7 +21,7 @@ pub struct Config {
     /// Path to config.toml - computed from home, not serialized
     #[serde(skip)]
     pub config_path: PathBuf,
-    /// API key for the selected provider. Overridden by `ZEROCLAW_API_KEY` or `API_KEY` env vars.
+    /// API key for the selected provider. Overridden by `NARAECLAW_API_KEY` or `API_KEY` env vars.
     #[secret]
     pub api_key: Option<String>,
     /// Base URL override for provider API (e.g. "http://10.0.0.1:11434" for remote Ollama)
@@ -67,7 +67,7 @@ pub struct Config {
     /// `X-Title`) for request routing or policy enforcement. Headers defined here
     /// augment (and override) the program's default headers.
     ///
-    /// Can also be set via `ZEROCLAW_EXTRA_HEADERS` environment variable using
+    /// Can also be set via `NARAECLAW_EXTRA_HEADERS` environment variable using
     /// the format `Key:Value,Key2:Value2`. Env var headers override config file headers.
     #[serde(default)]
     pub extra_headers: HashMap<String, String>,
@@ -365,7 +365,7 @@ pub struct Config {
     /// `tool_descriptions/<locale>.toml`. Falls back to English, then to
     /// hardcoded descriptions.
     ///
-    /// If omitted or empty, the locale is auto-detected from `ZEROCLAW_LOCALE`,
+    /// If omitted or empty, the locale is auto-detected from `NARAECLAW_LOCALE`,
     /// `LANG`, or `LC_ALL` environment variables (defaulting to `"en"`).
     #[serde(default)]
     pub locale: Option<String>,
@@ -444,7 +444,7 @@ pub struct WorkspaceConfig {
 }
 
 pub fn default_workspaces_dir() -> String {
-    "~/.zeroclaw/workspaces".to_string()
+    "~/.naraeclaw/workspaces".to_string()
 }
 
 impl Default for WorkspaceConfig {
@@ -2609,7 +2609,7 @@ pub struct SecurityOpsConfig {
 }
 
 pub fn default_playbooks_dir() -> String {
-    "~/.zeroclaw/playbooks".into()
+    "~/.naraeclaw/playbooks".into()
 }
 
 pub fn default_require_approval() -> bool {
@@ -2621,7 +2621,7 @@ pub fn default_max_auto_severity() -> String {
 }
 
 pub fn default_report_output_dir() -> String {
-    "~/.zeroclaw/security-reports".into()
+    "~/.naraeclaw/security-reports".into()
 }
 
 impl Default for SecurityOpsConfig {

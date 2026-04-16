@@ -765,7 +765,7 @@ pub struct KnowledgeConfig {
 }
 
 pub fn default_knowledge_db_path() -> String {
-    "~/.zeroclaw/knowledge.db".into()
+    "~/.naraeclaw/knowledge.db".into()
 }
 
 pub fn default_knowledge_max_nodes() -> usize {
@@ -884,7 +884,7 @@ impl Default for PluginSecurityConfig {
 }
 
 pub fn default_plugins_dir() -> String {
-    "~/.zeroclaw/plugins".to_string()
+    "~/.naraeclaw/plugins".to_string()
 }
 
 pub fn default_max_plugins() -> usize {
@@ -1248,7 +1248,7 @@ impl Default for ClaudeCodeConfig {
 /// Claude Code task runner configuration (`[claude_code_runner]` section).
 ///
 /// Spawns Claude Code in a tmux session with HTTP hooks that POST tool
-/// execution events back to ZeroClaw's gateway, updating a Slack message
+/// execution events back to NaraeClaw's gateway, updating a Slack message
 /// in-place with progress plus an SSH handoff link.
 #[derive(Debug, Clone, Serialize, Deserialize, Configurable)]
 #[cfg_attr(feature = "schema-export", derive(schemars::JsonSchema))]
@@ -1428,7 +1428,7 @@ impl Default for OpenCodeCliConfig {
 pub enum ProxyScope {
     /// Use system environment proxy variables only.
     Environment,
-    /// Apply proxy to all ZeroClaw-managed HTTP traffic (default).
+    /// Apply proxy to all NaraeClaw-managed HTTP traffic (default).
     #[default]
     Zeroclaw,
     /// Apply proxy only to explicitly listed service selectors.

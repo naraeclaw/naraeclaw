@@ -1,6 +1,6 @@
 # Nextcloud Talk Setup
 
-This guide covers native Nextcloud Talk integration for ZeroClaw.
+This guide covers native Nextcloud Talk integration for NaraeClaw.
 
 ## 1. What this integration does
 
@@ -40,9 +40,9 @@ Environment override:
 Run the daemon or gateway and expose the webhook endpoint:
 
 ```bash
-zeroclaw daemon
+naraeclaw daemon
 # or
-zeroclaw gateway --host 127.0.0.1 --port 3000
+naraeclaw gateway --host 127.0.0.1 --port 3000
 ```
 
 Configure your Nextcloud Talk bot webhook URL to:
@@ -51,7 +51,7 @@ Configure your Nextcloud Talk bot webhook URL to:
 
 ## 4. Signature verification contract
 
-When `webhook_secret` is configured, ZeroClaw verifies:
+When `webhook_secret` is configured, NaraeClaw verifies:
 
 - header `X-Nextcloud-Talk-Random`
 - header `X-Nextcloud-Talk-Signature`
@@ -64,15 +64,15 @@ If verification fails, the gateway returns `401 Unauthorized`.
 
 ## 5. Message routing behavior
 
-- ZeroClaw ignores bot-originated webhook events (`actorType = bots`).
-- ZeroClaw ignores non-message/system events.
+- NaraeClaw ignores bot-originated webhook events (`actorType = bots`).
+- NaraeClaw ignores non-message/system events.
 - Reply routing uses the Talk room token from the webhook payload.
 
 ## 6. Quick validation checklist
 
 1. Set `allowed_users = ["*"]` for first-time validation.
 2. Send a test message in the target Talk room.
-3. Confirm ZeroClaw receives and replies in the same room.
+3. Confirm NaraeClaw receives and replies in the same room.
 4. Tighten `allowed_users` to explicit actor IDs.
 
 ## 7. Troubleshooting

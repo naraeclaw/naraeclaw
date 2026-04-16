@@ -151,7 +151,7 @@ NaraeClaw supports layered secret management for local development and CI hygien
     - Persistent setup for long-term use
     - When `secrets.encrypt = true` (default), secret values are encrypted before save
     - Secret key is stored at `~/.zeroclaw/.secret_key` with restricted permissions
-    - Use `zeroclaw onboard` for guided setup
+    - Use `naraeclaw onboard` for guided setup
 
 ### Runtime Resolution Rules
 

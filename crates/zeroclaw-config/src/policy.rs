@@ -1462,7 +1462,7 @@ impl SecurityPolicy {
 
     pub fn runtime_config_violation_message(&self, resolved: &Path) -> String {
         format!(
-            "Refusing to modify ZeroClaw runtime config/state file: {}. Use dedicated config tools or edit it manually outside the agent loop.",
+            "Refusing to modify NaraeClaw runtime config/state file: {}. Use dedicated config tools or edit it manually outside the agent loop.",
             resolved.display()
         )
     }
@@ -2110,13 +2110,13 @@ mod tests {
     #[test]
     fn absolute_path_inside_workspace_allowed_when_workspace_only() {
         let p = SecurityPolicy {
-            workspace_dir: PathBuf::from("/home/user/.zeroclaw/workspace"),
+            workspace_dir: PathBuf::from("/home/user/.naraeclaw/workspace"),
             workspace_only: true,
             ..SecurityPolicy::default()
         };
         // Absolute path inside workspace should be allowed
-        assert!(p.is_path_allowed("/home/user/.zeroclaw/workspace/images/example.png"));
-        assert!(p.is_path_allowed("/home/user/.zeroclaw/workspace/file.txt"));
+        assert!(p.is_path_allowed("/home/user/.naraeclaw/workspace/images/example.png"));
+        assert!(p.is_path_allowed("/home/user/.naraeclaw/workspace/file.txt"));
         // Absolute path outside workspace should still be blocked
         assert!(!p.is_path_allowed("/home/user/other/file.txt"));
         assert!(!p.is_path_allowed("/tmp/file.txt"));
@@ -2125,15 +2125,15 @@ mod tests {
     #[test]
     fn absolute_path_in_allowed_root_permitted_when_workspace_only() {
         let p = SecurityPolicy {
-            workspace_dir: PathBuf::from("/home/user/.zeroclaw/workspace"),
+            workspace_dir: PathBuf::from("/home/user/.naraeclaw/workspace"),
             workspace_only: true,
-            allowed_roots: vec![PathBuf::from("/home/user/.zeroclaw/shared")],
+            allowed_roots: vec![PathBuf::from("/home/user/.naraeclaw/shared")],
             ..SecurityPolicy::default()
         };
         // Path in allowed root should be permitted
-        assert!(p.is_path_allowed("/home/user/.zeroclaw/shared/data.txt"));
+        assert!(p.is_path_allowed("/home/user/.naraeclaw/shared/data.txt"));
         // Path in workspace should still be permitted
-        assert!(p.is_path_allowed("/home/user/.zeroclaw/workspace/file.txt"));
+        assert!(p.is_path_allowed("/home/user/.naraeclaw/workspace/file.txt"));
         // Path outside both should still be blocked
         assert!(!p.is_path_allowed("/home/user/other/file.txt"));
     }
@@ -3202,13 +3202,13 @@ mod tests {
     #[test]
     fn resolve_tool_path_normalizes_workspace_prefixed_relative_paths() {
         let p = SecurityPolicy {
-            workspace_dir: PathBuf::from("/zeroclaw-data/workspace"),
+            workspace_dir: PathBuf::from("/naraeclaw-data/workspace"),
             ..SecurityPolicy::default()
         };
-        let resolved = p.resolve_tool_path("zeroclaw-data/workspace/scripts/daily.py");
+        let resolved = p.resolve_tool_path("naraeclaw-data/workspace/scripts/daily.py");
         assert_eq!(
             resolved,
-            PathBuf::from("/zeroclaw-data/workspace/scripts/daily.py")
+            PathBuf::from("/naraeclaw-data/workspace/scripts/daily.py")
         );
     }
 

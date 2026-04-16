@@ -1,7 +1,7 @@
 //! Channel subsystem for messaging platform integrations.
 //!
 //! This module provides the multi-channel messaging infrastructure that connects
-//! ZeroClaw to external platforms. Each channel implements the [`Channel`] trait
+//! NaraeClaw to external platforms. Each channel implements the [`Channel`] trait
 //! defined in [`traits`], which provides a uniform interface for sending messages,
 //! listening for incoming messages, health checking, and typing indicators.
 //!
@@ -302,8 +302,8 @@ fn runtime_config_store() -> &'static Mutex<HashMap<PathBuf, RuntimeConfigState>
     STORE.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
-const SYSTEMD_STATUS_ARGS: [&str; 3] = ["--user", "is-active", "zeroclaw.service"];
-const SYSTEMD_RESTART_ARGS: [&str; 3] = ["--user", "restart", "zeroclaw.service"];
+const SYSTEMD_STATUS_ARGS: [&str; 3] = ["--user", "is-active", "naraeclaw.service"];
+const SYSTEMD_RESTART_ARGS: [&str; 3] = ["--user", "restart", "naraeclaw.service"];
 const OPENRC_STATUS_ARGS: [&str; 2] = ["zeroclaw", "status"];
 const OPENRC_RESTART_ARGS: [&str; 2] = ["zeroclaw", "restart"];
 
@@ -1524,7 +1524,7 @@ fn build_models_help_response(
     if cached_models.is_empty() {
         let _ = writeln!(
             response,
-            "\nNo cached model list found for `{}`. Ask the operator to run `zeroclaw models refresh --provider {}`.",
+            "\nNo cached model list found for `{}`. Ask the operator to run `naraeclaw models refresh --provider {}`.",
             current.provider, current.provider
         );
     } else {
@@ -1806,7 +1806,7 @@ async fn handle_runtime_command_if_needed(
                     &ctx.model_routes,
                 );
                 // Use a magic prefix so SlackChannel::send() can detect Block Kit JSON.
-                format!("__ZEROCLAW_BLOCK_KIT__{blocks_json}")
+                format!("__NARAECLAW_BLOCK_KIT__{blocks_json}")
             } else {
                 build_config_text_response(&current, ctx.workspace_dir.as_path(), &ctx.model_routes)
             }
@@ -3743,7 +3743,7 @@ pub async fn bind_telegram_identity(config: &Config, identity: &str) -> Result<(
     let mut updated = config.clone();
     let Some(telegram) = updated.channels_config.telegram.as_mut() else {
         anyhow::bail!(
-            "Telegram channel is not configured. Run `zeroclaw onboard --channels-only` first"
+            "Telegram channel is not configured. Run `naraeclaw onboard --channels-only` first"
         );
     };
 
@@ -3773,13 +3773,13 @@ pub async fn bind_telegram_identity(config: &Config, identity: &str) -> Result<(
         }
         Ok(false) => {
             println!(
-                "ℹ️ No managed daemon service detected. If `zeroclaw daemon`/`channel start` is already running, restart it to load the updated allowlist."
+                "ℹ️ No managed daemon service detected. If `naraeclaw daemon`/`channel start` is already running, restart it to load the updated allowlist."
             );
         }
         Err(e) => {
             eprintln!(
                 "⚠️ Allowlist saved, but failed to reload daemon service automatically: {e}\n\
-                 Restart service manually with `zeroclaw service stop && zeroclaw service start`."
+                 Restart service manually with `naraeclaw service stop && naraeclaw service start`."
             );
         }
     }
@@ -3794,7 +3794,7 @@ fn maybe_restart_managed_daemon_service() -> Result<bool> {
         let plist = home
             .join("Library")
             .join("LaunchAgents")
-            .join("com.zeroclaw.daemon.plist");
+            .join("com.naraeclaw.daemon.plist");
         if !plist.exists() {
             return Ok(false);
         }
@@ -3804,15 +3804,15 @@ fn maybe_restart_managed_daemon_service() -> Result<bool> {
             .output()
             .context("Failed to query launchctl list")?;
         let listed = String::from_utf8_lossy(&list_output.stdout);
-        if !listed.contains("com.zeroclaw.daemon") {
+        if !listed.contains("com.naraeclaw.daemon") {
             return Ok(false);
         }
 
         let _ = Command::new("launchctl")
-            .args(["stop", "com.zeroclaw.daemon"])
+            .args(["stop", "com.naraeclaw.daemon"])
             .output();
         let start_output = Command::new("launchctl")
-            .args(["start", "com.zeroclaw.daemon"])
+            .args(["start", "com.naraeclaw.daemon"])
             .output()
             .context("Failed to start launchd daemon service")?;
         if !start_output.status.success() {
@@ -3851,7 +3851,7 @@ fn maybe_restart_managed_daemon_service() -> Result<bool> {
             .join(".config")
             .join("systemd")
             .join("user")
-            .join("zeroclaw.service");
+            .join("naraeclaw.service");
         if !unit_path.exists() {
             return Ok(false);
         }
@@ -4727,11 +4727,11 @@ pub async fn doctor_channels(config: Config) -> Result<()> {
     }
 
     if channels.is_empty() {
-        println!("No real-time channels configured. Run `zeroclaw onboard` first.");
+        println!("No real-time channels configured. Run `naraeclaw onboard` first.");
         return Ok(());
     }
 
-    println!("🩺 ZeroClaw Channel Doctor");
+    println!("🩺 NaraeClaw Channel Doctor");
     println!();
 
     let mut healthy = 0_u32;
@@ -4763,7 +4763,7 @@ pub async fn doctor_channels(config: Config) -> Result<()> {
     }
 
     if config.channels_config.webhook.is_some() {
-        println!("  ℹ️  Webhook   check via `zeroclaw gateway` then GET /health");
+        println!("  ℹ️  Webhook   check via `naraeclaw gateway` then GET /health");
     }
 
     println!();
@@ -5058,11 +5058,11 @@ pub async fn start_channels(config: Config) -> Result<()> {
         ));
     }
     if channels.is_empty() {
-        println!("No channels configured. Run `zeroclaw onboard` to set up channels.");
+        println!("No channels configured. Run `naraeclaw onboard` to set up channels.");
         return Ok(());
     }
 
-    println!("🦀 ZeroClaw Channel Server");
+    println!("🦀 NaraeClaw Channel Server");
     println!("  🤖 Model:    {model}");
     let effective_backend = zeroclaw_memory::effective_memory_backend_name(
         &config.memory.backend,
@@ -5445,7 +5445,11 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         // Create minimal workspace files
         std::fs::write(tmp.path().join("SOUL.md"), "# Soul\nBe helpful.").unwrap();
-        std::fs::write(tmp.path().join("IDENTITY.md"), "# Identity\nName: ZeroClaw").unwrap();
+        std::fs::write(
+            tmp.path().join("IDENTITY.md"),
+            "# Identity\nName: NaraeClaw",
+        )
+        .unwrap();
         std::fs::write(tmp.path().join("USER.md"), "# User\nName: Test User").unwrap();
         std::fs::write(
             tmp.path().join("AGENTS.md"),
@@ -7399,7 +7403,7 @@ BTC is currently around $65,000 based on latest tool output."#
             reliability: Arc::new(zeroclaw_config::schema::ReliabilityConfig::default()),
             provider_runtime_options: zeroclaw_providers::ProviderRuntimeOptions {
                 zeroclaw_dir: Some(temp.path().to_path_buf()),
-                ..zeroclaw_providers::ProviderRuntimeOptions::default()
+                ..naraeclaw_providers::ProviderRuntimeOptions::default()
             },
             workspace_dir: Arc::new(std::env::temp_dir()),
             prompt_config: Arc::new(zeroclaw_config::schema::Config::default()),
@@ -7533,7 +7537,7 @@ BTC is currently around $65,000 based on latest tool output."#
             cost_tracking: None,
             pacing: zeroclaw_config::schema::PacingConfig {
                 loop_detection_enabled: false,
-                ..zeroclaw_config::schema::PacingConfig::default()
+                ..naraeclaw_config::schema::PacingConfig::default()
             },
             max_tool_result_chars: 0,
             context_token_budget: 0,
@@ -7629,7 +7633,7 @@ BTC is currently around $65,000 based on latest tool output."#
             cost_tracking: None,
             pacing: zeroclaw_config::schema::PacingConfig {
                 loop_detection_enabled: false,
-                ..zeroclaw_config::schema::PacingConfig::default()
+                ..naraeclaw_config::schema::PacingConfig::default()
             },
             max_tool_result_chars: 0,
             context_token_budget: 0,
@@ -8629,7 +8633,7 @@ BTC is currently around $65,000 based on latest tool output."#
         assert!(prompt.contains("Be helpful"), "missing SOUL content");
         assert!(prompt.contains("### IDENTITY.md"), "missing IDENTITY.md");
         assert!(
-            prompt.contains("Name: ZeroClaw"),
+            prompt.contains("Name: NaraeClaw"),
             "missing IDENTITY content"
         );
         assert!(prompt.contains("### USER.md"), "missing USER.md");
@@ -8867,7 +8871,7 @@ BTC is currently around $65,000 based on latest tool output."#
 
     #[test]
     fn channel_log_truncation_is_utf8_safe_for_multibyte_text() {
-        let msg = "Hello from ZeroClaw 🌍. Current status is healthy, and café-style UTF-8 text stays safe in logs.";
+        let msg = "Hello from NaraeClaw 🌍. Current status is healthy, and café-style UTF-8 text stays safe in logs.";
 
         // Reproduces the production crash path where channel logs truncate at 80 chars.
         let result =
@@ -8906,7 +8910,7 @@ BTC is currently around $65,000 based on latest tool output."#
         let ws = make_workspace();
         let config = zeroclaw_config::schema::AutonomyConfig {
             level: zeroclaw_runtime::security::AutonomyLevel::Full,
-            ..zeroclaw_config::schema::AutonomyConfig::default()
+            ..naraeclaw_config::schema::AutonomyConfig::default()
         };
         let prompt = build_system_prompt_with_mode_and_autonomy(
             ws.path(),
@@ -8937,7 +8941,7 @@ BTC is currently around $65,000 based on latest tool output."#
         let ws = make_workspace();
         let config = zeroclaw_config::schema::AutonomyConfig {
             level: zeroclaw_runtime::security::AutonomyLevel::ReadOnly,
-            ..zeroclaw_config::schema::AutonomyConfig::default()
+            ..naraeclaw_config::schema::AutonomyConfig::default()
         };
         let prompt = build_system_prompt_with_mode_and_autonomy(
             ws.path(),
@@ -10227,11 +10231,11 @@ This is an example JSON object for profile settings."#;
     fn maybe_restart_daemon_systemd_args_regression() {
         assert_eq!(
             SYSTEMD_STATUS_ARGS,
-            ["--user", "is-active", "zeroclaw.service"]
+            ["--user", "is-active", "naraeclaw.service"]
         );
         assert_eq!(
             SYSTEMD_RESTART_ARGS,
-            ["--user", "restart", "zeroclaw.service"]
+            ["--user", "restart", "naraeclaw.service"]
         );
     }
 

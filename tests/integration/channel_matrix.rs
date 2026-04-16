@@ -4,7 +4,7 @@
 //! contract, covering: identity semantics, threading, default methods,
 //! capability declarations, cross-channel parity, and edge cases.
 //!
-//! This matrix ensures ZeroClaw channels are fully tested to maintain
+//! This matrix ensures NaraeClaw channels are fully tested to maintain
 //! competitive feature parity across all supported platforms.
 
 use async_trait::async_trait;
