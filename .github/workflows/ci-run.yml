@@ -36,9 +36,6 @@ jobs:
       - name: Install system dependencies
         run: sudo apt-get update -qq && sudo apt-get install -y libudev-dev
 
-      - name: Ensure web/dist placeholder exists
-        run: mkdir -p web/dist && touch web/dist/.gitkeep
-
       - name: Check formatting
         run: cargo fmt --all -- --check
 

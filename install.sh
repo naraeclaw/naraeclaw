@@ -236,12 +236,7 @@ detect_release_target() {
       echo "x86_64-unknown-linux-gnu"
       ;;
     Linux:aarch64|Linux:arm64)
-      # Termux on Android needs the android target, not linux-gnu
-      if [[ -n "${TERMUX_VERSION:-}" || -d "/data/data/com.termux" ]]; then
-        echo "aarch64-linux-android"
-      else
-        echo "aarch64-unknown-linux-gnu"
-      fi
+      echo "aarch64-unknown-linux-gnu"
       ;;
     Linux:armv7l)
       echo "armv7-unknown-linux-gnueabihf"
@@ -268,11 +263,6 @@ detect_device_class() {
     return
   fi
 
-  # Termux / Android
-  if [[ -n "${TERMUX_VERSION:-}" || -d "/data/data/com.termux" ]]; then
-    echo "mobile"
-    return
-  fi
 
   local os arch
   os="$(uname -s)"

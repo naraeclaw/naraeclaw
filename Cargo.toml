@@ -47,7 +47,6 @@ include = [
   "/LICENSE*",
   "/NOTICE",
   "/README.md",
-  "/web/dist/**/*",
   "/tool_descriptions/**/*",
 ]
 
@@ -213,7 +212,6 @@ mime_guess = { version = "2", optional = true }
 # Use the blocking HTTP exporter client to avoid Tokio-reactor panics in
 # non-Tokio contexts.
 
-# (Linux, macOS, Windows). Android/Termux uses target_os="android" and is excluded.
 
 # Uses wa-rs for Bot and Client, wa-rs-core for storage traits, custom rusqlite backend avoids Diesel conflict.
 
