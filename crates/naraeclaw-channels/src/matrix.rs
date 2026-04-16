@@ -37,7 +37,7 @@ pub struct MatrixChannel {
     allowed_rooms: Vec<String>,
     session_owner_hint: Option<String>,
     session_device_id_hint: Option<String>,
-    zeroclaw_dir: Option<PathBuf>,
+    naraeclaw_dir: Option<PathBuf>,
     resolved_room_id_cache: Arc<RwLock<Option<String>>>,
     sdk_client: Arc<OnceCell<MatrixSdkClient>>,
     http_client: Client,
@@ -188,14 +188,14 @@ impl MatrixChannel {
         )
     }
 
-    pub fn new_with_session_hint_and_zeroclaw_dir(
+    pub fn new_with_session_hint_and_naraeclaw_dir(
         homeserver: String,
         access_token: String,
         room_id: String,
         allowed_users: Vec<String>,
         owner_hint: Option<String>,
         device_id_hint: Option<String>,
-        zeroclaw_dir: Option<PathBuf>,
+        naraeclaw_dir: Option<PathBuf>,
     ) -> Self {
         Self::new_full(
             homeserver,
@@ -205,7 +205,7 @@ impl MatrixChannel {
             vec![],
             owner_hint,
             device_id_hint,
-            zeroclaw_dir,
+            naraeclaw_dir,
             None,
         )
     }
@@ -218,7 +218,7 @@ impl MatrixChannel {
         allowed_rooms: Vec<String>,
         owner_hint: Option<String>,
         device_id_hint: Option<String>,
-        zeroclaw_dir: Option<PathBuf>,
+        naraeclaw_dir: Option<PathBuf>,
         recovery_key: Option<String>,
     ) -> Self {
         let homeserver = homeserver.trim_end_matches('/').to_string();
@@ -243,7 +243,7 @@ impl MatrixChannel {
             allowed_rooms,
             session_owner_hint: Self::normalize_optional_field(owner_hint),
             session_device_id_hint: Self::normalize_optional_field(device_id_hint),
-            zeroclaw_dir,
+            naraeclaw_dir,
             resolved_room_id_cache: Arc::new(RwLock::new(None)),
             sdk_client: Arc::new(OnceCell::new()),
             http_client: Client::new(),
@@ -376,7 +376,7 @@ impl MatrixChannel {
     }
 
     fn matrix_store_dir(&self) -> Option<PathBuf> {
-        self.zeroclaw_dir
+        self.naraeclaw_dir
             .as_ref()
             .map(|dir| dir.join("state").join("matrix"))
     }
@@ -1869,8 +1869,8 @@ mod tests {
     }
 
     #[test]
-    fn matrix_store_dir_is_derived_from_zeroclaw_dir() {
-        let ch = MatrixChannel::new_with_session_hint_and_zeroclaw_dir(
+    fn matrix_store_dir_is_derived_from_naraeclaw_dir() {
+        let ch = MatrixChannel::new_with_session_hint_and_naraeclaw_dir(
             "https://matrix.org".to_string(),
             "tok".to_string(),
             "!r:m".to_string(),
@@ -1887,7 +1887,7 @@ mod tests {
     }
 
     #[test]
-    fn matrix_store_dir_absent_without_zeroclaw_dir() {
+    fn matrix_store_dir_absent_without_naraeclaw_dir() {
         let ch = MatrixChannel::new_with_session_hint(
             "https://matrix.org".to_string(),
             "tok".to_string(),

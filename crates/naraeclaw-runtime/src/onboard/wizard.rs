@@ -584,8 +584,8 @@ async fn run_quick_setup_with_home(
     );
     println!();
 
-    let (zeroclaw_dir, workspace_dir) = resolve_quick_setup_dirs_with_home(home);
-    let config_path = zeroclaw_dir.join("config.toml");
+    let (naraeclaw_dir, workspace_dir) = resolve_quick_setup_dirs_with_home(home);
+    let config_path = naraeclaw_dir.join("config.toml");
 
     ensure_onboard_overwrite_allowed(&config_path, force)?;
     fs::create_dir_all(&workspace_dir)
@@ -5743,10 +5743,10 @@ mod tests {
         let _workspace_env = EnvVarGuard::unset("NARAECLAW_WORKSPACE");
         let _config_env = EnvVarGuard::unset("NARAECLAW_CONFIG_DIR");
         let tmp = TempDir::new().unwrap();
-        let zeroclaw_dir = tmp.path().join(".naraeclaw");
-        let config_path = zeroclaw_dir.join("config.toml");
+        let naraeclaw_dir = tmp.path().join(".naraeclaw");
+        let config_path = naraeclaw_dir.join("config.toml");
 
-        tokio::fs::create_dir_all(&zeroclaw_dir).await.unwrap();
+        tokio::fs::create_dir_all(&naraeclaw_dir).await.unwrap();
         tokio::fs::write(&config_path, "default_provider = \"openrouter\"\n")
             .await
             .unwrap();
@@ -5773,10 +5773,10 @@ mod tests {
         let _workspace_env = EnvVarGuard::unset("NARAECLAW_WORKSPACE");
         let _config_env = EnvVarGuard::unset("NARAECLAW_CONFIG_DIR");
         let tmp = TempDir::new().unwrap();
-        let zeroclaw_dir = tmp.path().join(".naraeclaw");
-        let config_path = zeroclaw_dir.join("config.toml");
+        let naraeclaw_dir = tmp.path().join(".naraeclaw");
+        let config_path = naraeclaw_dir.join("config.toml");
 
-        tokio::fs::create_dir_all(&zeroclaw_dir).await.unwrap();
+        tokio::fs::create_dir_all(&naraeclaw_dir).await.unwrap();
         tokio::fs::write(
             &config_path,
             "default_provider = \"anthropic\"\ndefault_model = \"stale-model\"\n",

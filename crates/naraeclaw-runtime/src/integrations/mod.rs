@@ -146,8 +146,8 @@ pub fn show_integration_info(config: &Config, name: &str) -> Result<()> {
         }
         "Cron" => {
             println!("  Built-in:");
-            println!("    Schedule tasks in ~/.zeroclaw/workspace/cron/");
-            println!("    Run: zeroclaw cron list");
+            println!("    Schedule tasks in ~/.naraeclaw/workspace/cron/");
+            println!("    Run: naraeclaw cron list");
         }
         "Weather" => {
             println!("  Built-in:");
@@ -164,7 +164,7 @@ pub fn show_integration_info(config: &Config, name: &str) -> Result<()> {
         _ => {
             if status == IntegrationStatus::ComingSoon {
                 println!("  This integration is planned. Stay tuned!");
-                println!("  Track progress: https://github.com/zeroclaw-labs/zeroclaw");
+                println!("  Track progress: https://github.com/naraeclaw/naraeclaw");
             }
         }
     }
@@ -173,7 +173,7 @@ pub fn show_integration_info(config: &Config, name: &str) -> Result<()> {
     Ok(())
 }
 
-#[cfg(all(test, zeroclaw_root_crate))]
+#[cfg(all(test, naraeclaw_root_crate))]
 mod tests {
     use super::*;
 

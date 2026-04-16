@@ -140,9 +140,9 @@ fi
 
 # Test 8: Binary size check
 print_test "Binary size verification"
-if [ -f "target/release/zeroclaw" ]; then
-    BINARY_SIZE=$(ls -lh target/release/zeroclaw | awk '{print $5}')
-    SIZE_BYTES=$(stat -f%z target/release/zeroclaw 2>/dev/null || stat -c%s target/release/zeroclaw)
+if [ -f "target/release/naraeclaw" ]; then
+    BINARY_SIZE=$(ls -lh target/release/naraeclaw | awk '{print $5}')
+    SIZE_BYTES=$(stat -f%z target/release/naraeclaw 2>/dev/null || stat -c%s target/release/naraeclaw)
     SIZE_MB=$((SIZE_BYTES / 1024 / 1024))
 
     if [ $SIZE_MB -le 10 ]; then
@@ -162,7 +162,7 @@ print_header "Phase 3: Configuration Tests"
 
 # Test 9: Config file existence
 print_test "Configuration file check"
-CONFIG_PATH="$HOME/.zeroclaw/config.toml"
+CONFIG_PATH="$HOME/.naraeclaw/config.toml"
 if [ -f "$CONFIG_PATH" ]; then
     pass "Config file exists at $CONFIG_PATH"
 

@@ -239,7 +239,7 @@ mod tests {
 
     fn identity_with_roles(roles: Vec<&str>) -> NevisIdentity {
         NevisIdentity {
-            user_id: "zeroclaw_user".into(),
+            user_id: "naraeclaw_user".into(),
             roles: roles.into_iter().map(String::from).collect(),
             scopes: vec!["openid".into()],
             mfa_verified: true,

@@ -1,13 +1,13 @@
-//! `zeroclaw update` — self-update pipeline with rollback.
+//! `naraeclaw update` — self-update pipeline with rollback.
 
 use anyhow::{Context, Result, bail};
 use std::path::Path;
 use tracing::{info, warn};
 
 const GITHUB_RELEASES_LATEST_URL: &str =
-    "https://api.github.com/repos/zeroclaw-labs/zeroclaw/releases/latest";
+    "https://api.github.com/repos/naraeclaw/naraeclaw/releases/latest";
 const GITHUB_RELEASES_TAG_URL: &str =
-    "https://api.github.com/repos/zeroclaw-labs/zeroclaw/releases/tags";
+    "https://api.github.com/repos/naraeclaw/naraeclaw/releases/tags";
 
 #[derive(Debug)]
 pub struct UpdateInfo {
@@ -207,7 +207,7 @@ async fn download_binary(url: &str, dest: &Path) -> Result<()> {
 
     let bytes = resp.bytes().await.context("failed to read download body")?;
 
-    // Release assets are .tar.gz archives containing a single `zeroclaw` binary.
+    // Release assets are .tar.gz archives containing a single `naraeclaw` binary.
     // Extract the binary from the archive instead of writing the raw tarball.
     if url.ends_with(".tar.gz") || url.ends_with(".tgz") {
         extract_tar_gz(&bytes, dest).context("failed to extract binary from tar.gz archive")?;
@@ -228,7 +228,7 @@ async fn download_binary(url: &str, dest: &Path) -> Result<()> {
     Ok(())
 }
 
-/// Extract the `zeroclaw` binary from a `.tar.gz` archive.
+/// Extract the `naraeclaw` binary from a `.tar.gz` archive.
 fn extract_tar_gz(archive_bytes: &[u8], dest: &Path) -> Result<()> {
     use flate2::read::GzDecoder;
     use std::io::Read;

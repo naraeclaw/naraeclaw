@@ -530,7 +530,7 @@ mod tests {
     #[test]
     fn nevis_identity_serde_roundtrip() {
         let identity = NevisIdentity {
-            user_id: "zeroclaw_user".into(),
+            user_id: "naraeclaw_user".into(),
             roles: vec!["admin".into(), "operator".into()],
             scopes: vec!["openid".into(), "profile".into()],
             mfa_verified: true,
@@ -539,7 +539,7 @@ mod tests {
 
         let json = serde_json::to_string(&identity).unwrap();
         let parsed: NevisIdentity = serde_json::from_str(&json).unwrap();
-        assert_eq!(parsed.user_id, "zeroclaw_user");
+        assert_eq!(parsed.user_id, "naraeclaw_user");
         assert_eq!(parsed.roles.len(), 2);
         assert!(parsed.mfa_verified);
     }

@@ -110,4 +110,4 @@ scopeguard = "1.2"
 # Channel features (forwarded to naraeclaw-channels)
 
 [lints.rust]
-unexpected_cfgs = { level = "warn", check-cfg = ['cfg(zeroclaw_root_crate)'] }
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(naraeclaw_root_crate)'] }

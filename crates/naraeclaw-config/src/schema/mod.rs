@@ -2011,8 +2011,8 @@ mod tests {
 
     #[test]
     async fn config_dir_creation_error_mentions_openrc_and_path() {
-        let msg = config_dir_creation_error(Path::new("/etc/zeroclaw"));
-        assert!(msg.contains("/etc/zeroclaw"));
+        let msg = config_dir_creation_error(Path::new("/etc/naraeclaw"));
+        assert!(msg.contains("/etc/naraeclaw"));
         assert!(msg.contains("OpenRC"));
         assert!(msg.contains("zeroclaw"));
     }
@@ -2651,11 +2651,11 @@ provider_timeout_secs = 300
     #[test]
     async fn parse_extra_headers_env_with_url_value() {
         let headers =
-            parse_extra_headers_env("HTTP-Referer:https://github.com/zeroclaw-labs/zeroclaw");
+            parse_extra_headers_env("HTTP-Referer:https://github.com/naraeclaw/naraeclaw");
         assert_eq!(headers.len(), 1);
         // Only splits on first colon, preserving URL colons in value
         assert_eq!(headers[0].0, "HTTP-Referer");
-        assert_eq!(headers[0].1, "https://github.com/zeroclaw-labs/zeroclaw");
+        assert_eq!(headers[0].1, "https://github.com/naraeclaw/naraeclaw");
     }
 
     #[test]

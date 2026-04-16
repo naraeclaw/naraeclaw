@@ -957,15 +957,15 @@ async fn main() -> Result<()> {
 
         // Handle --reinit: backup and reset configuration
         if reinit {
-            let (zeroclaw_dir, _) =
+            let (naraeclaw_dir, _) =
                 crate::config::schema::resolve_runtime_dirs_for_onboarding().await?;
 
-            if zeroclaw_dir.exists() {
+            if naraeclaw_dir.exists() {
                 let timestamp = chrono::Local::now().format("%Y%m%d%H%M%S");
-                let backup_dir = format!("{}.backup.{}", zeroclaw_dir.display(), timestamp);
+                let backup_dir = format!("{}.backup.{}", naraeclaw_dir.display(), timestamp);
 
                 println!("⚠️  Reinitializing NaraeClaw configuration...");
-                println!("   Current config directory: {}", zeroclaw_dir.display());
+                println!("   Current config directory: {}", naraeclaw_dir.display());
                 println!(
                     "   This will back up your existing config to: {}",
                     backup_dir
@@ -985,7 +985,7 @@ async fn main() -> Result<()> {
                 println!();
 
                 // Rename existing directory as backup
-                tokio::fs::rename(&zeroclaw_dir, &backup_dir)
+                tokio::fs::rename(&naraeclaw_dir, &backup_dir)
                     .await
                     .with_context(|| {
                         format!("Failed to backup existing config to {}", backup_dir)
@@ -2612,7 +2612,7 @@ async fn handle_auth_command(auth_command: AuthCommands, config: &Config) -> Res
                         Err(e) => {
                             println!("Callback capture failed: {e}");
                             println!(
-                                "Run `zeroclaw auth paste-redirect --provider gemini --profile {profile}`"
+                                "Run `naraeclaw auth paste-redirect --provider gemini --profile {profile}`"
                             );
                             return Ok(());
                         }
@@ -2705,7 +2705,7 @@ async fn handle_auth_command(auth_command: AuthCommands, config: &Config) -> Res
                         Err(e) => {
                             println!("Callback capture failed: {e}");
                             println!(
-                                "Run `zeroclaw auth paste-redirect --provider openai-codex --profile {profile}`"
+                                "Run `naraeclaw auth paste-redirect --provider openai-codex --profile {profile}`"
                             );
                             return Ok(());
                         }
@@ -2743,7 +2743,7 @@ async fn handle_auth_command(auth_command: AuthCommands, config: &Config) -> Res
                 "openai-codex" => {
                     let pending = load_pending_oauth_login(config, "openai")?.ok_or_else(|| {
                         anyhow::anyhow!(
-                            "No pending OpenAI login found. Run `zeroclaw auth login --provider openai-codex` first."
+                            "No pending OpenAI login found. Run `naraeclaw auth login --provider openai-codex` first."
                         )
                     })?;
 
@@ -2787,7 +2787,7 @@ async fn handle_auth_command(auth_command: AuthCommands, config: &Config) -> Res
                 "gemini" => {
                     let pending = load_pending_oauth_login(config, "gemini")?.ok_or_else(|| {
                         anyhow::anyhow!(
-                            "No pending Gemini login found. Run `zeroclaw auth login --provider gemini` first."
+                            "No pending Gemini login found. Run `naraeclaw auth login --provider gemini` first."
                         )
                     })?;
 
@@ -2905,7 +2905,7 @@ async fn handle_auth_command(auth_command: AuthCommands, config: &Config) -> Res
                         }
                         None => {
                             bail!(
-                                "No OpenAI Codex auth profile found. Run `zeroclaw auth login --provider openai-codex`."
+                                "No OpenAI Codex auth profile found. Run `naraeclaw auth login --provider openai-codex`."
                             )
                         }
                     }
@@ -2923,7 +2923,7 @@ async fn handle_auth_command(auth_command: AuthCommands, config: &Config) -> Res
                         }
                         None => {
                             bail!(
-                                "No Gemini auth profile found. Run `zeroclaw auth login --provider gemini`."
+                                "No Gemini auth profile found. Run `naraeclaw auth login --provider gemini`."
                             )
                         }
                     }

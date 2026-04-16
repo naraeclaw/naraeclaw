@@ -662,8 +662,8 @@ impl TelegramChannel {
         let home = UserDirs::new()
             .map(|u| u.home_dir().to_path_buf())
             .context("Could not find home directory")?;
-        let zeroclaw_dir = home.join(".zeroclaw");
-        let config_path = zeroclaw_dir.join("config.toml");
+        let naraeclaw_dir = home.join(".naraeclaw");
+        let config_path = naraeclaw_dir.join("config.toml");
 
         let contents = fs::read_to_string(&config_path)
             .await
@@ -672,7 +672,7 @@ impl TelegramChannel {
             "Failed to parse config.toml — check [channels.telegram] section for syntax errors",
         )?;
         config.config_path = config_path;
-        config.workspace_dir = zeroclaw_dir.join("workspace");
+        config.workspace_dir = naraeclaw_dir.join("workspace");
         Ok(config)
     }
 
@@ -4857,7 +4857,7 @@ mod tests {
             "chat": { "id": chat_id },
             "reply_to_message": {
                 "message_id": message_id,
-                "from": { "username": "zeroclaw_user" },
+                "from": { "username": "naraeclaw_user" },
                 "voice": { "file_id": "test_file", "duration": 1 }
             }
         });

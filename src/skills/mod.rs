@@ -29,9 +29,9 @@ pub fn handle_command(command: crate::SkillCommands, config: &crate::config::Con
             if skills.is_empty() {
                 println!("No skills installed.");
                 println!();
-                println!("  Create one: mkdir -p ~/.zeroclaw/workspace/skills/my-skill");
+                println!("  Create one: mkdir -p ~/.naraeclaw/workspace/skills/my-skill");
                 println!(
-                    "              echo '# My Skill' > ~/.zeroclaw/workspace/skills/my-skill/SKILL.md"
+                    "              echo '# My Skill' > ~/.naraeclaw/workspace/skills/my-skill/SKILL.md"
                 );
                 println!();
                 println!("  Or install: naraeclaw skills install <source>");

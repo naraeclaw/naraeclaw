@@ -334,7 +334,7 @@ fn status_linux(config: &Config, init_system: InitSystem) -> Result<()> {
             let out = run_capture(Command::new("rc-service").args(["naraeclaw", "status"]))
                 .unwrap_or_else(|_| "unknown".into());
             println!("Service state: {}", out.trim());
-            println!("Unit: /etc/init.d/zeroclaw");
+            println!("Unit: /etc/init.d/naraeclaw");
         }
         InitSystem::Auto => unreachable!("Auto should be resolved before this point"),
     }
@@ -430,13 +430,13 @@ fn logs_linux(config: &Config, init_system: InitSystem, lines: usize, follow: bo
             }
         }
         InitSystem::Openrc => {
-            // OpenRC logs go to /var/log/zeroclaw/error.log (as configured in the init script)
-            let log_file = Path::new("/var/log/zeroclaw/error.log");
+            // OpenRC logs go to /var/log/naraeclaw/error.log (as configured in the init script)
+            let log_file = Path::new("/var/log/naraeclaw/error.log");
             if !log_file.exists() {
                 // Fall back to access log
-                let access_log = Path::new("/var/log/zeroclaw/access.log");
+                let access_log = Path::new("/var/log/naraeclaw/access.log");
                 if !access_log.exists() {
-                    bail!("No log files found at /var/log/zeroclaw/. Is the service installed?");
+                    bail!("No log files found at /var/log/naraeclaw/. Is the service installed?");
                 }
                 return tail_file(access_log, lines, follow);
             }
@@ -544,7 +544,7 @@ pub fn uninstall(config: &Config, init_system: InitSystem) -> Result<()> {
             .parent()
             .map_or_else(|| PathBuf::from("."), PathBuf::from)
             .join("logs")
-            .join("zeroclaw-daemon.cmd");
+            .join("naraeclaw-daemon.cmd");
         if wrapper.exists() {
             fs::remove_file(&wrapper).ok();
         }
@@ -567,19 +567,19 @@ fn uninstall_linux(config: &Config, init_system: InitSystem) -> Result<()> {
             println!("✅ Service uninstalled ({})", file.display());
         }
         InitSystem::Openrc => {
-            let init_script = Path::new("/etc/init.d/zeroclaw");
+            let init_script = Path::new("/etc/init.d/naraeclaw");
             if init_script.exists() {
                 if let Err(err) =
-                    run_checked(Command::new("rc-update").args(["del", "zeroclaw", "default"]))
+                    run_checked(Command::new("rc-update").args(["del", "naraeclaw", "default"]))
                 {
                     eprintln!(
-                        "⚠️  Warning: Could not remove zeroclaw from OpenRC default runlevel: {err}"
+                        "⚠️  Warning: Could not remove naraeclaw from OpenRC default runlevel: {err}"
                     );
                 }
                 fs::remove_file(init_script)
                     .with_context(|| format!("Failed to remove {}", init_script.display()))?;
             }
-            println!("✅ Service uninstalled (/etc/init.d/zeroclaw)");
+            println!("✅ Service uninstalled (/etc/init.d/naraeclaw)");
         }
         InitSystem::Auto => unreachable!("Auto should be resolved before this point"),
     }
@@ -587,7 +587,7 @@ fn uninstall_linux(config: &Config, init_system: InitSystem) -> Result<()> {
 }
 
 /// Detect if the executable lives under a Homebrew prefix and return the
-/// corresponding `var/zeroclaw` directory.
+/// corresponding `var/naraeclaw` directory.
 ///
 /// Homebrew installs binaries into `<prefix>/Cellar/<formula>/<version>/bin/`
 /// and symlinks them to `<prefix>/bin/`. The canonical `var` directory is
@@ -595,21 +595,21 @@ fn uninstall_linux(config: &Config, init_system: InitSystem) -> Result<()> {
 fn detect_homebrew_var_dir(exe: &Path) -> Option<PathBuf> {
     let path_str = exe.to_string_lossy();
 
-    // Symlinked binary: <prefix>/bin/zeroclaw
-    // Cellar binary:    <prefix>/Cellar/zeroclaw/<version>/bin/zeroclaw
+    // Symlinked binary: <prefix>/bin/naraeclaw
+    // Cellar binary:    <prefix>/Cellar/naraeclaw/<version>/bin/naraeclaw
     let prefix = if path_str.contains("/Cellar/") {
-        // Walk up from .../Cellar/zeroclaw/<ver>/bin/zeroclaw to the prefix
+        // Walk up from .../Cellar/naraeclaw/<ver>/bin/naraeclaw to the prefix
         let mut ancestor = exe.to_path_buf();
         while let Some(parent) = ancestor.parent() {
             ancestor = parent.to_path_buf();
             if ancestor.file_name().is_some_and(|n| n == "Cellar") {
                 // prefix is one level above Cellar
-                return ancestor.parent().map(|p| p.join("var").join("zeroclaw"));
+                return ancestor.parent().map(|p| p.join("var").join("naraeclaw"));
             }
         }
         return None;
     } else if let Some(bin_parent) = exe.parent() {
-        // <prefix>/bin/zeroclaw → check if <prefix>/Cellar exists (Homebrew marker)
+        // <prefix>/bin/naraeclaw → check if <prefix>/Cellar exists (Homebrew marker)
         if let Some(prefix) = bin_parent.parent() {
             if prefix.join("Cellar").is_dir() {
                 Some(prefix.to_path_buf())
@@ -623,7 +623,7 @@ fn detect_homebrew_var_dir(exe: &Path) -> Option<PathBuf> {
         None
     };
 
-    prefix.map(|p| p.join("var").join("zeroclaw"))
+    prefix.map(|p| p.join("var").join("naraeclaw"))
 }
 
 fn install_macos(config: &Config) -> Result<()> {
@@ -776,20 +776,22 @@ fn is_root() -> bool {
     false
 }
 
-/// Check if the zeroclaw user exists and has expected properties.
+/// Check if the naraeclaw user exists and has expected properties.
 /// Returns Ok if user doesn't exist (OpenRC will handle creation or fail gracefully).
 /// Returns error if user exists but has unexpected properties.
-fn check_zeroclaw_user() -> Result<()> {
-    let output = Command::new("getent").args(["passwd", "zeroclaw"]).output();
+fn check_naraeclaw_user() -> Result<()> {
+    let output = Command::new("getent")
+        .args(["passwd", "naraeclaw"])
+        .output();
     let is_alpine = Path::new("/etc/alpine-release").exists();
 
     let (del_cmd, add_cmd) = if is_alpine {
         (
-            "deluser zeroclaw && delgroup zeroclaw",
-            "addgroup -S zeroclaw && adduser -S -s /sbin/nologin -H -D -G zeroclaw zeroclaw",
+            "deluser naraeclaw && delgroup naraeclaw",
+            "addgroup -S naraeclaw && adduser -S -s /sbin/nologin -H -D -G naraeclaw naraeclaw",
         )
     } else {
-        ("userdel zeroclaw", "useradd -r -s /sbin/nologin zeroclaw")
+        ("userdel naraeclaw", "useradd -r -s /sbin/nologin naraeclaw")
     };
 
     match output {
@@ -804,7 +806,7 @@ fn check_zeroclaw_user() -> Result<()> {
 
                 if uid.parse::<u32>().unwrap_or(999) >= 1000 {
                     bail!(
-                        "User 'zeroclaw' exists but has unexpected UID {} (expected system UID < 1000).\n\
+                        "User 'naraeclaw' exists but has unexpected UID {} (expected system UID < 1000).\n\
                          Recreate with: sudo {} && sudo {}",
                         uid,
                         del_cmd,
@@ -814,7 +816,7 @@ fn check_zeroclaw_user() -> Result<()> {
 
                 if !shell.contains("nologin") && !shell.contains("false") {
                     bail!(
-                        "User 'zeroclaw' exists but has unexpected shell '{}'.\n\
+                        "User 'naraeclaw' exists but has unexpected shell '{}'.\n\
                          Expected nologin/false for security. Fix with: sudo {} && sudo {}",
                         shell,
                         del_cmd,
@@ -822,9 +824,9 @@ fn check_zeroclaw_user() -> Result<()> {
                     );
                 }
 
-                if home != "/var/lib/zeroclaw" && home != "/nonexistent" {
+                if home != "/var/lib/naraeclaw" && home != "/nonexistent" {
                     eprintln!(
-                        "⚠️  Warning: zeroclaw user has home directory '{}' (expected /var/lib/zeroclaw or /nonexistent)",
+                        "⚠️  Warning: naraeclaw user has home directory '{}' (expected /var/lib/naraeclaw or /nonexistent)",
                         home
                     );
                 }
@@ -837,31 +839,33 @@ fn check_zeroclaw_user() -> Result<()> {
     }
 }
 
-fn ensure_zeroclaw_user() -> Result<()> {
-    let output = Command::new("getent").args(["passwd", "zeroclaw"]).output();
+fn ensure_naraeclaw_user() -> Result<()> {
+    let output = Command::new("getent")
+        .args(["passwd", "naraeclaw"])
+        .output();
     if let Ok(output) = output
         && output.status.success()
     {
-        return check_zeroclaw_user();
+        return check_naraeclaw_user();
     }
 
     let is_alpine = Path::new("/etc/alpine-release").exists();
 
     if is_alpine {
-        let group_output = Command::new("getent").args(["group", "zeroclaw"]).output();
+        let group_output = Command::new("getent").args(["group", "naraeclaw"]).output();
         let group_exists = group_output.map(|o| o.status.success()).unwrap_or(false);
 
         if !group_exists {
             let output = Command::new("addgroup")
-                .args(["-S", "zeroclaw"])
+                .args(["-S", "naraeclaw"])
                 .output()
-                .context("Failed to create zeroclaw group")?;
+                .context("Failed to create naraeclaw group")?;
 
             if !output.status.success() {
                 let stderr = String::from_utf8_lossy(&output.stderr);
-                bail!("Failed to create zeroclaw group: {}", stderr.trim());
+                bail!("Failed to create naraeclaw group: {}", stderr.trim());
             }
-            println!("✅ Created system group: zeroclaw");
+            println!("✅ Created system group: naraeclaw");
         }
 
         let output = Command::new("adduser")
@@ -872,44 +876,44 @@ fn ensure_zeroclaw_user() -> Result<()> {
                 "-H",
                 "-D",
                 "-G",
-                "zeroclaw",
-                "zeroclaw",
+                "naraeclaw",
+                "naraeclaw",
             ])
             .output()
-            .context("Failed to create zeroclaw user")?;
+            .context("Failed to create naraeclaw user")?;
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            bail!("Failed to create zeroclaw user: {}", stderr.trim());
+            bail!("Failed to create naraeclaw user: {}", stderr.trim());
         }
     } else {
         let output = Command::new("useradd")
-            .args(["-r", "-s", "/sbin/nologin", "zeroclaw"])
+            .args(["-r", "-s", "/sbin/nologin", "naraeclaw"])
             .output()
-            .context("Failed to create zeroclaw user")?;
+            .context("Failed to create naraeclaw user")?;
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            bail!("Failed to create zeroclaw user: {}", stderr.trim());
+            bail!("Failed to create naraeclaw user: {}", stderr.trim());
         }
     }
 
-    println!("✅ Created system user: zeroclaw");
+    println!("✅ Created system user: naraeclaw");
     Ok(())
 }
 
-/// Change ownership of a path to zeroclaw:zeroclaw
+/// Change ownership of a path to naraeclaw:naraeclaw
 #[cfg(unix)]
-fn chown_to_zeroclaw(path: &Path) -> Result<()> {
+fn chown_to_naraeclaw(path: &Path) -> Result<()> {
     let output = Command::new("chown")
-        .args(["zeroclaw:zeroclaw", &path.to_string_lossy()])
+        .args(["naraeclaw:naraeclaw", &path.to_string_lossy()])
         .output()
         .context("Failed to run chown")?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
         bail!(
-            "Failed to change ownership of {} to zeroclaw:zeroclaw: {}",
+            "Failed to change ownership of {} to naraeclaw:naraeclaw: {}",
             path.display(),
             stderr.trim(),
         );
@@ -918,21 +922,21 @@ fn chown_to_zeroclaw(path: &Path) -> Result<()> {
 }
 
 #[cfg(not(unix))]
-fn chown_to_zeroclaw(_path: &Path) -> Result<()> {
+fn chown_to_naraeclaw(_path: &Path) -> Result<()> {
     Ok(())
 }
 
 #[cfg(unix)]
-fn chown_recursive_to_zeroclaw(path: &Path) -> Result<()> {
+fn chown_recursive_to_naraeclaw(path: &Path) -> Result<()> {
     let output = Command::new("chown")
-        .args(["-R", "zeroclaw:zeroclaw", &path.to_string_lossy()])
+        .args(["-R", "naraeclaw:naraeclaw", &path.to_string_lossy()])
         .output()
         .context("Failed to run recursive chown")?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
         bail!(
-            "Failed to recursively change ownership of {} to zeroclaw:zeroclaw: {}",
+            "Failed to recursively change ownership of {} to naraeclaw:naraeclaw: {}",
             path.display(),
             stderr.trim(),
         );
@@ -942,7 +946,7 @@ fn chown_recursive_to_zeroclaw(path: &Path) -> Result<()> {
 }
 
 #[cfg(not(unix))]
-fn chown_recursive_to_zeroclaw(_path: &Path) -> Result<()> {
+fn chown_recursive_to_naraeclaw(_path: &Path) -> Result<()> {
     Ok(())
 }
 
@@ -1043,7 +1047,7 @@ fn build_openrc_writability_probe_command(path: &Path, has_runuser: bool) -> (St
             "runuser".to_string(),
             vec![
                 "-u".to_string(),
-                "zeroclaw".to_string(),
+                "naraeclaw".to_string(),
                 "--".to_string(),
                 "sh".to_string(),
                 "-c".to_string(),
@@ -1058,7 +1062,7 @@ fn build_openrc_writability_probe_command(path: &Path, has_runuser: bool) -> (St
                 "/bin/sh".to_string(),
                 "-c".to_string(),
                 probe,
-                "zeroclaw".to_string(),
+                "naraeclaw".to_string(),
             ],
         )
     }
@@ -1086,8 +1090,8 @@ fn ensure_openrc_runtime_path_writable(path: &Path) -> Result<()> {
             stderr.trim()
         };
         bail!(
-            "OpenRC runtime user 'zeroclaw' cannot write {} ({details}). \
-             Re-run `sudo naraeclaw service install` and ensure ownership is zeroclaw:zeroclaw.",
+            "OpenRC runtime user 'naraeclaw' cannot write {} ({details}). \
+             Re-run `sudo naraeclaw service install` and ensure ownership is naraeclaw:naraeclaw.",
             path.display(),
         );
     }
@@ -1123,7 +1127,7 @@ fn warn_if_binary_in_home(exe_path: &Path) {
         eprintln!(
             "⚠️  Warning: Binary path '{}' appears to be in a user home directory.\n\
              For system-wide OpenRC service, consider installing to /usr/local/bin:\n\
-             sudo cp '{}' /usr/local/bin/zeroclaw",
+             sudo cp '{}' /usr/local/bin/naraeclaw",
             exe_path.display(),
             exe_path.display()
         );
@@ -1135,21 +1139,21 @@ fn generate_openrc_script(exe_path: &Path, config_dir: &Path) -> String {
     format!(
         r#"#!/sbin/openrc-run
 
-name="zeroclaw"
+name="naraeclaw"
 description="NaraeClaw daemon"
 
 command="{exe}"
 command_args="--config-dir {config_dir} daemon"
 command_background="yes"
-command_user="zeroclaw:zeroclaw"
+command_user="naraeclaw:naraeclaw"
 pidfile="/run/${{RC_SVCNAME}}.pid"
 umask 027
-output_log="/var/log/zeroclaw/access.log"
-error_log="/var/log/zeroclaw/error.log"
+output_log="/var/log/naraeclaw/access.log"
+error_log="/var/log/naraeclaw/error.log"
 
 # Provide HOME so headless browsers can create profile/cache directories.
 # Without this, Chromium/Firefox fail with sandbox or profile errors.
-export HOME="/var/lib/zeroclaw"
+export HOME="/var/lib/naraeclaw"
 
 depend() {{
     need net
@@ -1157,7 +1161,7 @@ depend() {{
 }}
 
 start_pre() {{
-    checkpath --directory --owner zeroclaw:zeroclaw --mode 0750 /var/lib/zeroclaw
+    checkpath --directory --owner naraeclaw:naraeclaw --mode 0750 /var/lib/naraeclaw
 }}
 "#,
         exe = exe_path.display(),
@@ -1166,7 +1170,7 @@ start_pre() {{
 }
 
 fn resolve_openrc_executable() -> Result<PathBuf> {
-    let preferred = Path::new("/usr/local/bin/zeroclaw");
+    let preferred = Path::new("/usr/local/bin/naraeclaw");
     if preferred.exists() {
         return Ok(preferred.to_path_buf());
     }
@@ -1183,14 +1187,14 @@ fn install_linux_openrc(config: &Config) -> Result<()> {
         );
     }
 
-    ensure_zeroclaw_user()?;
+    ensure_naraeclaw_user()?;
 
     let exe = resolve_openrc_executable()?;
     warn_if_binary_in_home(&exe);
 
-    let config_dir = Path::new("/etc/zeroclaw");
+    let config_dir = Path::new("/etc/naraeclaw");
     let workspace_dir = config_dir.join("workspace");
-    let log_dir = Path::new("/var/log/zeroclaw");
+    let log_dir = Path::new("/var/log/naraeclaw");
 
     if !config_dir.exists() {
         fs::create_dir_all(config_dir)
@@ -1217,9 +1221,9 @@ fn install_linux_openrc(config: &Config) -> Result<()> {
                 || format!("Failed to set permissions on {}", workspace_dir.display()),
             )?;
         }
-        chown_to_zeroclaw(&workspace_dir)?;
+        chown_to_naraeclaw(&workspace_dir)?;
         println!(
-            "✅ Created directory: {} (owned by zeroclaw:zeroclaw)",
+            "✅ Created directory: {} (owned by naraeclaw:naraeclaw)",
             workspace_dir.display()
         );
     }
@@ -1250,7 +1254,7 @@ fn install_linux_openrc(config: &Config) -> Result<()> {
         }
     }
 
-    chown_recursive_to_zeroclaw(config_dir)?;
+    chown_recursive_to_naraeclaw(config_dir)?;
 
     let created_log_dir = !log_dir.exists();
     if created_log_dir {
@@ -1264,19 +1268,19 @@ fn install_linux_openrc(config: &Config) -> Result<()> {
         }
     }
 
-    chown_to_zeroclaw(log_dir)?;
+    chown_to_naraeclaw(log_dir)?;
 
     ensure_openrc_runtime_dirs_writable(config_dir, &workspace_dir, log_dir)?;
 
     if created_log_dir {
         println!(
-            "✅ Created directory: {} (owned by zeroclaw:zeroclaw)",
+            "✅ Created directory: {} (owned by naraeclaw:naraeclaw)",
             log_dir.display()
         );
     }
 
     let init_script = generate_openrc_script(&exe, config_dir);
-    let init_path = Path::new("/etc/init.d/zeroclaw");
+    let init_path = Path::new("/etc/init.d/naraeclaw");
     fs::write(init_path, init_script)
         .with_context(|| format!("Failed to write {}", init_path.display()))?;
 
@@ -1287,9 +1291,9 @@ fn install_linux_openrc(config: &Config) -> Result<()> {
             .with_context(|| format!("Failed to set permissions on {}", init_path.display()))?;
     }
 
-    run_checked(Command::new("rc-update").args(["add", "zeroclaw", "default"]))?;
-    println!("✅ Installed OpenRC service: /etc/init.d/zeroclaw");
-    println!("   Config path: /etc/zeroclaw/config.toml");
+    run_checked(Command::new("rc-update").args(["add", "naraeclaw", "default"]))?;
+    println!("✅ Installed OpenRC service: /etc/init.d/naraeclaw");
+    println!("   Config path: /etc/naraeclaw/config.toml");
     println!("   Start with: sudo naraeclaw service start");
     let _ = config;
     Ok(())
@@ -1305,7 +1309,7 @@ fn install_windows(config: &Config) -> Result<()> {
     fs::create_dir_all(&logs_dir)?;
 
     // Create a wrapper script that redirects output to log files
-    let wrapper = logs_dir.join("zeroclaw-daemon.cmd");
+    let wrapper = logs_dir.join("naraeclaw-daemon.cmd");
     let stdout_log = logs_dir.join("daemon.stdout.log");
     let stderr_log = logs_dir.join("daemon.stderr.log");
 
@@ -1392,7 +1396,7 @@ pub fn xml_escape(raw: &str) -> String {
         .replace('\'', "&apos;")
 }
 
-#[cfg(all(test, zeroclaw_root_crate))]
+#[cfg(all(test, naraeclaw_root_crate))]
 mod tests {
     use super::*;
 
@@ -1498,22 +1502,22 @@ mod tests {
     fn generate_openrc_script_contains_required_directives() {
         use std::path::PathBuf;
 
-        let exe_path = PathBuf::from("/usr/local/bin/zeroclaw");
-        let script = generate_openrc_script(&exe_path, Path::new("/etc/zeroclaw"));
+        let exe_path = PathBuf::from("/usr/local/bin/naraeclaw");
+        let script = generate_openrc_script(&exe_path, Path::new("/etc/naraeclaw"));
 
         assert!(script.starts_with("#!/sbin/openrc-run"));
-        assert!(script.contains("name=\"zeroclaw\""));
+        assert!(script.contains("name=\"naraeclaw\""));
         assert!(script.contains("description=\"NaraeClaw daemon\""));
-        assert!(script.contains("command=\"/usr/local/bin/zeroclaw\""));
+        assert!(script.contains("command=\"/usr/local/bin/naraeclaw\""));
         assert!(script.contains("command_args=\"--config-dir /etc/naraeclaw daemon\""));
         assert!(!script.contains("env NARAECLAW_CONFIG_DIR"));
         assert!(!script.contains("env NARAECLAW_WORKSPACE"));
         assert!(script.contains("command_background=\"yes\""));
-        assert!(script.contains("command_user=\"zeroclaw:zeroclaw\""));
+        assert!(script.contains("command_user=\"naraeclaw:naraeclaw\""));
         assert!(script.contains("pidfile=\"/run/${RC_SVCNAME}.pid\""));
         assert!(script.contains("umask 027"));
-        assert!(script.contains("output_log=\"/var/log/zeroclaw/access.log\""));
-        assert!(script.contains("error_log=\"/var/log/zeroclaw/error.log\""));
+        assert!(script.contains("output_log=\"/var/log/naraeclaw/access.log\""));
+        assert!(script.contains("error_log=\"/var/log/naraeclaw/error.log\""));
         assert!(script.contains("depend()"));
         assert!(script.contains("need net"));
         assert!(script.contains("after firewall"));
@@ -1523,11 +1527,11 @@ mod tests {
     fn generate_openrc_script_sets_home_for_browser() {
         use std::path::PathBuf;
 
-        let exe_path = PathBuf::from("/usr/local/bin/zeroclaw");
-        let script = generate_openrc_script(&exe_path, Path::new("/etc/zeroclaw"));
+        let exe_path = PathBuf::from("/usr/local/bin/naraeclaw");
+        let script = generate_openrc_script(&exe_path, Path::new("/etc/naraeclaw"));
 
         assert!(
-            script.contains("export HOME=\"/var/lib/zeroclaw\""),
+            script.contains("export HOME=\"/var/lib/naraeclaw\""),
             "OpenRC script must set HOME for headless browser support"
         );
     }
@@ -1536,16 +1540,16 @@ mod tests {
     fn generate_openrc_script_creates_home_directory() {
         use std::path::PathBuf;
 
-        let exe_path = PathBuf::from("/usr/local/bin/zeroclaw");
-        let script = generate_openrc_script(&exe_path, Path::new("/etc/zeroclaw"));
+        let exe_path = PathBuf::from("/usr/local/bin/naraeclaw");
+        let script = generate_openrc_script(&exe_path, Path::new("/etc/naraeclaw"));
 
         assert!(
             script.contains("start_pre()"),
             "OpenRC script must have start_pre to create HOME dir"
         );
         assert!(
-            script.contains("checkpath --directory --owner zeroclaw:zeroclaw"),
-            "start_pre must ensure /var/lib/zeroclaw exists with correct ownership"
+            script.contains("checkpath --directory --owner naraeclaw:naraeclaw"),
+            "start_pre must ensure /var/lib/naraeclaw exists with correct ownership"
         );
     }
 
@@ -1584,14 +1588,14 @@ mod tests {
     fn warn_if_binary_in_home_detects_home_path() {
         use std::path::PathBuf;
 
-        let home_path = PathBuf::from("/home/user/.cargo/bin/zeroclaw");
+        let home_path = PathBuf::from("/home/user/.cargo/bin/naraeclaw");
         assert!(home_path.to_string_lossy().contains("/home/"));
         assert!(home_path.to_string_lossy().contains(".cargo/bin"));
 
-        let cargo_path = PathBuf::from("/home/user/.cargo/bin/zeroclaw");
+        let cargo_path = PathBuf::from("/home/user/.cargo/bin/naraeclaw");
         assert!(cargo_path.to_string_lossy().contains(".cargo/bin"));
 
-        let system_path = PathBuf::from("/usr/local/bin/zeroclaw");
+        let system_path = PathBuf::from("/usr/local/bin/naraeclaw");
         assert!(!system_path.to_string_lossy().contains("/home/"));
         assert!(!system_path.to_string_lossy().contains(".cargo/bin"));
     }
@@ -1609,38 +1613,38 @@ mod tests {
     #[test]
     fn openrc_writability_probe_prefers_runuser_when_available() {
         let (program, args) =
-            build_openrc_writability_probe_command(Path::new("/etc/zeroclaw"), true);
+            build_openrc_writability_probe_command(Path::new("/etc/naraeclaw"), true);
         assert_eq!(program, "runuser");
         assert_eq!(
             args,
             vec![
                 "-u".to_string(),
-                "zeroclaw".to_string(),
+                "naraeclaw".to_string(),
                 "--".to_string(),
                 "sh".to_string(),
                 "-c".to_string(),
-                "test -w '/etc/zeroclaw'".to_string()
+                "test -w '/etc/naraeclaw'".to_string()
             ]
         );
     }
 
     #[test]
     fn detect_homebrew_var_dir_from_cellar_path() {
-        let exe = PathBuf::from("/opt/homebrew/Cellar/zeroclaw/1.2.3/bin/zeroclaw");
+        let exe = PathBuf::from("/opt/homebrew/Cellar/naraeclaw/1.2.3/bin/naraeclaw");
         let var_dir = detect_homebrew_var_dir(&exe);
-        assert_eq!(var_dir, Some(PathBuf::from("/opt/homebrew/var/zeroclaw")));
+        assert_eq!(var_dir, Some(PathBuf::from("/opt/homebrew/var/naraeclaw")));
     }
 
     #[test]
     fn detect_homebrew_var_dir_intel_cellar_path() {
-        let exe = PathBuf::from("/usr/local/Cellar/zeroclaw/1.0.0/bin/zeroclaw");
+        let exe = PathBuf::from("/usr/local/Cellar/naraeclaw/1.0.0/bin/naraeclaw");
         let var_dir = detect_homebrew_var_dir(&exe);
-        assert_eq!(var_dir, Some(PathBuf::from("/usr/local/var/zeroclaw")));
+        assert_eq!(var_dir, Some(PathBuf::from("/usr/local/var/naraeclaw")));
     }
 
     #[test]
     fn detect_homebrew_var_dir_non_homebrew_path() {
-        let exe = PathBuf::from("/home/user/.cargo/bin/zeroclaw");
+        let exe = PathBuf::from("/home/user/.cargo/bin/naraeclaw");
         let var_dir = detect_homebrew_var_dir(&exe);
         assert_eq!(var_dir, None);
     }
@@ -1649,7 +1653,7 @@ mod tests {
     #[test]
     fn openrc_writability_probe_falls_back_to_su() {
         let (program, args) =
-            build_openrc_writability_probe_command(Path::new("/etc/zeroclaw/workspace"), false);
+            build_openrc_writability_probe_command(Path::new("/etc/naraeclaw/workspace"), false);
         assert_eq!(program, "su");
         assert_eq!(
             args,
@@ -1657,8 +1661,8 @@ mod tests {
                 "-s".to_string(),
                 "/bin/sh".to_string(),
                 "-c".to_string(),
-                "test -w '/etc/zeroclaw/workspace'".to_string(),
-                "zeroclaw".to_string()
+                "test -w '/etc/naraeclaw/workspace'".to_string(),
+                "naraeclaw".to_string()
             ]
         );
     }
@@ -1666,7 +1670,7 @@ mod tests {
     #[cfg(not(target_os = "windows"))]
     #[test]
     fn tail_file_errors_on_missing_file() {
-        let missing = Path::new("/tmp/zeroclaw-test-nonexistent-log-file.log");
+        let missing = Path::new("/tmp/naraeclaw-test-nonexistent-log-file.log");
         let result = tail_file(missing, 10, false);
         assert!(result.is_err(), "tail on missing file should fail");
     }
