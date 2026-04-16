@@ -1,7 +1,6 @@
 use super::{IntegrationCategory, IntegrationEntry, IntegrationStatus};
 use naraeclaw_providers::{
-    is_glm_alias, is_minimax_alias, is_moonshot_alias, is_qianfan_alias, is_qwen_alias,
-    is_zai_alias,
+    is_glm_alias, is_minimax_alias, is_moonshot_alias, is_qwen_alias, is_zai_alias,
 };
 
 /// Returns the full catalog of integrations
@@ -406,18 +405,6 @@ pub fn all_integrations() -> Vec<IntegrationEntry> {
             category: IntegrationCategory::AiModel,
             status_fn: |c| {
                 if c.default_provider.as_deref() == Some("bedrock") {
-                    IntegrationStatus::Active
-                } else {
-                    IntegrationStatus::Available
-                }
-            },
-        },
-        IntegrationEntry {
-            name: "Qianfan",
-            description: "Baidu AI models",
-            category: IntegrationCategory::AiModel,
-            status_fn: |c| {
-                if c.default_provider.as_deref().is_some_and(is_qianfan_alias) {
                     IntegrationStatus::Active
                 } else {
                     IntegrationStatus::Available
@@ -1019,7 +1006,7 @@ mod tests {
     fn regional_provider_aliases_activate_expected_ai_integrations() {
         let entries = all_integrations();
         let mut config = Config::default();
-        config.default_provider = Some("minimax-cn".to_string());
+        config.default_provider = Some("minimax".to_string());
 
         let minimax = entries.iter().find(|e| e.name == "MiniMax").unwrap();
         assert!(matches!(
@@ -1027,7 +1014,7 @@ mod tests {
             IntegrationStatus::Active
         ));
 
-        config.default_provider = Some("glm-cn".to_string());
+        config.default_provider = Some("glm".to_string());
         let glm = entries.iter().find(|e| e.name == "GLM").unwrap();
         assert!(matches!(
             (glm.status_fn)(&config),
@@ -1048,17 +1035,10 @@ mod tests {
             IntegrationStatus::Active
         ));
 
-        config.default_provider = Some("zai-cn".to_string());
+        config.default_provider = Some("zai".to_string());
         let zai = entries.iter().find(|e| e.name == "Z.AI").unwrap();
         assert!(matches!(
             (zai.status_fn)(&config),
-            IntegrationStatus::Active
-        ));
-
-        config.default_provider = Some("baidu".to_string());
-        let qianfan = entries.iter().find(|e| e.name == "Qianfan").unwrap();
-        assert!(matches!(
-            (qianfan.status_fn)(&config),
             IntegrationStatus::Active
         ));
     }

@@ -334,16 +334,6 @@ fn factory_resolves_qwen_provider() {
 }
 
 #[test]
-fn factory_resolves_doubao_provider() {
-    assert_provider_ok("doubao", Some("test-key"), None);
-}
-
-#[test]
-fn factory_resolves_qianfan_provider() {
-    assert_provider_ok("qianfan", Some("test-key"), None);
-}
-
-#[test]
 fn factory_resolves_minimax_provider() {
     assert_provider_ok("minimax", Some("test-key"), None);
 }

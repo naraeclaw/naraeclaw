@@ -2560,7 +2560,7 @@ mod tests {
     fn x_api_key_auth_style() {
         let p = OpenAiCompatibleProvider::new(
             "moonshot",
-            "https://api.moonshot.cn",
+            "https://api.moonshot.ai",
             Some("ms-key"),
             AuthStyle::XApiKey,
         );
@@ -2851,16 +2851,16 @@ mod tests {
     }
 
     #[test]
-    fn chat_completions_url_volcengine_ark() {
+    fn chat_completions_url_custom_preexpanded_path() {
         // VolcEngine ARK uses custom path - should use as-is
         let p = make_provider(
-            "volcengine",
-            "https://ark.cn-beijing.volces.com/api/coding/v3/chat/completions",
+            "custom",
+            "https://api.example.com/api/coding/v3/chat/completions",
             None,
         );
         assert_eq!(
             p.chat_completions_url(),
-            "https://ark.cn-beijing.volces.com/api/coding/v3/chat/completions"
+            "https://api.example.com/api/coding/v3/chat/completions"
         );
     }
 
@@ -2988,22 +2988,22 @@ mod tests {
     }
 
     #[test]
-    fn chat_completions_url_minimax() {
+    fn chat_completions_url_minimax_intl() {
         // MiniMax OpenAI-compatible endpoint requires /v1 base path.
-        let p = make_provider("minimax", "https://api.minimaxi.com/v1", None);
+        let p = make_provider("minimax", "https://api.minimax.io/v1", None);
         assert_eq!(
             p.chat_completions_url(),
-            "https://api.minimaxi.com/v1/chat/completions"
+            "https://api.minimax.io/v1/chat/completions"
         );
     }
 
     #[test]
     fn chat_completions_url_glm() {
         // GLM (BigModel) uses /api/paas/v4 base path
-        let p = make_provider("glm", "https://open.bigmodel.cn/api/paas/v4", None);
+        let p = make_provider("glm", "https://api.z.ai/api/paas/v4", None);
         assert_eq!(
             p.chat_completions_url(),
-            "https://open.bigmodel.cn/api/paas/v4/chat/completions"
+            "https://api.z.ai/api/paas/v4/chat/completions"
         );
     }
 
@@ -3214,7 +3214,7 @@ mod tests {
     fn capabilities_reports_vision_for_qwen_compatible_provider() {
         let p = OpenAiCompatibleProvider::new_with_vision(
             "Qwen",
-            "https://dashscope.aliyuncs.com/compatible-mode/v1",
+            "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
             Some("k"),
             AuthStyle::Bearer,
             true,

@@ -3233,7 +3233,7 @@ async fn process_channel_message(
             };
 
             // Append a footer when the response was served by a different provider family.
-            // Intra-family fallbacks (e.g. minimax → minimax-cn) are suppressed.
+            // Intra-family fallbacks (e.g. minimax aliases) are suppressed.
             if let Some(fb) = fallback_info.as_ref() {
                 let req_base = fb.requested_provider.split(':').next().unwrap_or("");
                 let act_base = fb.actual_provider.split(':').next().unwrap_or("");

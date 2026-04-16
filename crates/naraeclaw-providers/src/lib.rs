@@ -51,27 +51,19 @@ use std::path::PathBuf;
 
 const MAX_API_ERROR_CHARS: usize = 500;
 const MINIMAX_INTL_BASE_URL: &str = "https://api.minimax.io/v1";
-const MINIMAX_CN_BASE_URL: &str = "https://api.minimaxi.com/v1";
 const MINIMAX_OAUTH_GLOBAL_TOKEN_ENDPOINT: &str = "https://api.minimax.io/oauth/token";
-const MINIMAX_OAUTH_CN_TOKEN_ENDPOINT: &str = "https://api.minimaxi.com/oauth/token";
 const MINIMAX_OAUTH_PLACEHOLDER: &str = "minimax-oauth";
-const MINIMAX_OAUTH_CN_PLACEHOLDER: &str = "minimax-oauth-cn";
 use env_keys as ek;
 const MINIMAX_OAUTH_TOKEN_ENV: &str = ek::MINIMAX_OAUTH_TOKEN;
 const MINIMAX_API_KEY_ENV: &str = ek::MINIMAX_API_KEY;
 const MINIMAX_OAUTH_REFRESH_TOKEN_ENV: &str = ek::MINIMAX_OAUTH_REFRESH_TOKEN;
-const MINIMAX_OAUTH_REGION_ENV: &str = ek::MINIMAX_OAUTH_REGION;
 const MINIMAX_OAUTH_CLIENT_ID_ENV: &str = ek::MINIMAX_OAUTH_CLIENT_ID;
 const MINIMAX_OAUTH_DEFAULT_CLIENT_ID: &str = "78257093-7e40-4613-99e0-527b14b39113";
 const GLM_GLOBAL_BASE_URL: &str = "https://api.z.ai/api/paas/v4";
-const GLM_CN_BASE_URL: &str = "https://open.bigmodel.cn/api/paas/v4";
 const MOONSHOT_INTL_BASE_URL: &str = "https://api.moonshot.ai/v1";
-const MOONSHOT_CN_BASE_URL: &str = "https://api.moonshot.cn/v1";
-const QWEN_CN_BASE_URL: &str = "https://dashscope.aliyuncs.com/compatible-mode/v1";
 const QWEN_INTL_BASE_URL: &str = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1";
 const QWEN_US_BASE_URL: &str = "https://dashscope-us.aliyuncs.com/compatible-mode/v1";
-const QWEN_OAUTH_BASE_FALLBACK_URL: &str = QWEN_CN_BASE_URL;
-const BAILIAN_BASE_URL: &str = "https://coding.dashscope.aliyuncs.com/v1";
+const QWEN_OAUTH_BASE_FALLBACK_URL: &str = QWEN_INTL_BASE_URL;
 const QWEN_OAUTH_TOKEN_ENDPOINT: &str = "https://chat.qwen.ai/api/v1/oauth2/token";
 const QWEN_OAUTH_PLACEHOLDER: &str = "qwen-oauth";
 const QWEN_OAUTH_TOKEN_ENV: &str = ek::QWEN_OAUTH_TOKEN;
@@ -81,8 +73,6 @@ const QWEN_OAUTH_CLIENT_ID_ENV: &str = ek::QWEN_OAUTH_CLIENT_ID;
 const QWEN_OAUTH_DEFAULT_CLIENT_ID: &str = "f0304373b74a44d2b584a3fb70ca9e56";
 const QWEN_OAUTH_CREDENTIAL_FILE: &str = ".qwen/oauth_creds.json";
 const ZAI_GLOBAL_BASE_URL: &str = "https://api.z.ai/api/coding/paas/v4";
-const ZAI_CN_BASE_URL: &str = "https://open.bigmodel.cn/api/coding/paas/v4";
-const QIANFAN_BASE_URL: &str = "https://qianfan.baidubce.com/v2";
 const VERCEL_AI_GATEWAY_BASE_URL: &str = "https://ai-gateway.vercel.sh/v1";
 
 pub fn is_minimax_intl_alias(name: &str) -> bool {
@@ -99,52 +89,38 @@ pub fn is_minimax_intl_alias(name: &str) -> bool {
     )
 }
 
-pub fn is_minimax_cn_alias(name: &str) -> bool {
-    matches!(
-        name,
-        "minimax-cn" | "minimaxi" | "minimax-oauth-cn" | "minimax-portal-cn"
-    )
-}
-
 pub fn is_minimax_alias(name: &str) -> bool {
-    is_minimax_intl_alias(name) || is_minimax_cn_alias(name)
+    is_minimax_intl_alias(name)
 }
 
 pub fn is_glm_global_alias(name: &str) -> bool {
     matches!(name, "glm" | "zhipu" | "glm-global" | "zhipu-global")
 }
 
-pub fn is_glm_cn_alias(name: &str) -> bool {
-    matches!(name, "glm-cn" | "zhipu-cn" | "bigmodel")
-}
-
 pub fn is_glm_alias(name: &str) -> bool {
-    is_glm_global_alias(name) || is_glm_cn_alias(name)
+    is_glm_global_alias(name)
 }
 
 pub fn is_moonshot_intl_alias(name: &str) -> bool {
     matches!(
         name,
-        "moonshot-intl" | "moonshot-global" | "kimi-intl" | "kimi-global"
+        "moonshot" | "kimi" | "moonshot-intl" | "moonshot-global" | "kimi-intl" | "kimi-global"
     )
 }
 
-pub fn is_moonshot_cn_alias(name: &str) -> bool {
-    matches!(name, "moonshot" | "kimi" | "moonshot-cn" | "kimi-cn")
-}
-
 pub fn is_moonshot_alias(name: &str) -> bool {
-    is_moonshot_intl_alias(name) || is_moonshot_cn_alias(name)
-}
-
-pub fn is_qwen_cn_alias(name: &str) -> bool {
-    matches!(name, "qwen" | "dashscope" | "qwen-cn" | "dashscope-cn")
+    is_moonshot_intl_alias(name)
 }
 
 pub fn is_qwen_intl_alias(name: &str) -> bool {
     matches!(
         name,
-        "qwen-intl" | "dashscope-intl" | "qwen-international" | "dashscope-international"
+        "qwen"
+            | "dashscope"
+            | "qwen-intl"
+            | "dashscope-intl"
+            | "qwen-international"
+            | "dashscope-international"
     )
 }
 
@@ -156,57 +132,26 @@ pub fn is_qwen_oauth_alias(name: &str) -> bool {
     matches!(name, "qwen-code" | "qwen-oauth" | "qwen_oauth")
 }
 
-pub fn is_bailian_alias(name: &str) -> bool {
-    matches!(name, "bailian" | "aliyun-bailian" | "aliyun")
-}
-
 pub fn is_qwen_alias(name: &str) -> bool {
-    is_qwen_cn_alias(name)
-        || is_qwen_intl_alias(name)
-        || is_qwen_us_alias(name)
-        || is_qwen_oauth_alias(name)
+    is_qwen_intl_alias(name) || is_qwen_us_alias(name) || is_qwen_oauth_alias(name)
 }
 
 pub fn is_zai_global_alias(name: &str) -> bool {
     matches!(name, "zai" | "z.ai" | "zai-global" | "z.ai-global")
 }
 
-pub fn is_zai_cn_alias(name: &str) -> bool {
-    matches!(name, "zai-cn" | "z.ai-cn")
-}
-
 pub fn is_zai_alias(name: &str) -> bool {
-    is_zai_global_alias(name) || is_zai_cn_alias(name)
-}
-
-pub fn is_qianfan_alias(name: &str) -> bool {
-    matches!(name, "qianfan" | "baidu")
-}
-
-fn qianfan_base_url(api_url: Option<&str>) -> String {
-    api_url
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .map(ToString::to_string)
-        .unwrap_or_else(|| QIANFAN_BASE_URL.to_string())
-}
-
-pub fn is_doubao_alias(name: &str) -> bool {
-    matches!(name, "doubao" | "volcengine" | "ark" | "doubao-cn")
+    is_zai_global_alias(name)
 }
 
 #[derive(Clone, Copy, Debug)]
 enum MinimaxOauthRegion {
     Global,
-    Cn,
 }
 
 impl MinimaxOauthRegion {
     fn token_endpoint(self) -> &'static str {
-        match self {
-            Self::Global => MINIMAX_OAUTH_GLOBAL_TOKEN_ENDPOINT,
-            Self::Cn => MINIMAX_OAUTH_CN_TOKEN_ENDPOINT,
-        }
+        MINIMAX_OAUTH_GLOBAL_TOKEN_ENDPOINT
     }
 }
 
@@ -286,25 +231,10 @@ fn read_non_empty_env(name: &str) -> Option<String> {
 
 fn is_minimax_oauth_placeholder(value: &str) -> bool {
     value.eq_ignore_ascii_case(MINIMAX_OAUTH_PLACEHOLDER)
-        || value.eq_ignore_ascii_case(MINIMAX_OAUTH_CN_PLACEHOLDER)
 }
 
-fn minimax_oauth_region(name: &str) -> MinimaxOauthRegion {
-    if let Some(region) = read_non_empty_env(MINIMAX_OAUTH_REGION_ENV) {
-        let normalized = region.to_ascii_lowercase();
-        if matches!(normalized.as_str(), "cn" | "china") {
-            return MinimaxOauthRegion::Cn;
-        }
-        if matches!(normalized.as_str(), "global" | "intl" | "international") {
-            return MinimaxOauthRegion::Global;
-        }
-    }
-
-    if is_minimax_cn_alias(name) {
-        MinimaxOauthRegion::Cn
-    } else {
-        MinimaxOauthRegion::Global
-    }
+fn minimax_oauth_region(_name: &str) -> MinimaxOauthRegion {
+    MinimaxOauthRegion::Global
 }
 
 fn minimax_oauth_client_id() -> String {
@@ -617,7 +547,7 @@ fn resolve_minimax_oauth_refresh_token(name: &str) -> Option<String> {
     }
 }
 
-pub fn canonical_china_provider_name(name: &str) -> Option<&'static str> {
+pub fn canonical_provider_family(name: &str) -> Option<&'static str> {
     if is_qwen_alias(name) {
         Some("qwen")
     } else if is_glm_alias(name) {
@@ -628,21 +558,13 @@ pub fn canonical_china_provider_name(name: &str) -> Option<&'static str> {
         Some("minimax")
     } else if is_zai_alias(name) {
         Some("zai")
-    } else if is_qianfan_alias(name) {
-        Some("qianfan")
-    } else if is_doubao_alias(name) {
-        Some("doubao")
-    } else if is_bailian_alias(name) {
-        Some("bailian")
     } else {
         None
     }
 }
 
 fn minimax_base_url(name: &str) -> Option<&'static str> {
-    if is_minimax_cn_alias(name) {
-        Some(MINIMAX_CN_BASE_URL)
-    } else if is_minimax_intl_alias(name) {
+    if is_minimax_intl_alias(name) {
         Some(MINIMAX_INTL_BASE_URL)
     } else {
         None
@@ -650,9 +572,7 @@ fn minimax_base_url(name: &str) -> Option<&'static str> {
 }
 
 fn glm_base_url(name: &str) -> Option<&'static str> {
-    if is_glm_cn_alias(name) {
-        Some(GLM_CN_BASE_URL)
-    } else if is_glm_global_alias(name) {
+    if is_glm_global_alias(name) {
         Some(GLM_GLOBAL_BASE_URL)
     } else {
         None
@@ -660,19 +580,15 @@ fn glm_base_url(name: &str) -> Option<&'static str> {
 }
 
 fn moonshot_base_url(name: &str) -> Option<&'static str> {
-    if is_moonshot_intl_alias(name) {
+    if is_moonshot_intl_alias(name) || matches!(name, "moonshot" | "kimi") {
         Some(MOONSHOT_INTL_BASE_URL)
-    } else if is_moonshot_cn_alias(name) {
-        Some(MOONSHOT_CN_BASE_URL)
     } else {
         None
     }
 }
 
 fn qwen_base_url(name: &str) -> Option<&'static str> {
-    if is_qwen_cn_alias(name) || is_qwen_oauth_alias(name) {
-        Some(QWEN_CN_BASE_URL)
-    } else if is_qwen_intl_alias(name) {
+    if is_qwen_intl_alias(name) || is_qwen_oauth_alias(name) {
         Some(QWEN_INTL_BASE_URL)
     } else if is_qwen_us_alias(name) {
         Some(QWEN_US_BASE_URL)
@@ -682,9 +598,7 @@ fn qwen_base_url(name: &str) -> Option<&'static str> {
 }
 
 fn zai_base_url(name: &str) -> Option<&'static str> {
-    if is_zai_cn_alias(name) {
-        Some(ZAI_CN_BASE_URL)
-    } else if is_zai_global_alias(name) {
+    if is_zai_global_alias(name) {
         Some(ZAI_GLOBAL_BASE_URL)
     } else {
         None
@@ -944,12 +858,7 @@ fn resolve_provider_credential(name: &str, credential_override: Option<&str>) ->
             }
             return None;
         }
-        name if is_qianfan_alias(name) => vec!["QIANFAN_API_KEY"],
-        name if is_doubao_alias(name) => {
-            vec!["ARK_API_KEY", "VOLCENGINE_API_KEY", "DOUBAO_API_KEY"]
-        }
         name if is_qwen_alias(name) => vec!["DASHSCOPE_API_KEY"],
-        name if is_bailian_alias(name) => vec!["BAILIAN_API_KEY", "DASHSCOPE_API_KEY"],
         name if is_zai_alias(name) => vec!["ZAI_API_KEY"],
         "nvidia" | "nvidia-nim" | "build.nvidia.com" => vec!["NVIDIA_API_KEY"],
         "synthetic" => vec!["SYNTHETIC_API_KEY"],
@@ -1365,31 +1274,6 @@ fn create_provider_with_url_and_options(
                 ),
             ))
         }
-        name if is_qianfan_alias(name) => {
-            let base_url = qianfan_base_url(api_url);
-            Ok(compat(OpenAiCompatibleProvider::new(
-                "Qianfan",
-                &base_url,
-                key,
-                AuthStyle::Bearer,
-            )))
-        }
-        name if is_doubao_alias(name) => Ok(compat(OpenAiCompatibleProvider::new(
-            "Doubao",
-            "https://ark.cn-beijing.volces.com/api/v3",
-            key,
-            AuthStyle::Bearer,
-        ))),
-        name if is_bailian_alias(name) => Ok(Box::new(
-            OpenAiCompatibleProvider::new_with_user_agent_and_vision(
-                "Bailian",
-                BAILIAN_BASE_URL,
-                key,
-                AuthStyle::Bearer,
-                "openclaw",
-                true,
-            ),
-        )),
         name if qwen_base_url(name).is_some() => {
             Ok(compat(OpenAiCompatibleProvider::new_with_vision(
                 "Qwen",
@@ -2084,12 +1968,8 @@ pub fn list_providers() -> Vec<ProviderInfo> {
                 "minimax-intl",
                 "minimax-io",
                 "minimax-global",
-                "minimax-cn",
-                "minimaxi",
                 "minimax-oauth",
-                "minimax-oauth-cn",
                 "minimax-portal",
-                "minimax-portal-cn",
             ],
             local: false,
         },
@@ -2097,18 +1977,6 @@ pub fn list_providers() -> Vec<ProviderInfo> {
             name: "bedrock",
             display_name: "Amazon Bedrock",
             aliases: &["aws-bedrock"],
-            local: false,
-        },
-        ProviderInfo {
-            name: "qianfan",
-            display_name: "Qianfan (Baidu)",
-            aliases: &["baidu"],
-            local: false,
-        },
-        ProviderInfo {
-            name: "doubao",
-            display_name: "Doubao (Volcengine)",
-            aliases: &["volcengine", "ark", "doubao-cn"],
             local: false,
         },
         ProviderInfo {
@@ -2124,12 +1992,6 @@ pub fn list_providers() -> Vec<ProviderInfo> {
                 "qwen-oauth",
                 "qwen_oauth",
             ],
-            local: false,
-        },
-        ProviderInfo {
-            name: "bailian",
-            display_name: "Bailian (Aliyun)",
-            aliases: &["aliyun-bailian", "aliyun"],
             local: false,
         },
         ProviderInfo {
@@ -2600,57 +2462,40 @@ mod tests {
         assert!(is_moonshot_alias("moonshot"));
         assert!(is_moonshot_alias("kimi-global"));
         assert!(is_glm_alias("glm"));
-        assert!(is_glm_alias("bigmodel"));
         assert!(is_minimax_alias("minimax-io"));
-        assert!(is_minimax_alias("minimaxi"));
         assert!(is_minimax_alias("minimax-oauth"));
-        assert!(is_minimax_alias("minimax-portal-cn"));
         assert!(is_qwen_alias("dashscope"));
         assert!(is_qwen_alias("qwen-us"));
         assert!(is_qwen_alias("qwen-code"));
         assert!(is_qwen_oauth_alias("qwen-code"));
         assert!(is_qwen_oauth_alias("qwen_oauth"));
         assert!(is_zai_alias("z.ai"));
-        assert!(is_zai_alias("zai-cn"));
-        assert!(is_qianfan_alias("qianfan"));
-        assert!(is_qianfan_alias("baidu"));
-        assert!(is_doubao_alias("doubao"));
-        assert!(is_doubao_alias("volcengine"));
-        assert!(is_doubao_alias("ark"));
-        assert!(is_doubao_alias("doubao-cn"));
 
-        assert!(!is_moonshot_alias("openrouter"));
-        assert!(!is_glm_alias("openai"));
-        assert!(!is_qwen_alias("gemini"));
-        assert!(!is_zai_alias("anthropic"));
-        assert!(!is_qianfan_alias("cohere"));
-        assert!(!is_doubao_alias("deepseek"));
+        assert!(!is_glm_alias("removed-glm-alias"));
+        assert!(!is_minimax_alias("removed-minimax-alias"));
+        assert!(!is_minimax_alias("removed-minimax-portal"));
+        assert!(!is_zai_alias("removed-zai-regional"));
+        assert!(!is_qwen_alias("removed-qwen-regional"));
     }
 
     #[test]
-    fn canonical_china_provider_name_maps_regional_aliases() {
-        assert_eq!(canonical_china_provider_name("moonshot"), Some("moonshot"));
-        assert_eq!(canonical_china_provider_name("kimi-intl"), Some("moonshot"));
-        assert_eq!(canonical_china_provider_name("glm"), Some("glm"));
-        assert_eq!(canonical_china_provider_name("zhipu-cn"), Some("glm"));
-        assert_eq!(canonical_china_provider_name("minimax"), Some("minimax"));
-        assert_eq!(canonical_china_provider_name("minimax-cn"), Some("minimax"));
-        assert_eq!(canonical_china_provider_name("qwen"), Some("qwen"));
-        assert_eq!(canonical_china_provider_name("dashscope-us"), Some("qwen"));
-        assert_eq!(canonical_china_provider_name("qwen-code"), Some("qwen"));
-        assert_eq!(canonical_china_provider_name("zai"), Some("zai"));
-        assert_eq!(canonical_china_provider_name("z.ai-cn"), Some("zai"));
-        assert_eq!(canonical_china_provider_name("qianfan"), Some("qianfan"));
-        assert_eq!(canonical_china_provider_name("baidu"), Some("qianfan"));
-        assert_eq!(canonical_china_provider_name("doubao"), Some("doubao"));
-        assert_eq!(canonical_china_provider_name("volcengine"), Some("doubao"));
-        assert_eq!(canonical_china_provider_name("bailian"), Some("bailian"));
-        assert_eq!(
-            canonical_china_provider_name("aliyun-bailian"),
-            Some("bailian")
-        );
-        assert_eq!(canonical_china_provider_name("aliyun"), Some("bailian"));
-        assert_eq!(canonical_china_provider_name("openai"), None);
+    fn canonical_provider_family_maps_supported_aliases_only() {
+        assert_eq!(canonical_provider_family("moonshot"), Some("moonshot"));
+        assert_eq!(canonical_provider_family("kimi-intl"), Some("moonshot"));
+        assert_eq!(canonical_provider_family("glm"), Some("glm"));
+        assert_eq!(canonical_provider_family("minimax"), Some("minimax"));
+        assert_eq!(canonical_provider_family("qwen"), Some("qwen"));
+        assert_eq!(canonical_provider_family("dashscope-us"), Some("qwen"));
+        assert_eq!(canonical_provider_family("qwen-code"), Some("qwen"));
+        assert_eq!(canonical_provider_family("zai"), Some("zai"));
+
+        assert_eq!(canonical_provider_family("removed-zhipu-regional"), None);
+        assert_eq!(canonical_provider_family("removed-minimax-regional"), None);
+        assert_eq!(canonical_provider_family("removed-zai-dot-regional"), None);
+        assert_eq!(canonical_provider_family("removed-provider-a"), None);
+        assert_eq!(canonical_provider_family("removed-provider-b"), None);
+        assert_eq!(canonical_provider_family("removed-provider-c"), None);
+        assert_eq!(canonical_provider_family("openai"), None);
     }
 
     #[test]
@@ -2660,30 +2505,30 @@ mod tests {
             minimax_base_url("minimax-intl"),
             Some(MINIMAX_INTL_BASE_URL)
         );
-        assert_eq!(minimax_base_url("minimax-cn"), Some(MINIMAX_CN_BASE_URL));
+        assert_eq!(minimax_base_url("removed-minimax-regional"), None);
 
         assert_eq!(glm_base_url("glm"), Some(GLM_GLOBAL_BASE_URL));
-        assert_eq!(glm_base_url("glm-cn"), Some(GLM_CN_BASE_URL));
-        assert_eq!(glm_base_url("bigmodel"), Some(GLM_CN_BASE_URL));
+        assert_eq!(glm_base_url("removed-glm-regional"), None);
+        assert_eq!(glm_base_url("removed-glm-alias"), None);
 
-        assert_eq!(moonshot_base_url("moonshot"), Some(MOONSHOT_CN_BASE_URL));
+        assert_eq!(moonshot_base_url("moonshot"), Some(MOONSHOT_INTL_BASE_URL));
         assert_eq!(
             moonshot_base_url("moonshot-intl"),
             Some(MOONSHOT_INTL_BASE_URL)
         );
 
-        assert_eq!(qwen_base_url("qwen"), Some(QWEN_CN_BASE_URL));
-        assert_eq!(qwen_base_url("qwen-cn"), Some(QWEN_CN_BASE_URL));
+        assert_eq!(qwen_base_url("qwen"), Some(QWEN_INTL_BASE_URL));
+        assert_eq!(qwen_base_url("removed-qwen-regional"), None);
         assert_eq!(qwen_base_url("qwen-intl"), Some(QWEN_INTL_BASE_URL));
         assert_eq!(qwen_base_url("qwen-us"), Some(QWEN_US_BASE_URL));
-        assert_eq!(qwen_base_url("qwen-code"), Some(QWEN_CN_BASE_URL));
+        assert_eq!(qwen_base_url("qwen-code"), Some(QWEN_INTL_BASE_URL));
 
         assert_eq!(zai_base_url("zai"), Some(ZAI_GLOBAL_BASE_URL));
         assert_eq!(zai_base_url("z.ai"), Some(ZAI_GLOBAL_BASE_URL));
         assert_eq!(zai_base_url("zai-global"), Some(ZAI_GLOBAL_BASE_URL));
         assert_eq!(zai_base_url("z.ai-global"), Some(ZAI_GLOBAL_BASE_URL));
-        assert_eq!(zai_base_url("zai-cn"), Some(ZAI_CN_BASE_URL));
-        assert_eq!(zai_base_url("z.ai-cn"), Some(ZAI_CN_BASE_URL));
+        assert_eq!(zai_base_url("removed-zai-regional"), None);
+        assert_eq!(zai_base_url("removed-zai-dot-regional"), None);
     }
 
     // ── Primary providers ────────────────────────────────────
@@ -2814,18 +2659,18 @@ mod tests {
         assert!(create_provider("z.ai", Some("key")).is_ok());
         assert!(create_provider("zai-global", Some("key")).is_ok());
         assert!(create_provider("z.ai-global", Some("key")).is_ok());
-        assert!(create_provider("zai-cn", Some("key")).is_ok());
-        assert!(create_provider("z.ai-cn", Some("key")).is_ok());
+        assert!(create_provider("removed-zai-regional", Some("key")).is_err());
+        assert!(create_provider("removed-zai-dot-regional", Some("key")).is_err());
     }
 
     #[test]
     fn factory_glm() {
         assert!(create_provider("glm", Some("key")).is_ok());
         assert!(create_provider("zhipu", Some("key")).is_ok());
-        assert!(create_provider("glm-cn", Some("key")).is_ok());
-        assert!(create_provider("zhipu-cn", Some("key")).is_ok());
         assert!(create_provider("glm-global", Some("key")).is_ok());
-        assert!(create_provider("bigmodel", Some("key")).is_ok());
+        assert!(create_provider("removed-glm-regional", Some("key")).is_err());
+        assert!(create_provider("removed-zhipu-regional", Some("key")).is_err());
+        assert!(create_provider("removed-glm-alias", Some("key")).is_err());
     }
 
     #[test]
@@ -2834,22 +2679,18 @@ mod tests {
         assert!(create_provider("minimax-intl", Some("key")).is_ok());
         assert!(create_provider("minimax-io", Some("key")).is_ok());
         assert!(create_provider("minimax-global", Some("key")).is_ok());
-        assert!(create_provider("minimax-cn", Some("key")).is_ok());
-        assert!(create_provider("minimaxi", Some("key")).is_ok());
         assert!(create_provider("minimax-oauth", Some("key")).is_ok());
-        assert!(create_provider("minimax-oauth-cn", Some("key")).is_ok());
         assert!(create_provider("minimax-portal", Some("key")).is_ok());
-        assert!(create_provider("minimax-portal-cn", Some("key")).is_ok());
+        assert!(create_provider("removed-minimax-regional", Some("key")).is_err());
+        assert!(create_provider("removed-minimax-alias", Some("key")).is_err());
+        assert!(create_provider("removed-minimax-oauth-regional", Some("key")).is_err());
+        assert!(create_provider("removed-minimax-portal", Some("key")).is_err());
     }
 
     #[test]
     fn factory_minimax_disables_native_tool_calling() {
         let minimax = create_provider("minimax", Some("key")).expect("provider should resolve");
         assert!(!minimax.supports_native_tools());
-
-        let minimax_cn =
-            create_provider("minimax-cn", Some("key")).expect("provider should resolve");
-        assert!(!minimax_cn.supports_native_tools());
     }
 
     #[test]
@@ -2862,25 +2703,11 @@ mod tests {
     }
 
     #[test]
-    fn factory_qianfan() {
-        assert!(create_provider("qianfan", Some("key")).is_ok());
-        assert!(create_provider("baidu", Some("key")).is_ok());
-    }
-
-    #[test]
-    fn factory_doubao() {
-        assert!(create_provider("doubao", Some("key")).is_ok());
-        assert!(create_provider("volcengine", Some("key")).is_ok());
-        assert!(create_provider("ark", Some("key")).is_ok());
-        assert!(create_provider("doubao-cn", Some("key")).is_ok());
-    }
-
-    #[test]
     fn factory_qwen() {
         assert!(create_provider("qwen", Some("key")).is_ok());
         assert!(create_provider("dashscope", Some("key")).is_ok());
-        assert!(create_provider("qwen-cn", Some("key")).is_ok());
-        assert!(create_provider("dashscope-cn", Some("key")).is_ok());
+        assert!(create_provider("removed-qwen-regional", Some("key")).is_err());
+        assert!(create_provider("removed-dashscope-regional", Some("key")).is_err());
         assert!(create_provider("qwen-intl", Some("key")).is_ok());
         assert!(create_provider("dashscope-intl", Some("key")).is_ok());
         assert!(create_provider("qwen-international", Some("key")).is_ok());
@@ -2963,14 +2790,6 @@ mod tests {
         let _guard = EnvGuard::set("OSAURUS_API_KEY", Some("osaurus-test-key"));
         let resolved = resolve_provider_credential("osaurus", None);
         assert_eq!(resolved, Some("osaurus-test-key".to_string()));
-    }
-
-    #[test]
-    fn resolve_provider_credential_volcengine_env() {
-        let _env_lock = env_lock();
-        let _guard = EnvGuard::set("VOLCENGINE_API_KEY", Some("volc-test-key"));
-        let resolved = resolve_provider_credential("volcengine", None);
-        assert_eq!(resolved, Some("volc-test-key".to_string()));
     }
 
     #[test]
@@ -3407,23 +3226,15 @@ mod tests {
             "moonshot",
             "moonshot-intl",
             "kimi-code",
-            "moonshot-cn",
-            "kimi-code",
             "synthetic",
             "opencode",
             "opencode-go",
             "zai",
-            "zai-cn",
             "glm",
-            "glm-cn",
             "minimax",
-            "minimax-cn",
             "bedrock",
-            "qianfan",
-            "doubao",
             "qwen",
             "qwen-intl",
-            "qwen-cn",
             "qwen-us",
             "qwen-code",
             "lmstudio",

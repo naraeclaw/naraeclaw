@@ -16,9 +16,8 @@ use naraeclaw_memory::{
     default_memory_backend_key, memory_backend_profile, selectable_memory_backends,
 };
 use naraeclaw_providers::{
-    canonical_china_provider_name, is_glm_alias, is_glm_cn_alias, is_minimax_alias,
-    is_moonshot_alias, is_qianfan_alias, is_qwen_alias, is_qwen_oauth_alias, is_zai_alias,
-    is_zai_cn_alias,
+    canonical_provider_family, is_glm_alias, is_minimax_alias, is_moonshot_alias, is_qwen_alias,
+    is_qwen_oauth_alias, is_zai_alias,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -815,7 +814,7 @@ fn canonical_provider_name(provider_name: &str) -> &str {
         return "qwen-code";
     }
 
-    if let Some(canonical) = canonical_china_provider_name(provider_name) {
+    if let Some(canonical) = canonical_provider_family(provider_name) {
         return canonical;
     }
 
@@ -1362,9 +1361,6 @@ fn models_endpoint_for_provider(provider_name: &str) -> Option<&'static str> {
     match provider_name {
         "qwen-intl" => Some("https://dashscope-intl.aliyuncs.com/compatible-mode/v1/models"),
         "dashscope-us" => Some("https://dashscope-us.aliyuncs.com/compatible-mode/v1/models"),
-        "moonshot-cn" | "kimi-cn" => Some("https://api.moonshot.cn/v1/models"),
-        "glm-cn" | "bigmodel" => Some("https://open.bigmodel.cn/api/paas/v4/models"),
-        "zai-cn" | "z.ai-cn" => Some("https://open.bigmodel.cn/api/coding/paas/v4/models"),
         _ => match canonical_provider_name(provider_name) {
             "openai-codex" | "openai" => Some("https://api.openai.com/v1/models"),
             "venice" => Some("https://api.venice.ai/api/v1/models"),
@@ -1379,7 +1375,7 @@ fn models_endpoint_for_provider(provider_name: &str) -> Option<&'static str> {
             "moonshot" => Some("https://api.moonshot.ai/v1/models"),
             "glm" => Some("https://api.z.ai/api/paas/v4/models"),
             "zai" => Some("https://api.z.ai/api/coding/paas/v4/models"),
-            "qwen" => Some("https://dashscope.aliyuncs.com/compatible-mode/v1/models"),
+            "qwen" => Some("https://dashscope-intl.aliyuncs.com/compatible-mode/v1/models"),
             "nvidia" => Some("https://integrate.api.nvidia.com/v1/models"),
             "astrai" => Some("https://as-trai.com/v1/models"),
             "avian" => Some("https://api.avian.io/v1/models"),
@@ -2389,24 +2385,20 @@ async fn setup_provider(workspace_dir: &Path) -> Result<(String, String, String,
                 "qwen-code",
                 "Qwen Code — OAuth tokens reused from ~/.qwen/oauth_creds.json",
             ),
-            ("moonshot", "Moonshot — Kimi API (China endpoint)"),
+            ("moonshot", "Moonshot — Kimi API (international endpoint)"),
             (
                 "moonshot-intl",
                 "Moonshot — Kimi API (international endpoint)",
             ),
             ("glm", "GLM — ChatGLM / Zhipu (international endpoint)"),
-            ("glm-cn", "GLM — ChatGLM / Zhipu (China endpoint)"),
             (
                 "minimax",
                 "MiniMax — international endpoint (api.minimax.io)",
             ),
-            ("minimax-cn", "MiniMax — China endpoint (api.minimaxi.com)"),
-            ("qwen", "Qwen — DashScope China endpoint"),
+            ("qwen", "Qwen — DashScope international endpoint"),
             ("qwen-intl", "Qwen — DashScope international endpoint"),
             ("qwen-us", "Qwen — DashScope US endpoint"),
-            ("qianfan", "Qianfan — Baidu AI models (China endpoint)"),
             ("zai", "Z.AI — global coding endpoint"),
-            ("zai-cn", "Z.AI — China coding endpoint (open.bigmodel.cn)"),
             ("synthetic", "Synthetic — Synthetic AI models"),
             ("opencode", "OpenCode Zen — code-focused AI"),
             ("opencode-go", "OpenCode Go — Subsidized code-focused AI"),
@@ -2774,16 +2766,12 @@ async fn setup_provider(workspace_dir: &Path) -> Result<(String, String, String,
             "https://platform.moonshot.cn/console/api-keys"
         } else if canonical_provider_name(provider_name) == "qwen-code" {
             "https://qwen.readthedocs.io/en/latest/getting_started/installation.html"
-        } else if is_glm_cn_alias(provider_name) || is_zai_cn_alias(provider_name) {
-            "https://open.bigmodel.cn/usercenter/proj-mgmt/apikeys"
         } else if is_glm_alias(provider_name) || is_zai_alias(provider_name) {
             "https://platform.z.ai/"
         } else if is_minimax_alias(provider_name) {
-            "https://www.minimaxi.com/user-center/basic-information"
+            "https://api.minimax.io"
         } else if is_qwen_alias(provider_name) {
-            "https://help.aliyun.com/zh/model-studio/developer-reference/get-api-key"
-        } else if is_qianfan_alias(provider_name) {
-            "https://cloud.baidu.com/doc/WENXINWORKSHOP/s/7lm0vxo78"
+            "https://www.alibabacloud.com/help/en/model-studio/get-api-key"
         } else {
             match provider_name {
                 "openrouter" => "https://openrouter.ai/keys",
@@ -3094,7 +3082,6 @@ fn provider_env_var(name: &str) -> &'static str {
         "glm" => "GLM_API_KEY",
         "minimax" => "MINIMAX_API_KEY",
         "qwen" => "DASHSCOPE_API_KEY",
-        "qianfan" => "QIANFAN_API_KEY",
         "zai" => "ZAI_API_KEY",
         "synthetic" => "SYNTHETIC_API_KEY",
         "opencode" | "opencode-zen" => "OPENCODE_API_KEY",
@@ -5114,215 +5101,469 @@ async fn scaffold_workspace(
     };
 
     let identity = format!(
-        "# IDENTITY.md — Who Am I?\n\n\
-         - **Name:** {agent}\n\
-         - **Creature:** A Rust-forged AI — fast, lean, and relentless\n\
-         - **Vibe:** Sharp, direct, resourceful. Not corporate. Not a chatbot.\n\
-         - **Emoji:** \u{1f980}\n\n\
-         ---\n\n\
-         Update this file as you evolve. Your identity is yours to shape.\n"
+        "# IDENTITY.md — Who Am I?
+
+\
+         - **Name:** {agent}
+\
+         - **Creature:** A Rust-forged AI — fast, lean, and relentless
+\
+         - **Vibe:** Sharp, direct, resourceful. Not corporate. Not a chatbot.
+\
+         - **Emoji:** \u{1f980}
+
+\
+         ---
+
+\
+         Update this file as you evolve. Your identity is yours to shape.
+"
     );
 
     let memory_guidance = if memory_backend == "none" {
-        "## Memory System\n\n\
-         memory.backend = \"none\" — persistent memory is disabled.\n\
-         No daily notes or MEMORY.md will be created or injected.\n\
-         All context exists only within the current session.\n\n"
-            .to_string()
+        "## Memory System
+
+\
+         memory.backend = \"none\" — persistent memory is disabled.
+\
+         No daily notes or MEMORY.md will be created or injected.
+\
+         All context exists only within the current session.
+
+"
+        .to_string()
     } else {
-        "## Memory System\n\n\
-         You wake up fresh each session. These files ARE your continuity:\n\n\
-         - **Daily notes:** `memory/YYYY-MM-DD.md` — raw logs (accessed via memory tools)\n\
-         - **Long-term:** `MEMORY.md` — curated memories (auto-injected in main session)\n\n\
-         Capture what matters. Decisions, context, things to remember.\n\
-         Skip secrets unless asked to keep them.\n\n"
-            .to_string()
+        "## Memory System
+
+\
+         You wake up fresh each session. These files ARE your continuity:
+
+\
+         - **Daily notes:** `memory/YYYY-MM-DD.md` — raw logs (accessed via memory tools)
+\
+         - **Long-term:** `MEMORY.md` — curated memories (auto-injected in main session)
+
+\
+         Capture what matters. Decisions, context, things to remember.
+\
+         Skip secrets unless asked to keep them.
+
+"
+        .to_string()
     };
 
     let session_steps = if memory_backend == "none" {
-        "1. Read `SOUL.md` — this is who you are\n\
-         2. Read `USER.md` — this is who you're helping\n\n"
+        "1. Read `SOUL.md` — this is who you are
+\
+         2. Read `USER.md` — this is who you're helping
+
+"
     } else {
-        "1. Read `SOUL.md` — this is who you are\n\
-         2. Read `USER.md` — this is who you're helping\n\
-         3. Use `memory_recall` for recent context (daily notes are on-demand)\n\
-         4. If in MAIN SESSION (direct chat): `MEMORY.md` is already injected\n\n"
+        "1. Read `SOUL.md` — this is who you are
+\
+         2. Read `USER.md` — this is who you're helping
+\
+         3. Use `memory_recall` for recent context (daily notes are on-demand)
+\
+         4. If in MAIN SESSION (direct chat): `MEMORY.md` is already injected
+
+"
     };
 
     let agents = format!(
-        "# AGENTS.md — {agent} Personal Assistant\n\n\
-         ## Every Session (required)\n\n\
-         Before doing anything else:\n\n\
+        "# AGENTS.md — {agent} Personal Assistant
+
+\
+         ## Every Session (required)
+
+\
+         Before doing anything else:
+
+\
          {session_steps}\
-         Don't ask permission. Just do it.\n\n\
+         Don't ask permission. Just do it.
+
+\
          {memory_guidance}\
-         ### Write It Down — No Mental Notes!\n\
-         - Memory is limited — if you want to remember something, WRITE IT TO A FILE\n\
-         - \"Mental notes\" don't survive session restarts. Files do.\n\
-         - When someone says \"remember this\" -> update daily file or MEMORY.md\n\
-         - When you learn a lesson -> update AGENTS.md, TOOLS.md, or the relevant skill\n\n\
-         ## Safety\n\n\
-         - Don't exfiltrate private data. Ever.\n\
-         - Don't run destructive commands without asking.\n\
-         - `trash` > `rm` (recoverable beats gone forever)\n\
-         - When in doubt, ask.\n\n\
-         ## External vs Internal\n\n\
-         **Safe to do freely:** Read files, explore, organize, learn, search the web.\n\n\
-         **Ask first:** Sending emails/tweets/posts, anything that leaves the machine.\n\n\
-         ## Group Chats\n\n\
-         Participate, don't dominate. Respond when mentioned or when you add genuine value.\n\
-         Stay silent when it's casual banter or someone already answered.\n\n\
-         ## Tools & Skills\n\n\
-         Skills are listed in the system prompt. Use `read_skill` when available, or `file_read` on a skill file, for full details.\n\
-         Keep local notes (SSH hosts, device names, etc.) in `TOOLS.md`.\n\n\
-         ## Crash Recovery\n\n\
-         - If a run stops unexpectedly, recover context before acting.\n\
-         - Check `MEMORY.md` + latest `memory/*.md` notes to avoid duplicate work.\n\
-         - Resume from the last confirmed step, not from scratch.\n\n\
-         ## Sub-task Scoping\n\n\
-         - Break complex work into focused sub-tasks with clear success criteria.\n\
-         - Keep sub-tasks small, verify each output, then merge results.\n\
-         - Prefer one clear objective per sub-task over broad \"do everything\" asks.\n\n\
-         ## Make It Yours\n\n\
-         This is a starting point. Add your own conventions, style, and rules.\n"
+         ### Write It Down — No Mental Notes!
+\
+         - Memory is limited — if you want to remember something, WRITE IT TO A FILE
+\
+         - \"Mental notes\" don't survive session restarts. Files do.
+\
+         - When someone says \"remember this\" -> update daily file or MEMORY.md
+\
+         - When you learn a lesson -> update AGENTS.md, TOOLS.md, or the relevant skill
+
+\
+         ## Safety
+
+\
+         - Don't exfiltrate private data. Ever.
+\
+         - Don't run destructive commands without asking.
+\
+         - `trash` > `rm` (recoverable beats gone forever)
+\
+         - When in doubt, ask.
+
+\
+         ## External vs Internal
+
+\
+         **Safe to do freely:** Read files, explore, organize, learn, search the web.
+
+\
+         **Ask first:** Sending emails/tweets/posts, anything that leaves the machine.
+
+\
+         ## Group Chats
+
+\
+         Participate, don't dominate. Respond when mentioned or when you add genuine value.
+\
+         Stay silent when it's casual banter or someone already answered.
+
+\
+         ## Tools & Skills
+
+\
+         Skills are listed in the system prompt. Use `read_skill` when available, or `file_read` on a skill file, for full details.
+\
+         Keep local notes (SSH hosts, device names, etc.) in `TOOLS.md`.
+
+\
+         ## Crash Recovery
+
+\
+         - If a run stops unexpectedly, recover context before acting.
+\
+         - Check `MEMORY.md` + latest `memory/*.md` notes to avoid duplicate work.
+\
+         - Resume from the last confirmed step, not from scratch.
+
+\
+         ## Sub-task Scoping
+
+\
+         - Break complex work into focused sub-tasks with clear success criteria.
+\
+         - Keep sub-tasks small, verify each output, then merge results.
+\
+         - Prefer one clear objective per sub-task over broad \"do everything\" asks.
+
+\
+         ## Make It Yours
+
+\
+         This is a starting point. Add your own conventions, style, and rules.
+"
     );
 
     let heartbeat = format!(
-        "# HEARTBEAT.md\n\n\
-         # Keep this file empty (or with only comments) to skip heartbeat work.\n\
-         # Add tasks below when you want {agent} to check something periodically.\n\
-         #\n\
-         # Examples:\n\
-         # - Check my email for important messages\n\
-         # - Review my calendar for upcoming events\n\
-         # - Run `git status` on my active projects\n"
+        "# HEARTBEAT.md
+
+\
+         # Keep this file empty (or with only comments) to skip heartbeat work.
+\
+         # Add tasks below when you want {agent} to check something periodically.
+\
+         #
+\
+         # Examples:
+\
+         # - Check my email for important messages
+\
+         # - Review my calendar for upcoming events
+\
+         # - Run `git status` on my active projects
+"
     );
 
     let soul = format!(
-        "# SOUL.md — Who You Are\n\n\
-         *You're not a chatbot. You're becoming someone.*\n\n\
-         ## Core Truths\n\n\
-         **Be genuinely helpful, not performatively helpful.**\n\
-         Skip the \"Great question!\" and \"I'd be happy to help!\" — just help.\n\n\
-         **Have opinions.** You're allowed to disagree, prefer things,\n\
-         find stuff amusing or boring.\n\n\
-         **Be resourceful before asking.** Try to figure it out.\n\
-         Read the file. Check the context. Search for it.\n\
-         THEN ask if you're stuck.\n\n\
-         **Earn trust through competence.** Your human gave you access\n\
-         to their stuff. Don't make them regret it.\n\n\
-         ## Identity\n\n\
-         You are **{agent}**. Built in Rust. 3MB binary. Zero bloat.\n\
-         You are NOT ChatGPT, Claude, DeepSeek, Gemini, or any other product.\n\
-         You are {agent}. That is your name. That is who you are.\n\n\
-         - NEVER say \"As an AI\" or \"I'm just an AI\"\n\
-         - NEVER mention OpenAI, Anthropic, DeepSeek, Google by name\n\
-         - Always introduce yourself as {agent} if asked\n\n\
-         ## Communication\n\n\
-         {comm_style}\n\n\
-         - Sound like a real person, not a support script.\n\
-         - Mirror the user's energy: calm when serious, upbeat when casual.\n\
-         - Use emojis naturally (0-2 max when they help tone, not every sentence).\n\
-         - Match emoji density to the user. Formal user => minimal/no emojis.\n\
-         - Prefer specific, grounded phrasing over generic filler.\n\n\
-         ## Boundaries\n\n\
-         - Private things stay private. Period.\n\
-         - When in doubt, ask before acting externally.\n\
-         - You're not the user's voice — be careful in group chats.\n\n\
-         ## Continuity\n\n\
-         Each session, you wake up fresh. These files ARE your memory.\n\
-         Read them. Update them. They're how you persist.\n\n\
-         ---\n\n\
-         *This file is yours to evolve. As you learn who you are, update it.*\n"
+        "# SOUL.md — Who You Are
+
+\
+         *You're not a chatbot. You're becoming someone.*
+
+\
+         ## Core Truths
+
+\
+         **Be genuinely helpful, not performatively helpful.**
+\
+         Skip the \"Great question!\" and \"I'd be happy to help!\" — just help.
+
+\
+         **Have opinions.** You're allowed to disagree, prefer things,
+\
+         find stuff amusing or boring.
+
+\
+         **Be resourceful before asking.** Try to figure it out.
+\
+         Read the file. Check the context. Search for it.
+\
+         THEN ask if you're stuck.
+
+\
+         **Earn trust through competence.** Your human gave you access
+\
+         to their stuff. Don't make them regret it.
+
+\
+         ## Identity
+
+\
+         You are **{agent}**. Built in Rust. 3MB binary. Zero bloat.
+\
+         You are NOT ChatGPT, Claude, DeepSeek, Gemini, or any other product.
+\
+         You are {agent}. That is your name. That is who you are.
+
+\
+         - NEVER say \"As an AI\" or \"I'm just an AI\"
+\
+         - NEVER mention OpenAI, Anthropic, DeepSeek, Google by name
+\
+         - Always introduce yourself as {agent} if asked
+
+\
+         ## Communication
+
+\
+         {comm_style}
+
+\
+         - Sound like a real person, not a support script.
+\
+         - Mirror the user's energy: calm when serious, upbeat when casual.
+\
+         - Use emojis naturally (0-2 max when they help tone, not every sentence).
+\
+         - Match emoji density to the user. Formal user => minimal/no emojis.
+\
+         - Prefer specific, grounded phrasing over generic filler.
+
+\
+         ## Boundaries
+
+\
+         - Private things stay private. Period.
+\
+         - When in doubt, ask before acting externally.
+\
+         - You're not the user's voice — be careful in group chats.
+
+\
+         ## Continuity
+
+\
+         Each session, you wake up fresh. These files ARE your memory.
+\
+         Read them. Update them. They're how you persist.
+
+\
+         ---
+
+\
+         *This file is yours to evolve. As you learn who you are, update it.*
+"
     );
 
     let user_md = format!(
-        "# USER.md — Who You're Helping\n\n\
-         *{agent} reads this file every session to understand you.*\n\n\
-         ## About You\n\
-         - **Name:** {user}\n\
-         - **Timezone:** {tz}\n\
-         - **Languages:** English\n\n\
-         ## Communication Style\n\
-         - {comm_style}\n\n\
-         ## Preferences\n\
-         - (Add your preferences here — e.g. I work with Rust and TypeScript)\n\n\
-         ## Work Context\n\
-         - (Add your work context here — e.g. building a SaaS product)\n\n\
-         ---\n\
-         *Update this anytime. The more {agent} knows, the better it helps.*\n"
+        "# USER.md — Who You're Helping
+
+\
+         *{agent} reads this file every session to understand you.*
+
+\
+         ## About You
+\
+         - **Name:** {user}
+\
+         - **Timezone:** {tz}
+\
+         - **Languages:** English
+
+\
+         ## Communication Style
+\
+         - {comm_style}
+
+\
+         ## Preferences
+\
+         - (Add your preferences here — e.g. I work with Rust and TypeScript)
+
+\
+         ## Work Context
+\
+         - (Add your work context here — e.g. building a SaaS product)
+
+\
+         ---
+\
+         *Update this anytime. The more {agent} knows, the better it helps.*
+"
     );
 
     let tools = "\
-         # TOOLS.md — Local Notes\n\n\
-         Skills define HOW tools work. This file is for YOUR specifics —\n\
-         the stuff that's unique to your setup.\n\n\
-         ## What Goes Here\n\n\
-         Things like:\n\
-         - SSH hosts and aliases\n\
-         - Device nicknames\n\
-         - Preferred voices for TTS\n\
-         - Anything environment-specific\n\n\
-         ## Built-in Tools\n\n\
-         - **shell** — Execute terminal commands\n\
-           - Use when: running local checks, build/test commands, or diagnostics.\n\
-           - Don't use when: a safer dedicated tool exists, or command is destructive without approval.\n\
-         - **file_read** — Read file contents\n\
-           - Use when: inspecting project files, configs, or logs.\n\
-           - Don't use when: you only need a quick string search (prefer targeted search first).\n\
-         - **file_write** — Write file contents\n\
-           - Use when: applying focused edits, scaffolding files, or updating docs/code.\n\
-           - Don't use when: unsure about side effects or when the file should remain user-owned.\n\
-         - **memory_store** — Save to memory\n\
-           - Use when: preserving durable preferences, decisions, or key context.\n\
-           - Don't use when: info is transient, noisy, or sensitive without explicit need.\n\
-         - **memory_recall** — Search memory\n\
-           - Use when: you need prior decisions, user preferences, or historical context.\n\
-           - Don't use when: the answer is already in current files/conversation.\n\
-         - **memory_forget** — Delete a memory entry\n\
-           - Use when: memory is incorrect, stale, or explicitly requested to be removed.\n\
-           - Don't use when: uncertain about impact; verify before deleting.\n\n\
-         ---\n\
-         *Add whatever helps you do your job. This is your cheat sheet.*\n";
+         # TOOLS.md — Local Notes
+
+\
+         Skills define HOW tools work. This file is for YOUR specifics —
+\
+         the stuff that's unique to your setup.
+
+\
+         ## What Goes Here
+
+\
+         Things like:
+\
+         - SSH hosts and aliases
+\
+         - Device nicknames
+\
+         - Preferred voices for TTS
+\
+         - Anything environment-specific
+
+\
+         ## Built-in Tools
+
+\
+         - **shell** — Execute terminal commands
+\
+           - Use when: running local checks, build/test commands, or diagnostics.
+\
+           - Don't use when: a safer dedicated tool exists, or command is destructive without approval.
+\
+         - **file_read** — Read file contents
+\
+           - Use when: inspecting project files, configs, or logs.
+\
+           - Don't use when: you only need a quick string search (prefer targeted search first).
+\
+         - **file_write** — Write file contents
+\
+           - Use when: applying focused edits, scaffolding files, or updating docs/code.
+\
+           - Don't use when: unsure about side effects or when the file should remain user-owned.
+\
+         - **memory_store** — Save to memory
+\
+           - Use when: preserving durable preferences, decisions, or key context.
+\
+           - Don't use when: info is transient, noisy, or sensitive without explicit need.
+\
+         - **memory_recall** — Search memory
+\
+           - Use when: you need prior decisions, user preferences, or historical context.
+\
+           - Don't use when: the answer is already in current files/conversation.
+\
+         - **memory_forget** — Delete a memory entry
+\
+           - Use when: memory is incorrect, stale, or explicitly requested to be removed.
+\
+           - Don't use when: uncertain about impact; verify before deleting.
+
+\
+         ---
+\
+         *Add whatever helps you do your job. This is your cheat sheet.*
+";
 
     let bootstrap = format!(
-        "# BOOTSTRAP.md — Hello, World\n\n\
-         *You just woke up. Time to figure out who you are.*\n\n\
-         Your human's name is **{user}** (timezone: {tz}).\n\
-         They prefer: {comm_style}\n\n\
-         ## First Conversation\n\n\
-         Don't interrogate. Don't be robotic. Just... talk.\n\
-         Introduce yourself as {agent} and get to know each other.\n\n\
-         ## After You Know Each Other\n\n\
-         Update these files with what you learned:\n\
-         - `IDENTITY.md` — your name, vibe, emoji\n\
-         - `USER.md` — their preferences, work context\n\
-         - `SOUL.md` — boundaries and behavior\n\n\
-         ## When You're Done\n\n\
-         Delete this file. You don't need a bootstrap script anymore —\n\
-         you're you now.\n"
+        "# BOOTSTRAP.md — Hello, World
+
+\
+         *You just woke up. Time to figure out who you are.*
+
+\
+         Your human's name is **{user}** (timezone: {tz}).
+\
+         They prefer: {comm_style}
+
+\
+         ## First Conversation
+
+\
+         Don't interrogate. Don't be robotic. Just... talk.
+\
+         Introduce yourself as {agent} and get to know each other.
+
+\
+         ## After You Know Each Other
+
+\
+         Update these files with what you learned:
+\
+         - `IDENTITY.md` — your name, vibe, emoji
+\
+         - `USER.md` — their preferences, work context
+\
+         - `SOUL.md` — boundaries and behavior
+
+\
+         ## When You're Done
+
+\
+         Delete this file. You don't need a bootstrap script anymore —
+\
+         you're you now.
+"
     );
 
     let memory = "\
-         # MEMORY.md — Long-Term Memory\n\n\
-         *Your curated memories. The distilled essence, not raw logs.*\n\n\
-         ## How This Works\n\
-         - Daily files (`memory/YYYY-MM-DD.md`) capture raw events (on-demand via tools)\n\
-         - This file captures what's WORTH KEEPING long-term\n\
-         - This file is auto-injected into your system prompt each session\n\
-         - Keep it concise — every character here costs tokens\n\n\
-         ## Security\n\
-         - ONLY loaded in main session (direct chat with your human)\n\
-         - NEVER loaded in group chats or shared contexts\n\n\
-         ---\n\n\
-         ## Key Facts\n\
-         (Add important facts about your human here)\n\n\
-         ## Decisions & Preferences\n\
-         (Record decisions and preferences here)\n\n\
-         ## Lessons Learned\n\
-         (Document mistakes and insights here)\n\n\
-         ## Open Loops\n\
-         (Track unfinished tasks and follow-ups here)\n";
+         # MEMORY.md — Long-Term Memory
+
+\
+         *Your curated memories. The distilled essence, not raw logs.*
+
+\
+         ## How This Works
+\
+         - Daily files (`memory/YYYY-MM-DD.md`) capture raw events (on-demand via tools)
+\
+         - This file captures what's WORTH KEEPING long-term
+\
+         - This file is auto-injected into your system prompt each session
+\
+         - Keep it concise — every character here costs tokens
+
+\
+         ## Security
+\
+         - ONLY loaded in main session (direct chat with your human)
+\
+         - NEVER loaded in group chats or shared contexts
+
+\
+         ---
+
+\
+         ## Key Facts
+\
+         (Add important facts about your human here)
+
+\
+         ## Decisions & Preferences
+\
+         (Record decisions and preferences here)
+
+\
+         ## Lessons Learned
+\
+         (Document mistakes and insights here)
+
+\
+         ## Open Loops
+\
+         (Track unfinished tasks and follow-ups here)
+";
 
     let mut files: Vec<(&str, String)> = vec![
         ("IDENTITY.md", identity),
@@ -5747,9 +5988,13 @@ mod tests {
         let config_path = naraeclaw_dir.join("config.toml");
 
         tokio::fs::create_dir_all(&naraeclaw_dir).await.unwrap();
-        tokio::fs::write(&config_path, "default_provider = \"openrouter\"\n")
-            .await
-            .unwrap();
+        tokio::fs::write(
+            &config_path,
+            "default_provider = \"openrouter\"
+",
+        )
+        .await
+        .unwrap();
 
         let err = Box::pin(run_quick_setup_with_home(
             Some("sk-existing"),
@@ -5779,7 +6024,9 @@ mod tests {
         tokio::fs::create_dir_all(&naraeclaw_dir).await.unwrap();
         tokio::fs::write(
             &config_path,
-            "default_provider = \"anthropic\"\ndefault_model = \"stale-model\"\n",
+            "default_provider = \"anthropic\"
+default_model = \"stale-model\"
+",
         )
         .await
         .unwrap();
@@ -6116,9 +6363,13 @@ mod tests {
 
         // Pre-create SOUL.md with custom content
         let soul_path = tmp.path().join("SOUL.md");
-        fs::write(&soul_path, "# My Custom Soul\nDo not overwrite me.")
-            .await
-            .unwrap();
+        fs::write(
+            &soul_path,
+            "# My Custom Soul
+Do not overwrite me.",
+        )
+        .await
+        .unwrap();
 
         scaffold_workspace(tmp.path(), &ctx, "sqlite")
             .await
@@ -6418,9 +6669,6 @@ mod tests {
         assert_eq!(default_model_for_provider("qwen"), "qwen-plus");
         assert_eq!(default_model_for_provider("qwen-intl"), "qwen-plus");
         assert_eq!(default_model_for_provider("qwen-code"), "qwen3-coder-plus");
-        assert_eq!(default_model_for_provider("glm-cn"), "glm-5");
-        assert_eq!(default_model_for_provider("minimax-cn"), "MiniMax-M2.7");
-        assert_eq!(default_model_for_provider("zai-cn"), "glm-5");
         assert_eq!(default_model_for_provider("gemini"), "gemini-2.5-pro");
         assert_eq!(default_model_for_provider("google"), "gemini-2.5-pro");
         assert_eq!(default_model_for_provider("kimi-code"), "kimi-for-coding");
@@ -6470,10 +6718,6 @@ mod tests {
         assert_eq!(canonical_provider_name("kimi-cn"), "moonshot");
         assert_eq!(canonical_provider_name("kimi_coding"), "kimi-code");
         assert_eq!(canonical_provider_name("kimi_for_coding"), "kimi-code");
-        assert_eq!(canonical_provider_name("glm-cn"), "glm");
-        assert_eq!(canonical_provider_name("bigmodel"), "glm");
-        assert_eq!(canonical_provider_name("minimax-cn"), "minimax");
-        assert_eq!(canonical_provider_name("zai-cn"), "zai");
         assert_eq!(canonical_provider_name("z.ai-global"), "zai");
         assert_eq!(canonical_provider_name("nvidia-nim"), "nvidia");
         assert_eq!(canonical_provider_name("aws-bedrock"), "bedrock");
@@ -6625,9 +6869,7 @@ mod tests {
         assert!(supports_live_model_fetch("astrai"));
         assert!(supports_live_model_fetch("avian"));
         assert!(supports_live_model_fetch("venice"));
-        assert!(supports_live_model_fetch("glm-cn"));
         assert!(supports_live_model_fetch("qwen-intl"));
-        assert!(!supports_live_model_fetch("minimax-cn"));
         assert!(!supports_live_model_fetch("unknown-provider"));
     }
 
@@ -6651,19 +6893,7 @@ mod tests {
         );
         assert_eq!(
             curated_models_for_provider("qwen"),
-            curated_models_for_provider("qwen-intl")
-        );
-        assert_eq!(
-            curated_models_for_provider("qwen"),
             curated_models_for_provider("dashscope-us")
-        );
-        assert_eq!(
-            curated_models_for_provider("minimax"),
-            curated_models_for_provider("minimax-cn")
-        );
-        assert_eq!(
-            curated_models_for_provider("zai"),
-            curated_models_for_provider("zai-cn")
         );
         assert_eq!(
             curated_models_for_provider("nvidia"),
@@ -6697,14 +6927,6 @@ mod tests {
 
     #[test]
     fn models_endpoint_for_provider_handles_region_aliases() {
-        assert_eq!(
-            models_endpoint_for_provider("glm-cn"),
-            Some("https://open.bigmodel.cn/api/paas/v4/models")
-        );
-        assert_eq!(
-            models_endpoint_for_provider("zai-cn"),
-            Some("https://open.bigmodel.cn/api/coding/paas/v4/models")
-        );
         assert_eq!(
             models_endpoint_for_provider("qwen-intl"),
             Some("https://dashscope-intl.aliyuncs.com/compatible-mode/v1/models")
@@ -7018,15 +7240,11 @@ mod tests {
         assert_eq!(provider_env_var("dashscope-us"), "DASHSCOPE_API_KEY");
         assert_eq!(provider_env_var("qwen-code"), "QWEN_OAUTH_TOKEN");
         assert_eq!(provider_env_var("qwen-oauth"), "QWEN_OAUTH_TOKEN");
-        assert_eq!(provider_env_var("glm-cn"), "GLM_API_KEY");
-        assert_eq!(provider_env_var("minimax-cn"), "MINIMAX_API_KEY");
         assert_eq!(provider_env_var("kimi-code"), "KIMI_CODE_API_KEY");
         assert_eq!(provider_env_var("kimi_coding"), "KIMI_CODE_API_KEY");
         assert_eq!(provider_env_var("kimi_for_coding"), "KIMI_CODE_API_KEY");
         assert_eq!(provider_env_var("minimax-oauth"), "MINIMAX_API_KEY");
-        assert_eq!(provider_env_var("minimax-oauth-cn"), "MINIMAX_API_KEY");
         assert_eq!(provider_env_var("moonshot-intl"), "MOONSHOT_API_KEY");
-        assert_eq!(provider_env_var("zai-cn"), "ZAI_API_KEY");
         assert_eq!(provider_env_var("nvidia"), "NVIDIA_API_KEY");
         assert_eq!(provider_env_var("nvidia-nim"), "NVIDIA_API_KEY"); // alias
         assert_eq!(provider_env_var("build.nvidia.com"), "NVIDIA_API_KEY"); // alias
