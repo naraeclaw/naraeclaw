@@ -19,7 +19,7 @@ Use this section for quick operational routing.
 
 ### 1.1 Proxy only NaraeClaw internal traffic
 
-1. Use scope `zeroclaw`.
+1. Use scope `naraeclaw`.
 2. Set `http_proxy`/`https_proxy` or `all_proxy`.
 3. Validate with `{"action":"get"}`.
 
@@ -95,7 +95,7 @@ Use when NaraeClaw provider/channel/tool HTTP traffic should use proxy, without 
 Tool calls:
 
 ```json
-{"action":"set","enabled":true,"scope":"zeroclaw","http_proxy":"http://127.0.0.1:7890","https_proxy":"http://127.0.0.1:7890","no_proxy":["localhost","127.0.0.1"]}
+{"action":"set","enabled":true,"scope":"naraeclaw","http_proxy":"http://127.0.0.1:7890","https_proxy":"http://127.0.0.1:7890","no_proxy":["localhost","127.0.0.1"]}
 {"action":"get"}
 ```
 
