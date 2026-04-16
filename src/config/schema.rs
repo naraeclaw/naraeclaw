@@ -1,3 +1,3 @@
-//! Configuration schema — re-exported from `zeroclaw-config`.
+//! Configuration schema — re-exported from `naraeclaw-config`.
 
-pub use zeroclaw_config::schema::*;
+pub use naraeclaw_config::schema::*;

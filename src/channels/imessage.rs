@@ -1,1 +1,1 @@
-pub use zeroclaw_channels::imessage::*;
+pub use naraeclaw_channels::imessage::*;

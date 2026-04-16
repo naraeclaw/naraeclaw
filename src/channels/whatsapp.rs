@@ -1,1 +1,1 @@
-pub use zeroclaw_channels::whatsapp::*;
+pub use naraeclaw_channels::whatsapp::*;

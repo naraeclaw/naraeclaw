@@ -1,1 +1,1 @@
-pub use zeroclaw_config::workspace::*;
+pub use naraeclaw_config::workspace::*;

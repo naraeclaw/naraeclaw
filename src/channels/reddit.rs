@@ -1,1 +1,1 @@
-pub use zeroclaw_channels::reddit::*;
+pub use naraeclaw_channels::reddit::*;

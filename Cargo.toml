@@ -1,5 +1,5 @@
 [workspace]
-members = [".", "crates/zeroclaw-api", "crates/zeroclaw-infra", "crates/zeroclaw-config", "crates/zeroclaw-providers", "crates/zeroclaw-memory", "crates/zeroclaw-channels", "crates/zeroclaw-tools", "crates/zeroclaw-runtime", "crates/zeroclaw-tui", "crates/zeroclaw-plugins", "crates/zeroclaw-gateway", "crates/zeroclaw-tool-call-parser", "crates/zeroclaw-macros", "apps/tauri"]
+members = [".", "crates/naraeclaw-api", "crates/naraeclaw-infra", "crates/naraeclaw-config", "crates/naraeclaw-providers", "crates/naraeclaw-memory", "crates/naraeclaw-channels", "crates/naraeclaw-tools", "crates/naraeclaw-runtime", "crates/naraeclaw-tui", "crates/naraeclaw-plugins", "crates/naraeclaw-gateway", "crates/naraeclaw-tool-call-parser", "crates/naraeclaw-macros", "apps/tauri"]
 resolver = "2"
 
 [workspace.package]
@@ -10,19 +10,19 @@ repository = "https://github.com/naraeclaw/naraeclaw"
 rust-version = "1.87"
 
 [workspace.dependencies]
-zeroclaw-api = { path = "crates/zeroclaw-api", version = "0.6.9" }
-zeroclaw-infra = { path = "crates/zeroclaw-infra", version = "0.6.9" }
-zeroclaw-config = { path = "crates/zeroclaw-config", version = "0.6.9", default-features = false }
-zeroclaw-providers = { path = "crates/zeroclaw-providers", version = "0.6.9" }
-zeroclaw-memory = { path = "crates/zeroclaw-memory", version = "0.6.9" }
-zeroclaw-channels = { path = "crates/zeroclaw-channels", version = "0.6.9", default-features = false }
-zeroclaw-tools = { path = "crates/zeroclaw-tools", version = "0.6.9" }
-zeroclaw-runtime = { path = "crates/zeroclaw-runtime", version = "0.6.9", default-features = false }
-zeroclaw-tui = { path = "crates/zeroclaw-tui", version = "0.6.9" }
-zeroclaw-plugins = { path = "crates/zeroclaw-plugins", version = "0.6.9" }
-zeroclaw-gateway = { path = "crates/zeroclaw-gateway", version = "0.6.9" }
-zeroclaw-tool-call-parser = { path = "crates/zeroclaw-tool-call-parser", version = "0.6.9" }
-zeroclaw-macros = { path = "crates/zeroclaw-macros", version = "0.6.9" }
+naraeclaw-api = { path = "crates/naraeclaw-api", version = "0.6.9" }
+naraeclaw-infra = { path = "crates/naraeclaw-infra", version = "0.6.9" }
+naraeclaw-config = { path = "crates/naraeclaw-config", version = "0.6.9", default-features = false }
+naraeclaw-providers = { path = "crates/naraeclaw-providers", version = "0.6.9" }
+naraeclaw-memory = { path = "crates/naraeclaw-memory", version = "0.6.9" }
+naraeclaw-channels = { path = "crates/naraeclaw-channels", version = "0.6.9", default-features = false }
+naraeclaw-tools = { path = "crates/naraeclaw-tools", version = "0.6.9" }
+naraeclaw-runtime = { path = "crates/naraeclaw-runtime", version = "0.6.9", default-features = false }
+naraeclaw-tui = { path = "crates/naraeclaw-tui", version = "0.6.9" }
+naraeclaw-plugins = { path = "crates/naraeclaw-plugins", version = "0.6.9" }
+naraeclaw-gateway = { path = "crates/naraeclaw-gateway", version = "0.6.9" }
+naraeclaw-tool-call-parser = { path = "crates/naraeclaw-tool-call-parser", version = "0.6.9" }
+naraeclaw-macros = { path = "crates/naraeclaw-macros", version = "0.6.9" }
 
 # Memory zeroization for secrets on drop
 zeroize = { version = "1", features = ["derive"] }
@@ -56,24 +56,24 @@ name = "naraeclaw"
 path = "src/main.rs"
 
 [lib]
-name = "zeroclaw"
+name = "naraeclaw"
 path = "src/lib.rs"
 
 [dependencies]
 # Internal workspace crates — versions and paths declared once in [workspace.dependencies]
-zeroclaw-api.workspace = true
-zeroclaw-infra.workspace = true
-zeroclaw-config.workspace = true
-zeroclaw-providers.workspace = true
-zeroclaw-memory.workspace = true
-zeroclaw-channels = { workspace = true, optional = true }
-zeroclaw-tools = { workspace = true, optional = true }
-zeroclaw-runtime = { workspace = true, optional = true }
-zeroclaw-tui = { workspace = true, optional = true }
-zeroclaw-plugins = { workspace = true, optional = true }
-zeroclaw-gateway = { workspace = true, optional = true }
-zeroclaw-tool-call-parser.workspace = true
-zeroclaw-macros.workspace = true
+naraeclaw-api.workspace = true
+naraeclaw-infra.workspace = true
+naraeclaw-config.workspace = true
+naraeclaw-providers.workspace = true
+naraeclaw-memory.workspace = true
+naraeclaw-channels = { workspace = true, optional = true }
+naraeclaw-tools = { workspace = true, optional = true }
+naraeclaw-runtime = { workspace = true, optional = true }
+naraeclaw-tui = { workspace = true, optional = true }
+naraeclaw-plugins = { workspace = true, optional = true }
+naraeclaw-gateway = { workspace = true, optional = true }
+naraeclaw-tool-call-parser.workspace = true
+naraeclaw-macros.workspace = true
 # CLI - minimal and fast
 clap = { version = "4.5", features = ["derive"] }
 clap_complete = "4.5"
@@ -231,7 +231,7 @@ default = [
 # The default agent runtime — agent loop, core channels, tools, gateway, TUI.
 # Without this, you get the kernel: config + providers + memory + CLI chat.
 agent-runtime = [
-    "dep:zeroclaw-runtime", "dep:zeroclaw-channels", "dep:zeroclaw-tools",
+    "dep:naraeclaw-runtime", "dep:naraeclaw-channels", "dep:naraeclaw-tools",
     "dep:rusqlite",
     "dep:ring", "dep:lru", "dep:chrono-tz", "dep:cron", "dep:which",
     "dep:ratatui", "dep:crossterm",
@@ -248,33 +248,33 @@ agent-runtime = [
 ]
 
 # Major subsystems — each forwards to exactly ONE crate
-gateway = ["dep:zeroclaw-gateway"]
-tui-onboarding = ["dep:zeroclaw-tui"]
-schema-export = ["zeroclaw-config/schema-export"]
+gateway = ["dep:naraeclaw-gateway"]
+tui-onboarding = ["dep:naraeclaw-tui"]
+schema-export = ["naraeclaw-config/schema-export"]
 
-# Channels — each forwards directly to zeroclaw-channels (1 hop)
-channel-email = ["zeroclaw-channels/channel-email"]
-channel-telegram = ["zeroclaw-channels/channel-telegram"]
-channel-nostr = ["zeroclaw-channels/channel-nostr", "zeroclaw-runtime/channel-nostr", "dep:nostr-sdk"]
-channel-matrix = ["zeroclaw-channels/channel-matrix"]
-channel-discord = ["zeroclaw-channels/channel-discord"]
-channel-slack = ["zeroclaw-channels/channel-slack"]
-channel-signal = ["zeroclaw-channels/channel-signal"]
-channel-mattermost = ["zeroclaw-channels/channel-mattermost"]
-channel-irc = ["zeroclaw-channels/channel-irc"]
-channel-imessage = ["zeroclaw-channels/channel-imessage"]
-channel-bluesky = ["zeroclaw-channels/channel-bluesky"]
-channel-twitter = ["zeroclaw-channels/channel-twitter"]
-channel-reddit = ["zeroclaw-channels/channel-reddit"]
-channel-notion = ["zeroclaw-channels/channel-notion"]
-channel-linq = ["zeroclaw-channels/channel-linq", "zeroclaw-gateway/channel-linq"]
-channel-wati = ["zeroclaw-channels/channel-wati", "zeroclaw-gateway/channel-wati"]
-channel-nextcloud = ["zeroclaw-channels/channel-nextcloud"]
-channel-clawdtalk = ["zeroclaw-channels/channel-clawdtalk"]
-channel-webhook = ["zeroclaw-channels/channel-webhook"]
-channel-acp-server = ["zeroclaw-channels/channel-acp-server"]
-channel-whatsapp-cloud = ["zeroclaw-channels/channel-whatsapp-cloud"]
-channel-voice-call = ["zeroclaw-channels/channel-voice-call"]
+# Channels — each forwards directly to naraeclaw-channels (1 hop)
+channel-email = ["naraeclaw-channels/channel-email"]
+channel-telegram = ["naraeclaw-channels/channel-telegram"]
+channel-nostr = ["naraeclaw-channels/channel-nostr", "naraeclaw-runtime/channel-nostr", "dep:nostr-sdk"]
+channel-matrix = ["naraeclaw-channels/channel-matrix"]
+channel-discord = ["naraeclaw-channels/channel-discord"]
+channel-slack = ["naraeclaw-channels/channel-slack"]
+channel-signal = ["naraeclaw-channels/channel-signal"]
+channel-mattermost = ["naraeclaw-channels/channel-mattermost"]
+channel-irc = ["naraeclaw-channels/channel-irc"]
+channel-imessage = ["naraeclaw-channels/channel-imessage"]
+channel-bluesky = ["naraeclaw-channels/channel-bluesky"]
+channel-twitter = ["naraeclaw-channels/channel-twitter"]
+channel-reddit = ["naraeclaw-channels/channel-reddit"]
+channel-notion = ["naraeclaw-channels/channel-notion"]
+channel-linq = ["naraeclaw-channels/channel-linq", "naraeclaw-gateway/channel-linq"]
+channel-wati = ["naraeclaw-channels/channel-wati", "naraeclaw-gateway/channel-wati"]
+channel-nextcloud = ["naraeclaw-channels/channel-nextcloud"]
+channel-clawdtalk = ["naraeclaw-channels/channel-clawdtalk"]
+channel-webhook = ["naraeclaw-channels/channel-webhook"]
+channel-acp-server = ["naraeclaw-channels/channel-acp-server"]
+channel-whatsapp-cloud = ["naraeclaw-channels/channel-whatsapp-cloud"]
+channel-voice-call = ["naraeclaw-channels/channel-voice-call"]
 
 # Optional channel bundles for non-default integrations.
 channels-social = ["channel-bluesky", "channel-twitter", "channel-reddit"]
@@ -284,18 +284,18 @@ channels-full = [
     "channel-clawdtalk", "channel-voice-call",
 ]
 
-whatsapp-web = ["zeroclaw-channels/whatsapp-web"]
-voice-wake = ["zeroclaw-channels/voice-wake"]
+whatsapp-web = ["naraeclaw-channels/whatsapp-web"]
+voice-wake = ["naraeclaw-channels/voice-wake"]
 
 # Backends and platform flags — each forwards to ONE crate
-observability-prometheus = ["zeroclaw-runtime/observability-prometheus"]
-observability-otel = ["zeroclaw-runtime/observability-otel"]
-sandbox-landlock = ["zeroclaw-runtime/sandbox-landlock"]
-sandbox-bubblewrap = ["zeroclaw-runtime/sandbox-bubblewrap"]
-browser-native = ["zeroclaw-tools/browser-native"]
-plugins-wasm = ["dep:zeroclaw-plugins", "zeroclaw-runtime/plugins-wasm"]
-rag-pdf = ["zeroclaw-tools/rag-pdf"]
-webauthn = ["zeroclaw-runtime/webauthn"]
+observability-prometheus = ["naraeclaw-runtime/observability-prometheus"]
+observability-otel = ["naraeclaw-runtime/observability-otel"]
+sandbox-landlock = ["naraeclaw-runtime/sandbox-landlock"]
+sandbox-bubblewrap = ["naraeclaw-runtime/sandbox-bubblewrap"]
+browser-native = ["naraeclaw-tools/browser-native"]
+plugins-wasm = ["dep:naraeclaw-plugins", "naraeclaw-runtime/plugins-wasm"]
+rag-pdf = ["naraeclaw-tools/rag-pdf"]
+webauthn = ["naraeclaw-runtime/webauthn"]
 
 # Backward-compatible aliases
 fantoccini = ["browser-native"]

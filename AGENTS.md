@@ -14,7 +14,7 @@ V1 fork goals (all completed as of 2026-04-13):
 
 Current focus: V2 desktop app porting (see `Plan.md`).
 
-Internal crate names still use `zeroclaw-*`, but the binary name is `naraeclaw`.
+Internal crate and binary names use `naraeclaw-*` / `naraeclaw`. Legacy `ZEROCLAW_*` environment variables are retained only as compatibility fallbacks.
 
 ## Commands
 
@@ -64,29 +64,29 @@ The `naraeclaw` binary (`src/main.rs`) enables the `agent-runtime` feature by de
 Message flow:
 
 1. Incoming message
-2. `zeroclaw-channels` transport layer
-3. `zeroclaw-runtime/agent/` agent loop
-4. `zeroclaw-providers` LLM call
-5. `zeroclaw-tools` tool execution
+2. `naraeclaw-channels` transport layer
+3. `naraeclaw-runtime/agent/` agent loop
+4. `naraeclaw-providers` LLM call
+5. `naraeclaw-tools` tool execution
 6. Response delivery
 
 Core architecture is trait-driven and modular. Extend by implementing traits and registering in factory modules.
 
 Key extension points:
 
-- `crates/zeroclaw-api/src/provider.rs` (`Provider`)
-- `crates/zeroclaw-api/src/channel.rs` (`Channel`)
-- `crates/zeroclaw-api/src/tool.rs` (`Tool`)
-- `crates/zeroclaw-api/src/memory_traits.rs` (`Memory`)
-- `crates/zeroclaw-api/src/observability_traits.rs` (`Observer`)
-- `crates/zeroclaw-api/src/runtime_traits.rs` (`RuntimeAdapter`)
+- `crates/naraeclaw-api/src/provider.rs` (`Provider`)
+- `crates/naraeclaw-api/src/channel.rs` (`Channel`)
+- `crates/naraeclaw-api/src/tool.rs` (`Tool`)
+- `crates/naraeclaw-api/src/memory_traits.rs` (`Memory`)
+- `crates/naraeclaw-api/src/observability_traits.rs` (`Observer`)
+- `crates/naraeclaw-api/src/runtime_traits.rs` (`RuntimeAdapter`)
 
 ## Current Priorities
 
-1. Convert Telegram from polling to webhooks.
-2. Remove unnecessary channels from default Cargo features.
-3. Localize the default system prompt in `crates/zeroclaw-runtime/src/agent/system_prompt.rs`.
-4. Localize CLI help text.
+1. Keep the CLI/runtime stable for server management and personal knowledge workflows.
+2. Continue desktop and web UX work without regressing the CLI path.
+3. Finish remaining `zeroclaw` legacy-name cleanup in small compatibility-aware passes.
+4. Prefer fast validation on `master` until the project settles.
 
 ## Stability Tiers
 
@@ -94,19 +94,19 @@ Every workspace crate carries a stability tier per the Microkernel Architecture 
 
 | Crate | Tier | Notes |
 |-------|------|-------|
-| `zeroclaw-api` | Experimental | Stable at v1.0.0 (formal milestone) |
-| `zeroclaw-config` | Beta | Stable at v0.8.0 |
-| `zeroclaw-providers` | Beta | — |
-| `zeroclaw-memory` | Beta | — |
-| `zeroclaw-infra` | Beta | — |
-| `zeroclaw-tool-call-parser` | Beta | Stable at v0.8.0 |
-| `zeroclaw-channels` | Experimental | Plugin migration at v1.0.0 |
-| `zeroclaw-tools` | Experimental | Plugin migration at v1.0.0 |
-| `zeroclaw-runtime` | Experimental | Agent runtime (agent loop, security, cron, SOP, skills, observability) |
-| `zeroclaw-gateway` | Experimental | Separate binary at v0.9.0 |
-| `zeroclaw-tui` | Experimental | TUI onboarding wizard |
-| `zeroclaw-plugins` | Experimental | WASM plugin system — foundation for v1.0.0 plugin ecosystem |
-| `zeroclaw-macros` | Beta | Tightly coupled to config schema |
+| `naraeclaw-api` | Experimental | Stable at v1.0.0 (formal milestone) |
+| `naraeclaw-config` | Beta | Stable at v0.8.0 |
+| `naraeclaw-providers` | Beta | — |
+| `naraeclaw-memory` | Beta | — |
+| `naraeclaw-infra` | Beta | — |
+| `naraeclaw-tool-call-parser` | Beta | Stable at v0.8.0 |
+| `naraeclaw-channels` | Experimental | Plugin migration at v1.0.0 |
+| `naraeclaw-tools` | Experimental | Plugin migration at v1.0.0 |
+| `naraeclaw-runtime` | Experimental | Agent runtime (agent loop, security, cron, SOP, skills, observability) |
+| `naraeclaw-gateway` | Experimental | Separate binary at v0.9.0 |
+| `naraeclaw-tui` | Experimental | TUI onboarding wizard |
+| `naraeclaw-plugins` | Experimental | WASM plugin system — foundation for v1.0.0 plugin ecosystem |
+| `naraeclaw-macros` | Beta | Tightly coupled to config schema |
 
 **Tiers**: Stable = covered by breaking-change policy. Beta = breaking changes permitted in MINOR with changelog notes. Experimental = no stability guarantee.
 
@@ -116,48 +116,48 @@ Tiers are promoted, never demoted, through deliberate team decision.
 
 - `src/main.rs` — CLI entrypoint and command routing
 - `src/lib.rs` — module re-exports and CLI command enum definitions
-- `crates/zeroclaw-api/` — public trait definitions (Provider, Channel, Tool, Memory, Observer, Peripheral)
-- `crates/zeroclaw-config/` — schema, config loading/merging
-- `crates/zeroclaw-macros/` — Configurable derive macro
-- `crates/zeroclaw-providers/` — model providers and resilient wrapper
-- `crates/zeroclaw-channels/` — messaging platform integrations (30+ channels)
-- `crates/zeroclaw-channels/src/orchestrator/` — channel lifecycle, routing, media pipeline
-- `crates/zeroclaw-tools/` — tool execution surface (shell, file, memory, browser)
-- `crates/zeroclaw-runtime/` — agent loop, security, cron, SOP, skills, onboarding wizard, observability
-- `crates/zeroclaw-memory/` — memory backends (markdown, sqlite, embeddings, vector merge)
-- `crates/zeroclaw-infra/` — shared infrastructure (debounce, session, stall watchdog)
-- `crates/zeroclaw-gateway/` — webhook/gateway server (separate binary)
-- `crates/zeroclaw-tui/` — TUI onboarding wizard
-- `crates/zeroclaw-plugins/` — WASM plugin system
-- `crates/zeroclaw-tool-call-parser/` — tool call parsing
+- `crates/naraeclaw-api/` — public trait definitions (Provider, Channel, Tool, Memory, Observer, Peripheral)
+- `crates/naraeclaw-config/` — schema, config loading/merging
+- `crates/naraeclaw-macros/` — Configurable derive macro
+- `crates/naraeclaw-providers/` — model providers and resilient wrapper
+- `crates/naraeclaw-channels/` — messaging platform integrations (30+ channels)
+- `crates/naraeclaw-channels/src/orchestrator/` — channel lifecycle, routing, media pipeline
+- `crates/naraeclaw-tools/` — tool execution surface (shell, file, memory, browser)
+- `crates/naraeclaw-runtime/` — agent loop, security, cron, SOP, skills, onboarding wizard, observability
+- `crates/naraeclaw-memory/` — memory backends (markdown, sqlite, embeddings, vector merge)
+- `crates/naraeclaw-infra/` — shared infrastructure (debounce, session, stall watchdog)
+- `crates/naraeclaw-gateway/` — webhook/gateway server (separate binary)
+- `crates/naraeclaw-tui/` — TUI onboarding wizard
+- `crates/naraeclaw-plugins/` — WASM plugin system
+- `crates/naraeclaw-tool-call-parser/` — tool call parsing
 - `docs/` — topic-based documentation (setup-guides, reference, ops, security, contributing, maintainers)
 - `.github/` — CI, templates, automation workflows
 
 ## Architecture Notes
 
-- `crates/zeroclaw-runtime/src/agent/` — agent loop core, including `loop_.rs` and `agent.rs`.
-- `crates/zeroclaw-runtime/src/security/` — access control and policy. Treat as high risk.
-- `crates/zeroclaw-runtime/src/cron/` — cron scheduler.
-- `crates/zeroclaw-runtime/src/sop/` — SOP engine.
-- `crates/zeroclaw-runtime/src/skills/` and `crates/zeroclaw-runtime/src/skillforge/` — skill system.
-- `crates/zeroclaw-runtime/src/onboard/` — TUI onboarding wizard.
-- `crates/zeroclaw-channels/` — channel integrations gated by `channel-<name>` Cargo features.
-- `crates/zeroclaw-channels/src/orchestrator/` — channel lifecycle, routing, and media pipeline.
-- `crates/zeroclaw-config/` — TOML-based config. `Configurable` derive generates schema. Config keys are public contract; document defaults and migration path when changing them.
+- `crates/naraeclaw-runtime/src/agent/` — agent loop core, including `loop_.rs` and `agent.rs`.
+- `crates/naraeclaw-runtime/src/security/` — access control and policy. Treat as high risk.
+- `crates/naraeclaw-runtime/src/cron/` — cron scheduler.
+- `crates/naraeclaw-runtime/src/sop/` — SOP engine.
+- `crates/naraeclaw-runtime/src/skills/` and `crates/naraeclaw-runtime/src/skillforge/` — skill system.
+- `crates/naraeclaw-runtime/src/onboard/` — TUI onboarding wizard.
+- `crates/naraeclaw-channels/` — channel integrations gated by `channel-<name>` Cargo features.
+- `crates/naraeclaw-channels/src/orchestrator/` — channel lifecycle, routing, and media pipeline.
+- `crates/naraeclaw-config/` — TOML-based config. `Configurable` derive generates schema. Config keys are public contract; document defaults and migration path when changing them.
 - `tests/support/` — shared mocks such as `MockProvider`, `MockChannel`, and `EchoTool`.
 - `tests/fixtures/traces/` — JSON fixture replay data for `TraceLlmProvider`.
 
 Telegram latency-related code:
 
-- `crates/zeroclaw-channels/src/telegram.rs:2871` — polling timeout of 30 seconds; target for webhook replacement.
-- `crates/zeroclaw-channels/src/telegram.rs:372` — draft update interval of 1000 ms.
-- `crates/zeroclaw-channels/src/orchestrator/mod.rs:1844` — memory recall query performed on every message.
+- `crates/naraeclaw-channels/src/telegram.rs:2871` — polling timeout of 30 seconds; target for webhook replacement.
+- `crates/naraeclaw-channels/src/telegram.rs:372` — draft update interval of 1000 ms.
+- `crates/naraeclaw-channels/src/orchestrator/mod.rs:1844` — memory recall query performed on every message.
 
 ## Risk Tiers
 
 - **Low risk**: docs/chore/tests-only changes
 - **Medium risk**: most `crates/*/src/**` behavior changes without boundary/security impact
-- **High risk**: `crates/zeroclaw-runtime/src/**` (especially `src/security/`), `crates/zeroclaw-gateway/src/**`, `crates/zeroclaw-tools/src/**`, `.github/workflows/**`, access-control boundaries
+- **High risk**: `crates/naraeclaw-runtime/src/**` (especially `src/security/`), `crates/naraeclaw-gateway/src/**`, `crates/naraeclaw-tools/src/**`, `.github/workflows/**`, access-control boundaries
 
 When uncertain, classify as higher risk.
 

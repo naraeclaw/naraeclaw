@@ -1,1 +1,1 @@
-pub use zeroclaw_channels::nextcloud_talk::*;
+pub use naraeclaw_channels::nextcloud_talk::*;

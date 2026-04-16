@@ -11,7 +11,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - ✅ **경량화** — 기본 feature에서 불필요한 채널 제거 완료
 - ✅ **보안 강화** — `unsafe set_var` 제거, `OnceLock`/`zeroize`/`CredentialFilter` 도입 완료
 
-내부 크레이트명은 여전히 `zeroclaw-*`이나, 바이너리 이름은 `naraeclaw`입니다.
+내부 크레이트명과 바이너리 이름은 `naraeclaw-*` / `naraeclaw`를 사용합니다. 기존 `ZEROCLAW_*` 환경변수는 호환 fallback으로만 유지합니다.
 
 ## Commands
 
@@ -53,15 +53,15 @@ just dev      # cargo run --
 
 Rust edition 2024 워크스페이스. `naraeclaw` 바이너리(`src/main.rs`)는 기본적으로 `agent-runtime` feature가 켜져 있고, 이것이 대부분의 에이전트 서브시스템을 활성화합니다.
 
-**메시지 흐름**: 수신 메시지 → `zeroclaw-channels` (전송 계층) → `zeroclaw-runtime/agent/` (에이전트 루프) → `zeroclaw-providers` (LLM 호출) → `zeroclaw-tools` (도구 실행) → 응답 전송
+**메시지 흐름**: 수신 메시지 → `naraeclaw-channels` (전송 계층) → `naraeclaw-runtime/agent/` (에이전트 루프) → `naraeclaw-providers` (LLM 호출) → `naraeclaw-tools` (도구 실행) → 응답 전송
 
-**핵심 확장 포인트** (`crates/zeroclaw-api/`):
+**핵심 확장 포인트** (`crates/naraeclaw-api/`):
 - `provider.rs` — LLM Provider 트레이트
 - `channel.rs` — 채널 트레이트
 - `tool.rs` — 도구 트레이트
 - `memory_traits.rs` — 메모리 백엔드 트레이트
 
-**`zeroclaw-runtime/src/` 주요 서브시스템:**
+**`naraeclaw-runtime/src/` 주요 서브시스템:**
 - `agent/` — 에이전트 루프 핵심 (`loop_.rs`, `agent.rs`)
 - `security/` — 접근제어 및 정책 (고위험, 신중히 수정)
 - `cron/` — 크론 스케줄러
@@ -69,14 +69,14 @@ Rust edition 2024 워크스페이스. `naraeclaw` 바이너리(`src/main.rs`)는
 - `skills/`, `skillforge/` — 스킬 시스템
 - `onboard/` — TUI 온보딩 마법사
 
-**채널** (`crates/zeroclaw-channels/`): 각 채널은 `channel-<이름>` Cargo feature로 게이팅됨. `orchestrator/`가 채널 생명주기와 미디어 파이프라인 담당.
+**채널** (`crates/naraeclaw-channels/`): 각 채널은 `channel-<이름>` Cargo feature로 게이팅됨. `orchestrator/`가 채널 생명주기와 미디어 파이프라인 담당.
 
 **텔레그램 Webhook 관련 코드 위치:**
-- `crates/zeroclaw-channels/src/telegram.rs` — webhook 핸들러 (Axum 기반)
-- `crates/zeroclaw-channels/src/telegram.rs:372` — draft 업데이트 간격 1000ms
-- `crates/zeroclaw-channels/src/orchestrator/mod.rs` — 채널 생명주기 및 라우팅
+- `crates/naraeclaw-channels/src/telegram.rs` — webhook 핸들러 (Axum 기반)
+- `crates/naraeclaw-channels/src/telegram.rs:372` — draft 업데이트 간격 1000ms
+- `crates/naraeclaw-channels/src/orchestrator/mod.rs` — 채널 생명주기 및 라우팅
 
-**Config** (`crates/zeroclaw-config/`): TOML 기반, `Configurable` derive 매크로로 스키마 자동 생성. Config 키는 공개 계약 — 변경 시 기본값과 마이그레이션 경로 문서화 필수.
+**Config** (`crates/naraeclaw-config/`): TOML 기반, `Configurable` derive 매크로로 스키마 자동 생성. Config 키는 공개 계약 — 변경 시 기본값과 마이그레이션 경로 문서화 필수.
 
 **테스트 인프라** (`tests/support/`): `MockProvider`, `MockChannel`, `EchoTool` 등 공유 목. JSON fixture replay는 `TraceLlmProvider` 사용 (`tests/fixtures/traces/`).
 
@@ -159,4 +159,4 @@ git branch -d <브랜치명>
 
 - **저위험**: docs, 테스트, 설정값 조정
 - **중위험**: `crates/*/src/**` 동작 변경
-- **고위험**: `zeroclaw-runtime/src/security/`, `zeroclaw-gateway/src/`, `zeroclaw-tools/src/`
+- **고위험**: `naraeclaw-runtime/src/security/`, `naraeclaw-gateway/src/`, `naraeclaw-tools/src/`

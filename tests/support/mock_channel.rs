@@ -4,8 +4,8 @@
 //! injection and response capture for race-free testing.
 
 use async_trait::async_trait;
+use naraeclaw::channels::{Channel, ChannelMessage, SendMessage};
 use std::sync::{Arc, Mutex};
-use zeroclaw::channels::{Channel, ChannelMessage, SendMessage};
 
 /// A test channel that captures sent messages and supports message injection.
 pub struct TestChannel {

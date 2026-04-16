@@ -464,7 +464,7 @@ channel, provider, or integration with sensitive fields (API keys, tokens, passw
    and an `enabled` field:
 
 ```rust
-use zeroclaw_macros::Configurable;
+use naraeclaw_macros::Configurable;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema, Configurable)]
 #[prefix = "channels.your-channel"]

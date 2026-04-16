@@ -1,1 +1,1 @@
-pub use zeroclaw_tools::node_capabilities::*;
+pub use naraeclaw_tools::node_capabilities::*;
