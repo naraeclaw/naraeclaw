@@ -3,9 +3,12 @@
 > 나래 — 날개의 고어. 가볍게, 빠르게.
 
 **한국어 우선 경량 AI 에이전트 런타임.**  
-텔레그램 등 메신저에서 즉시 응답하는 개인 AI 어시스턴트.
+텔레그램, CLI, Web/Desktop에서 즉시 응답하는 개인 AI 어시스턴트.
 
-NaraeClaw 포크 — 불필요한 기능을 제거하고 한국어 환경과 보안에 최적화되었습니다.
+나래클로는 개인 서버와 작업 환경을 관리하기 위한 경량 에이전트입니다.
+인프라 상태 확인, 반복 운영 작업 자동화, 장기 메모리 기반 개인 지식 관리를 한 곳에서 다룹니다.
+
+Zeroclaw 포크 — 불필요한 기능을 제거하고 한국어 환경, 서버 운영, 개인 지식 관리에 맞게 다듬고 있습니다.
 
 ---
 
@@ -19,6 +22,18 @@ NaraeClaw 포크 — 불필요한 기능을 제거하고 한국어 환경과 보
 
 ---
 
+## 사용 사례
+
+- 텔레그램/Web UI를 통한 서버 상태 확인 및 작업 요청
+- 크론/SOP 기반 반복 운영 작업 자동화
+- 장기 메모리에 운영 노트, 장애 이력, 개인 지식 저장
+- 파일, 셸, HTTP, 브라우저 도구를 조합한 로컬 작업 보조
+- 민감 정보 필터링과 감사 로그 기반 안전한 에이전트 운영
+
+현재는 개인 운영자와 소규모 서버 환경을 우선 대상으로 하며, 대규모 멀티테넌트 SaaS보다 단순하고 직접 제어 가능한 구성을 지향합니다.
+
+---
+
 ## 빌드 및 설치
 
 ### 기본 빌드 (경량 모드)
@@ -26,12 +41,6 @@ NaraeClaw 포크 — 불필요한 기능을 제거하고 한국어 환경과 보
 ```bash
 # 의존성: Rust 1.87+
 cargo build --release
-```
-
-### 전체 채널 포함 빌드 (Full Mode)
-중국 채널(QQ, DingTalk 등), SNS(Twitter, Reddit 등)를 모두 포함하려면:
-```bash
-cargo build --release --features channels-full
 ```
 
 ---
@@ -78,4 +87,4 @@ naraeclaw agent
 - 포크 및 변경분: NaraeClaw contributors
 - 자세한 고지: [NOTICE](NOTICE), [LICENSE-MIT](LICENSE-MIT), [LICENSE-APACHE](LICENSE-APACHE)
 
-NaraeClaw는 공식 NaraeClaw 프로젝트가 아니며, upstream 프로젝트와의 제휴나 보증을 의미하지 않습니다.
+NaraeClaw는 공식 Zeroclaw 프로젝트가 아니며, upstream 프로젝트와의 제휴나 보증을 의미하지 않습니다.
