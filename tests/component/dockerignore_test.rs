@@ -22,7 +22,6 @@ const MUST_EXCLUDE: &[&str] = &[
     "*.db-journal",
     ".DS_Store",
     ".github",
-    "deny.toml",
     "LICENSE",
     ".env",
     ".tmp_*",

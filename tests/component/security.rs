@@ -144,10 +144,8 @@ fn security_full_autonomy_parses() {
 /// Config does not expose raw API keys in Debug output.
 #[test]
 fn security_config_debug_does_not_leak_api_key() {
-    let config = Config {
-        api_key: Some("sk-1234567890abcdef".to_string()),
-        ..Config::default()
-    };
+    let mut config = Config::default();
+    config.api_key = Some("sk-1234567890abcdef".to_string());
 
     // The Config struct should either not include api_key in Debug
     // or it should be masked. Check that raw key doesn't appear in debug output.

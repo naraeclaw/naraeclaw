@@ -27,7 +27,6 @@ These directories are the primary navigation modules by product area.
 - `docs/reference/` for command/config/provider/channel reference indexes
 - `docs/operations/` for day-2 operations, deployment, and troubleshooting entry points
 - `docs/security/` for security guidance and security-oriented navigation
-- `docs/hardware/` for board/peripheral implementation and hardware workflows
 - `docs/contributing/` for contribution and CI/review processes
 - `docs/project/` for project snapshots, planning context, and status-oriented docs
 
@@ -59,8 +58,6 @@ Use this grouping to decide where new docs belong.
 
 - `docs/pr-workflow.md`
 - `docs/reviewer-playbook.md`
-- `docs/ci-map.md`
-- `docs/actions-source-policy.md`
 
 ### Proposals / Roadmaps
 

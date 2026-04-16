@@ -76,17 +76,11 @@ Operational notes:
 
 Matrix support is controlled at compile time.
 
-- Default builds are lean (`default = []`) and do not include Matrix.
-- Typical local check with only hardware support:
-
-```bash
-cargo check --features hardware
-```
-
+- Default builds are lean and do not include Matrix.
 - Enable Matrix explicitly when needed:
 
 ```bash
-cargo check --features hardware,channel-matrix
+cargo check --features channel-matrix
 ```
 
 If `[channels_config.matrix]` is present but the corresponding feature is not compiled in, `zeroclaw channel list`, `zeroclaw channel doctor`, and `zeroclaw channel start` will report that the channel is intentionally skipped for this build.

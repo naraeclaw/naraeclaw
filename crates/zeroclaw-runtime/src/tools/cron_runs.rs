@@ -122,11 +122,9 @@ mod tests {
     use zeroclaw_config::schema::Config;
 
     async fn test_config(tmp: &TempDir) -> Arc<Config> {
-        let config = Config {
-            workspace_dir: tmp.path().join("workspace"),
-            config_path: tmp.path().join("config.toml"),
-            ..Config::default()
-        };
+        let mut config = Config::default();
+        config.workspace_dir = tmp.path().join("workspace");
+        config.config_path = tmp.path().join("config.toml");
         tokio::fs::create_dir_all(&config.workspace_dir)
             .await
             .unwrap();

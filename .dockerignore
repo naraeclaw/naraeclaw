@@ -33,9 +33,6 @@ tests
 # CI/CD configs (not needed in image)
 .github
 
-# Cargo deny config (lint tool, not runtime)
-deny.toml
-
 # License file (not needed for runtime)
 LICENSE
 

@@ -285,11 +285,6 @@ pub struct Config {
     #[nested]
     pub cost: CostConfig,
 
-    /// Peripheral board configuration for hardware integration (`[peripherals]`).
-    #[serde(default)]
-    #[nested]
-    pub peripherals: PeripheralsConfig,
-
     /// Delegate tool global default configuration (`[delegate]`).
     #[serde(default)]
     #[nested]
@@ -308,11 +303,6 @@ pub struct Config {
     #[serde(default)]
     #[nested]
     pub hooks: HooksConfig,
-
-    /// Hardware configuration (wizard-driven physical world setup).
-    #[serde(default)]
-    #[nested]
-    pub hardware: HardwareConfig,
 
     /// Voice transcription configuration (Whisper API via Groq).
     #[serde(default)]
@@ -670,79 +660,6 @@ pub fn default_max_depth() -> u32 {
 
 pub fn default_max_tool_iterations() -> usize {
     10
-}
-
-// ── Hardware Config (wizard-driven) ─────────────────────────────
-
-/// Hardware transport mode.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[cfg_attr(feature = "schema-export", derive(schemars::JsonSchema))]
-pub enum HardwareTransport {
-    #[default]
-    None,
-    Native,
-    Serial,
-    Probe,
-}
-
-impl std::fmt::Display for HardwareTransport {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::None => write!(f, "none"),
-            Self::Native => write!(f, "native"),
-            Self::Serial => write!(f, "serial"),
-            Self::Probe => write!(f, "probe"),
-        }
-    }
-}
-
-/// Wizard-driven hardware configuration for physical world interaction.
-#[derive(Debug, Clone, Serialize, Deserialize, Configurable)]
-#[cfg_attr(feature = "schema-export", derive(schemars::JsonSchema))]
-#[prefix = "hardware"]
-pub struct HardwareConfig {
-    /// Whether hardware access is enabled
-    #[serde(default)]
-    pub enabled: bool,
-    /// Transport mode
-    #[serde(default)]
-    pub transport: HardwareTransport,
-    /// Serial port path (e.g. "/dev/ttyACM0")
-    #[serde(default)]
-    pub serial_port: Option<String>,
-    /// Serial baud rate
-    #[serde(default = "default_baud_rate")]
-    pub baud_rate: u32,
-    /// Probe target chip (e.g. "STM32F401RE")
-    #[serde(default)]
-    pub probe_target: Option<String>,
-    /// Enable workspace datasheet RAG (index PDF schematics for AI pin lookups)
-    #[serde(default)]
-    pub workspace_datasheets: bool,
-}
-
-pub fn default_baud_rate() -> u32 {
-    115_200
-}
-
-impl HardwareConfig {
-    /// Return the active transport mode.
-    pub fn transport_mode(&self) -> HardwareTransport {
-        self.transport.clone()
-    }
-}
-
-impl Default for HardwareConfig {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            transport: HardwareTransport::None,
-            serial_port: None,
-            baud_rate: default_baud_rate(),
-            probe_target: None,
-            workspace_datasheets: false,
-        }
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -1199,63 +1116,6 @@ pub fn get_default_pricing() -> std::collections::HashMap<String, ModelPricing> 
     );
 
     prices
-}
-
-// ── Peripherals (hardware: STM32, RPi GPIO, etc.) ────────────────────────
-
-/// Peripheral board integration configuration (`[peripherals]` section).
-///
-/// Boards become agent tools when enabled.
-#[derive(Debug, Clone, Serialize, Deserialize, Default, Configurable)]
-#[cfg_attr(feature = "schema-export", derive(schemars::JsonSchema))]
-#[prefix = "peripherals"]
-pub struct PeripheralsConfig {
-    /// Enable peripheral support (boards become agent tools)
-    #[serde(default)]
-    pub enabled: bool,
-    /// Board configurations (nucleo-f401re, rpi-gpio, etc.)
-    #[serde(default)]
-    pub boards: Vec<PeripheralBoardConfig>,
-    /// Path to datasheet docs (relative to workspace) for RAG retrieval.
-    /// Place .md/.txt files named by board (e.g. nucleo-f401re.md, rpi-gpio.md).
-    #[serde(default)]
-    pub datasheet_dir: Option<String>,
-}
-
-/// Configuration for a single peripheral board (e.g. STM32, RPi GPIO).
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "schema-export", derive(schemars::JsonSchema))]
-pub struct PeripheralBoardConfig {
-    /// Board type: "nucleo-f401re", "rpi-gpio", "esp32", etc.
-    pub board: String,
-    /// Transport: "serial", "native", "websocket"
-    #[serde(default = "default_peripheral_transport")]
-    pub transport: String,
-    /// Path for serial: "/dev/ttyACM0", "/dev/ttyUSB0"
-    #[serde(default)]
-    pub path: Option<String>,
-    /// Baud rate for serial (default: 115200)
-    #[serde(default = "default_peripheral_baud")]
-    pub baud: u32,
-}
-
-pub fn default_peripheral_transport() -> String {
-    "serial".into()
-}
-
-pub fn default_peripheral_baud() -> u32 {
-    115_200
-}
-
-impl Default for PeripheralBoardConfig {
-    fn default() -> Self {
-        Self {
-            board: String::new(),
-            transport: default_peripheral_transport(),
-            path: None,
-            baud: default_peripheral_baud(),
-        }
-    }
 }
 
 // ── Gateway security ─────────────────────────────────────────────

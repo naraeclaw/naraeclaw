@@ -1,5 +1,5 @@
 [workspace]
-members = [".", "crates/zeroclaw-api", "crates/zeroclaw-infra", "crates/zeroclaw-config", "crates/zeroclaw-providers", "crates/zeroclaw-memory", "crates/zeroclaw-channels", "crates/zeroclaw-tools", "crates/zeroclaw-runtime", "crates/zeroclaw-tui", "crates/zeroclaw-plugins", "crates/zeroclaw-gateway", "crates/zeroclaw-hardware", "crates/zeroclaw-tool-call-parser", "crates/robot-kit", "crates/aardvark-sys", "crates/zeroclaw-macros", "apps/tauri"]
+members = [".", "crates/zeroclaw-api", "crates/zeroclaw-infra", "crates/zeroclaw-config", "crates/zeroclaw-providers", "crates/zeroclaw-memory", "crates/zeroclaw-channels", "crates/zeroclaw-tools", "crates/zeroclaw-runtime", "crates/zeroclaw-tui", "crates/zeroclaw-plugins", "crates/zeroclaw-gateway", "crates/zeroclaw-tool-call-parser", "crates/zeroclaw-macros", "apps/tauri"]
 resolver = "2"
 
 [workspace.package]
@@ -21,10 +21,8 @@ zeroclaw-runtime = { path = "crates/zeroclaw-runtime", version = "0.6.9", defaul
 zeroclaw-tui = { path = "crates/zeroclaw-tui", version = "0.6.9" }
 zeroclaw-plugins = { path = "crates/zeroclaw-plugins", version = "0.6.9" }
 zeroclaw-gateway = { path = "crates/zeroclaw-gateway", version = "0.6.9" }
-zeroclaw-hardware = { path = "crates/zeroclaw-hardware", version = "0.6.9" }
 zeroclaw-tool-call-parser = { path = "crates/zeroclaw-tool-call-parser", version = "0.6.9" }
 zeroclaw-macros = { path = "crates/zeroclaw-macros", version = "0.6.9" }
-aardvark-sys = { path = "crates/aardvark-sys", version = "0.1.0" }
 
 # Memory zeroization for secrets on drop
 zeroize = { version = "1", features = ["derive"] }
@@ -74,7 +72,6 @@ zeroclaw-runtime = { workspace = true, optional = true }
 zeroclaw-tui = { workspace = true, optional = true }
 zeroclaw-plugins = { workspace = true, optional = true }
 zeroclaw-gateway = { workspace = true, optional = true }
-zeroclaw-hardware = { workspace = true, optional = true }
 zeroclaw-tool-call-parser.workspace = true
 zeroclaw-macros.workspace = true
 # CLI - minimal and fast
@@ -134,8 +131,6 @@ zip = { version = "8.1", default-features = false, features = ["deflate-flate2"]
 anyhow = "1.0"
 thiserror = "2.0"
 
-# Aardvark I2C/SPI/GPIO USB adapter (Total Phase) — stub when SDK absent
-aardvark-sys.workspace = true
 
 # UUID generation
 uuid = { version = "1.22", default-features = false, features = ["v4", "std"] }
@@ -144,8 +139,8 @@ uuid = { version = "1.22", default-features = false, features = ["v4", "std"] }
 chacha20poly1305 = "0.10"
 
 # HMAC for webhook signature verification
-hmac = "0.12"
-sha2 = "0.10"
+hmac = "0.13"
+sha2 = "0.11"
 hex = "0.4"
 
 # CSPRNG for secure token generation
@@ -180,8 +175,6 @@ console = "0.16"
 ratatui = { version = "0.30", default-features = true, optional = true }
 crossterm = { version = "0.29", features = ["event-stream"], optional = true }
 
-# Hardware discovery (device path globbing)
-glob = { version = "0.3", optional = true }
 
 # Nostr key validation for wizard (behind channel-nostr feature)
 nostr-sdk = { version = "0.44", default-features = false, optional = true }
@@ -240,7 +233,7 @@ default = [
 agent-runtime = [
     "dep:zeroclaw-runtime", "dep:zeroclaw-channels", "dep:zeroclaw-tools",
     "dep:rusqlite",
-    "dep:ring", "dep:lru", "dep:chrono-tz", "dep:cron", "dep:glob", "dep:which",
+    "dep:ring", "dep:lru", "dep:chrono-tz", "dep:cron", "dep:which",
     "dep:ratatui", "dep:crossterm",
     "dep:tokio-tungstenite", "dep:tokio-socks", "dep:hostname",
     "dep:rustls", "dep:rustls-pemfile", "dep:rustls-pki-types", "dep:tokio-rustls", "dep:webpki-roots",
@@ -297,13 +290,10 @@ voice-wake = ["zeroclaw-channels/voice-wake"]
 # Backends and platform flags — each forwards to ONE crate
 observability-prometheus = ["zeroclaw-runtime/observability-prometheus"]
 observability-otel = ["zeroclaw-runtime/observability-otel"]
-hardware = ["dep:zeroclaw-hardware", "zeroclaw-hardware/hardware"]
-peripheral-rpi = ["dep:zeroclaw-hardware", "zeroclaw-hardware/peripheral-rpi"]
 sandbox-landlock = ["zeroclaw-runtime/sandbox-landlock"]
 sandbox-bubblewrap = ["zeroclaw-runtime/sandbox-bubblewrap"]
 browser-native = ["zeroclaw-tools/browser-native"]
 plugins-wasm = ["dep:zeroclaw-plugins", "zeroclaw-runtime/plugins-wasm"]
-probe = ["dep:zeroclaw-hardware", "zeroclaw-hardware/probe"]
 rag-pdf = ["zeroclaw-tools/rag-pdf"]
 webauthn = ["zeroclaw-runtime/webauthn"]
 
@@ -317,9 +307,8 @@ ci-all = [
     "channels-full",
     "channel-nostr", "channel-matrix", "whatsapp-web",
     "observability-prometheus", "observability-otel",
-    "hardware", "peripheral-rpi",
     "sandbox-landlock", "sandbox-bubblewrap",
-    "browser-native", "plugins-wasm", "probe", "rag-pdf",
+    "browser-native", "plugins-wasm", "rag-pdf",
     "webauthn",
 ]
 
@@ -355,7 +344,6 @@ panic = "abort"
 
 [dev-dependencies]
 tempfile = "3.26"
-criterion = { version = "0.8", features = ["async_tokio"] }
 wiremock = "0.6"
 scopeguard = "1.2"
 rcgen = "0.13"
@@ -375,7 +363,3 @@ path = "tests/test_system.rs"
 [[test]]
 name = "live"
 path = "tests/test_live.rs"
-
-[[bench]]
-name = "agent_benchmarks"
-harness = false

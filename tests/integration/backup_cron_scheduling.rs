@@ -4,11 +4,9 @@ use zeroclaw::config::schema::{CronJobDecl, CronScheduleDecl};
 use zeroclaw::cron::{JobType, Schedule, get_job, list_jobs, sync_declarative_jobs};
 
 fn test_config(tmp: &TempDir, schedule_cron: Option<String>) -> Config {
-    let mut config = Config {
-        workspace_dir: tmp.path().join("workspace"),
-        config_path: tmp.path().join("config.toml"),
-        ..Config::default()
-    };
+    let mut config = Config::default();
+    config.workspace_dir = tmp.path().join("workspace");
+    config.config_path = tmp.path().join("config.toml");
     config.backup.schedule_cron = schedule_cron;
     std::fs::create_dir_all(&config.workspace_dir).unwrap();
     config

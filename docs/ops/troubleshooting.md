@@ -66,12 +66,6 @@ If you must compile from source on constrained hosts:
 CARGO_BUILD_JOBS=1 cargo build --release --locked
 ```
 
-1. Reduce heavy features when Matrix is not required:
-
-```bash
-cargo build --release --locked --features hardware
-```
-
 1. Cross-compile on a stronger machine and copy the binary to the target host.
 
 ### Build is very slow or appears stuck
@@ -109,12 +103,6 @@ To build with Matrix support explicitly enabled:
 
 ```bash
 cargo check --features channel-matrix
-```
-
-To build with Matrix + hardware support:
-
-```bash
-cargo check --features hardware,channel-matrix
 ```
 
 Lock-contention mitigation:

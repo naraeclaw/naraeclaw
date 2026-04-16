@@ -14,7 +14,6 @@ use zeroclaw_config::schema::{
     IMessageConfig, MatrixConfig, MemoryConfig, ObservabilityConfig, RuntimeConfig, SecretsConfig,
     SlackConfig, StorageConfig, TelegramConfig, WebhookConfig,
 };
-use zeroclaw_config::schema::{HardwareConfig, HardwareTransport};
 use zeroclaw_config::schema::{
     IrcConfig, LinqConfig, NextcloudTalkConfig, SignalConfig, StreamMode, WhatsAppConfig,
 };
@@ -36,17 +35,12 @@ use zeroclaw_providers::{
 pub type NostrKeyValidator = Box<dyn Fn(&str) -> Result<String>>;
 
 /// Callbacks injected by the binary crate to wire wizard sections whose
-/// implementations live in downstream crates (zeroclaw-hardware, zeroclaw-channels).
+/// implementations live in downstream crates such as zeroclaw-channels.
 ///
 /// NOTE: Transitional bridge — see RFC #5574 Phase 2 D4. This struct will be
 /// replaced when `naraeclaw onboard` integrates with `PluginRegistry::install`.
 #[derive(Default)]
 pub struct WizardCallbacks {
-    /// Full interactive hardware setup flow. When `Some`, the wizard runs
-    /// hardware discovery and configuration; when `None`, hardware is skipped
-    /// and `HardwareConfig::default()` is used.
-    pub hardware_setup: Option<Box<dyn Fn() -> Result<HardwareConfig>>>,
-
     /// Validate a Nostr private key string (hex or nsec) and return the
     /// public key hex on success. Requires `nostr-sdk` which lives in
     /// `zeroclaw-channels`.
@@ -119,7 +113,7 @@ pub async fn run_wizard(force: bool, callbacks: WizardCallbacks) -> Result<Confi
     );
     println!();
 
-    print_step(1, 9, "Workspace Setup");
+    print_step(1, 8, "Workspace Setup");
     let (workspace_dir, config_path) = setup_workspace().await?;
     match resolve_interactive_onboarding_mode(&config_path, force)? {
         InteractiveOnboardingMode::FullOnboarding => {}
@@ -128,32 +122,25 @@ pub async fn run_wizard(force: bool, callbacks: WizardCallbacks) -> Result<Confi
         }
     }
 
-    print_step(2, 9, "AI Provider & API Key");
+    print_step(2, 8, "AI Provider & API Key");
     let (provider, api_key, model, provider_api_url) = setup_provider(&workspace_dir).await?;
 
-    print_step(3, 9, "Channels (How You Talk to NaraeClaw)");
+    print_step(3, 8, "Channels (How You Talk to NaraeClaw)");
     let channels_config = setup_channels(None, &callbacks)?;
 
-    print_step(4, 9, "Tunnel (Expose to Internet)");
+    print_step(4, 8, "Tunnel (Expose to Internet)");
     let tunnel_config = setup_tunnel()?;
 
-    print_step(5, 9, "Tool Mode & Security");
+    print_step(5, 8, "Tool Mode & Security");
     let secrets_config = setup_tool_mode()?;
 
-    print_step(6, 9, "Hardware (Physical World)");
-    let hardware_config = if let Some(ref hw_setup) = callbacks.hardware_setup {
-        hw_setup()?
-    } else {
-        HardwareConfig::default()
-    };
-
-    print_step(7, 9, "Memory Configuration");
+    print_step(6, 8, "Memory Configuration");
     let memory_config = setup_memory()?;
 
-    print_step(8, 9, "Project Context (Personalize Your Agent)");
+    print_step(7, 8, "Project Context (Personalize Your Agent)");
     let project_ctx = setup_project_context()?;
 
-    print_step(9, 9, "Workspace Files");
+    print_step(8, 8, "Workspace Files");
     scaffold_workspace(&workspace_dir, &project_ctx, &memory_config.backend).await?;
 
     // ── Build config ──
@@ -213,12 +200,10 @@ pub async fn run_wizard(force: bool, callbacks: WizardCallbacks) -> Result<Confi
         proxy: zeroclaw_config::schema::ProxyConfig::default(),
         identity: zeroclaw_config::schema::IdentityConfig::default(),
         cost: zeroclaw_config::schema::CostConfig::default(),
-        peripherals: zeroclaw_config::schema::PeripheralsConfig::default(),
         delegate: zeroclaw_config::schema::DelegateToolConfig::default(),
         agents: std::collections::HashMap::new(),
         swarms: std::collections::HashMap::new(),
         hooks: zeroclaw_config::schema::HooksConfig::default(),
-        hardware: hardware_config,
         query_classification: zeroclaw_config::schema::QueryClassificationConfig::default(),
         transcription: zeroclaw_config::schema::TranscriptionConfig::default(),
         tts: zeroclaw_config::schema::TtsConfig::default(),
@@ -673,12 +658,10 @@ async fn run_quick_setup_with_home(
         proxy: zeroclaw_config::schema::ProxyConfig::default(),
         identity: zeroclaw_config::schema::IdentityConfig::default(),
         cost: zeroclaw_config::schema::CostConfig::default(),
-        peripherals: zeroclaw_config::schema::PeripheralsConfig::default(),
         delegate: zeroclaw_config::schema::DelegateToolConfig::default(),
         agents: std::collections::HashMap::new(),
         swarms: std::collections::HashMap::new(),
         hooks: zeroclaw_config::schema::HooksConfig::default(),
-        hardware: zeroclaw_config::schema::HardwareConfig::default(),
         query_classification: zeroclaw_config::schema::QueryClassificationConfig::default(),
         transcription: zeroclaw_config::schema::TranscriptionConfig::default(),
         tts: zeroclaw_config::schema::TtsConfig::default(),
@@ -5502,38 +5485,6 @@ fn print_summary(config: &Config) {
         }
     );
 
-    // Hardware
-    println!(
-        "    {} Hardware:      {}",
-        style("🔌").cyan(),
-        if config.hardware.enabled {
-            let mode = config.hardware.transport_mode();
-            match mode {
-                HardwareTransport::Native => style("Native GPIO (direct)").green().to_string(),
-                HardwareTransport::Serial => format!(
-                    "{}",
-                    style(format!(
-                        "Serial → {} @ {} baud",
-                        config.hardware.serial_port.as_deref().unwrap_or("?"),
-                        config.hardware.baud_rate
-                    ))
-                    .green()
-                ),
-                HardwareTransport::Probe => format!(
-                    "{}",
-                    style(format!(
-                        "Probe → {}",
-                        config.hardware.probe_target.as_deref().unwrap_or("?")
-                    ))
-                    .green()
-                ),
-                HardwareTransport::None => "disabled (software only)".to_string(),
-            }
-        } else {
-            "disabled (software only)".to_string()
-        }
-    );
-
     println!();
     println!("  {}", style("Next steps:").white().bold());
     println!();
@@ -5687,10 +5638,8 @@ mod tests {
 
     #[test]
     fn apply_provider_update_preserves_non_provider_settings() {
-        let mut config = Config {
-            default_temperature: 1.23,
-            ..Config::default()
-        };
+        let mut config = Config::default();
+        config.default_temperature = 1.23;
         config.memory.backend = "markdown".to_string();
         config.skills.open_skills_enabled = true;
         config.channels_config.cli = false;
@@ -5718,10 +5667,8 @@ mod tests {
 
     #[test]
     fn apply_provider_update_clears_api_key_when_empty() {
-        let mut config = Config {
-            api_key: Some("sk-old".to_string()),
-            ..Config::default()
-        };
+        let mut config = Config::default();
+        config.api_key = Some("sk-old".to_string());
 
         apply_provider_update(
             &mut config,
@@ -7023,11 +6970,9 @@ mod tests {
             .await
             .unwrap();
 
-        let config = Config {
-            workspace_dir: tmp.path().to_path_buf(),
-            default_provider: Some("openai".to_string()),
-            ..Config::default()
-        };
+        let mut config = Config::default();
+        config.workspace_dir = tmp.path().to_path_buf();
+        config.default_provider = Some("openai".to_string());
 
         run_models_refresh(&config, None, false).await.unwrap();
     }
@@ -7036,12 +6981,10 @@ mod tests {
     async fn run_models_refresh_rejects_unsupported_provider() {
         let tmp = TempDir::new().unwrap();
 
-        let config = Config {
-            workspace_dir: tmp.path().to_path_buf(),
-            // Use a non-provider channel key to keep this test deterministic and offline.
-            default_provider: Some("imessage".to_string()),
-            ..Config::default()
-        };
+        let mut config = Config::default();
+        config.workspace_dir = tmp.path().to_path_buf();
+        // Use a non-provider channel key to keep this test deterministic and offline.
+        config.default_provider = Some("imessage".to_string());
 
         let err = run_models_refresh(&config, None, true).await.unwrap_err();
         assert!(

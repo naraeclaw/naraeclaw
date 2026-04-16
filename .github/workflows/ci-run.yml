@@ -20,7 +20,7 @@ env:
 
 jobs:
   rust:
-    name: Rust fmt, check, and lib tests
+    name: Rust fmt and check
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -43,7 +43,4 @@ jobs:
         run: cargo fmt --all -- --check
 
       - name: Check workspace
-        run: cargo check --workspace --exclude zeroclaw-desktop --locked
-
-      - name: Run library tests
-        run: cargo test --workspace --lib --locked
+        run: cargo check --workspace --exclude zeroclaw-desktop

@@ -179,8 +179,7 @@ If handing off review to another maintainer/agent, include:
 
 - [README.md](../README.md) — documentation taxonomy and navigation.
 - [pr-workflow.md](./pr-workflow.md) — governance workflow and merge contract.
-- [ci-map.md](./ci-map.md) — CI ownership and triage map.
-- [actions-source-policy.md](./actions-source-policy.md) — action source allowlist policy.
+- [`.github/workflows/README.md`](../../.github/workflows/README.md) — active fast CI workflow.
 
 ---
 

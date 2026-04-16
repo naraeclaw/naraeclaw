@@ -16,7 +16,6 @@ zeroclaw-providers.workspace = true
 zeroclaw-channels = { workspace = true, default-features = true, features = ["channel-email", "channel-telegram"] }
 zeroclaw-runtime.workspace = true
 zeroclaw-tools.workspace = true
-zeroclaw-hardware.workspace = true
 zeroclaw-plugins = { workspace = true, optional = true }
 
 # HTTP server
@@ -50,7 +49,7 @@ directories = "6.0"
 
 # Crypto
 hmac = "0.13"
-sha2 = "0.10"
+sha2 = "0.11"
 hex = "0.4"
 
 # Database (session queue)

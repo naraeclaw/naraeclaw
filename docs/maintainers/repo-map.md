@@ -1,6 +1,6 @@
 # ZeroClaw Repository Map
 
-ZeroClaw is a Rust-first autonomous agent runtime. It receives messages from messaging platforms, routes them through an LLM, executes tool calls, persists memory, and returns responses. It can also control hardware peripherals and run as a long-lived daemon.
+ZeroClaw is a Rust-first autonomous agent runtime. It receives messages from messaging platforms, routes them through an LLM, executes tool calls, persists memory, and returns responses. It can also run as a long-lived daemon.
 
 ## Runtime Flow
 
@@ -40,14 +40,11 @@ User message (Telegram/Discord/Slack/...)
 ```
 zeroclaw/
 ├── src/                  # Rust source (the runtime)
-├── crates/robot-kit/     # Separate crate for hardware robot kit
 ├── tests/                # Integration/E2E tests
-├── benches/              # Benchmarks (agent loop)
 ├── docs/contributing/extension-examples.md  # Extension examples (custom provider/channel/tool/memory)
-├── firmware/             # Embedded firmware for Arduino, ESP32, Nucleo boards
 ├── web/                  # Web UI (Vite + TypeScript)
 ├── dev/                  # Local dev tooling (Docker, CI scripts, sandbox)
-├── scripts/              # CI scripts, release automation, bootstrap
+├── scripts/              # CI helpers, service scripts, deployment helpers
 ├── docs/                 # Documentation system (multilingual, runtime refs)
 ├── .github/              # CI workflows, PR templates, automation
 ├── playground/           # (git-ignored) Docker dev workspace, auto-populated at runtime
@@ -74,7 +71,7 @@ zeroclaw/
 | Module | Key Files | Role |
 |---|---|---|
 | `agent/` | `agent.rs`, `loop_.rs` (5.6k), `dispatcher.rs`, `prompt.rs`, `classifier.rs`, `memory_loader.rs` | **The brain.** `AgentBuilder` composes provider+tools+memory+observer. `loop_.rs` runs the multi-turn tool-calling loop. Dispatcher handles native vs XML tool call parsing. Classifier routes queries to different models. |
-| `config/` | `schema.rs` (7.6k), `mod.rs`, `traits.rs` | **All configuration structs.** Every subsystem's config lives in `schema.rs` — providers, channels, memory, security, gateway, tools, hardware, scheduling, etc. Loaded from TOML. |
+| `config/` | `schema.rs` (7.6k), `mod.rs`, `traits.rs` | **All configuration structs.** Every subsystem's config lives in `schema.rs` — providers, channels, memory, security, gateway, tools, scheduling, etc. Loaded from TOML. |
 | `runtime/` | `native.rs`, `docker.rs`, `wasm.rs`, `traits.rs` | **Platform adapters.** `RuntimeAdapter` trait abstracts shell access, filesystem, storage paths, memory budgets. Native = direct OS. Docker = container isolation. WASM = experimental. |
 
 ### LLM Providers
@@ -105,7 +102,6 @@ Tool categories:
 - **Web**: `browser`, `browser_open`, `web_fetch`, `web_search_tool`, `http_request`
 - **Scheduling**: `cron_add`, `cron_list`, `cron_remove`, `cron_update`, `cron_run`, `cron_runs`, `schedule`
 - **Delegation**: `delegate` (sub-agent spawning)
-- **Hardware**: `hardware_board_info`, `hardware_memory_map`, `hardware_memory_read`
 - **SOP**: `sop_execute`, `sop_advance`, `sop_approve`, `sop_list`, `sop_status`
 - **Utility**: `git_operations`, `image_info`, `pdf_read`, `screenshot`, `pushover`, `model_routing_config`, `proxy_config`, `cli_discovery`, `schema`
 
@@ -137,8 +133,6 @@ Sandboxing: `bubblewrap.rs`, `firejail.rs`, `landlock.rs`, `docker.rs`, `detect.
 
 | Module | Key Files | Role |
 |---|---|---|
-| `peripherals/` | `traits.rs`, `mod.rs`, `serial.rs`, `rpi.rs`, `arduino_flash.rs`, `uno_q_bridge.rs`, `uno_q_setup.rs`, `nucleo_flash.rs`, `capabilities_tool.rs` | **Hardware board abstraction.** `Peripheral` trait: `connect()`, `disconnect()`, `health_check()`, `tools()`. Each peripheral exposes its capabilities as Tools the agent can call. |
-| `hardware/` | `discover.rs`, `introspect.rs`, `registry.rs`, `mod.rs` | **USB discovery and board identification.** Scans VID/PID, matches known boards, introspects connected devices. |
 
 ### Observability
 
@@ -193,14 +187,11 @@ Sandboxing: `bubblewrap.rs`, `firejail.rs`, `landlock.rs`, `docker.rs`, `detect.
 
 | Directory | Role |
 |---|---|
-| `crates/robot-kit/` | Separate Rust crate for hardware robot kit functionality |
 | `tests/` | Integration and E2E tests (agent loop, config persistence, channel routing, provider resolution, webhook security) |
-| `benches/` | Performance benchmarks (`agent_benchmarks.rs`) |
 | `docs/contributing/extension-examples.md` | Extension examples for custom providers, channels, tools, and memory backends |
-| `firmware/` | Embedded firmware: `arduino/`, `esp32/`, `esp32-ui/`, `nucleo/`, `uno-q-bridge/` |
 | `web/` | Web UI frontend (Vite + TypeScript) |
 | `dev/` | Local development: Docker Compose, CI script (`ci.sh`), config template, sandbox configs |
-| `scripts/` | CI helpers, release automation, bootstrap, contributor tier computation |
+| `scripts/` | CI helpers, service scripts, deployment helpers |
 | `docs/` | Documentation system: multilingual (en/zh-CN/ja/ru/fr/vi), runtime references, operations runbooks, security proposals |
 | `.github/` | CI workflows, PR templates, issue templates, automation |
 
@@ -239,8 +230,6 @@ zeroclaw
 ├── skill {list|install|audit|remove}
 ├── memory {list|get|stats|clear}
 ├── cron {list|add|add-at|add-every|once|remove|update|pause|resume}
-├── peripheral {list|add|flash|flash-nucleo|setup-uno-q}
-├── hardware {discover|introspect|info}
 ├── service {install|start|stop|restart|status|uninstall}
 ├── doctor                                # Diagnostics
 ├── status                                # System overview

@@ -421,15 +421,14 @@ mod tests {
     use zeroclaw_memory::SqliteMemory;
 
     fn test_config(workspace: &Path) -> Config {
-        Config {
-            workspace_dir: workspace.to_path_buf(),
-            config_path: workspace.join("config.toml"),
-            memory: MemoryConfig {
-                backend: "sqlite".to_string(),
-                ..MemoryConfig::default()
-            },
-            ..Config::default()
-        }
+        let mut config = Config::default();
+        config.workspace_dir = workspace.to_path_buf();
+        config.config_path = workspace.join("config.toml");
+        config.memory = MemoryConfig {
+            backend: "sqlite".to_string(),
+            ..MemoryConfig::default()
+        };
+        config
     }
 
     #[test]

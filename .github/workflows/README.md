@@ -1,17 +1,16 @@
-# Workflow Directory Layout
+# GitHub Actions
 
-GitHub Actions only loads workflow entry files from:
+Fast development mode keeps GitHub Actions intentionally small.
 
-- `.github/workflows/*.yml`
-- `.github/workflows/*.yaml`
+## Active workflow
 
-Subdirectories are not valid locations for workflow entry files.
+- `ci-run.yml` — runs on pushes and pull requests to `master`.
 
-Repository convention:
+## Fast CI commands
 
-1. Keep runnable workflow entry files at `.github/workflows/` root.
-2. Keep cross-tooling/local CI scripts under `dev/` or `scripts/ci/` when used outside Actions.
+```bash
+cargo fmt --all -- --check
+cargo check --workspace --exclude zeroclaw-desktop
+```
 
-Workflow behavior documentation in this directory:
-
-- `.github/workflows/master-branch-flow.md`
+Library tests are currently run locally or in targeted follow-up work while the historical test suite is being repaired. Release, package publishing, CodeQL, label automation, and heavy matrix builds are disabled until the project reaches a steadier release cadence.

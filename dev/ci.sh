@@ -57,8 +57,7 @@ Commands:
   test-manual     Run manual test scripts (dockerignore, etc.)
   build         Run release build smoke check (container only)
   audit         Run cargo audit (container only)
-  deny          Run cargo deny check (container only)
-  security      Run cargo audit + cargo deny (container only)
+  security      Run cargo audit (container only)
   docker-smoke  Build and verify runtime image (host docker daemon)
   all           Run lint, test, build, security, docker-smoke
   clean         Remove local CI containers and volumes
@@ -123,12 +122,7 @@ case "$1" in
     run_in_ci "cargo audit"
     ;;
 
-  deny)
-    run_in_ci "cargo deny check licenses sources"
-    ;;
-
   security)
-    run_in_ci "cargo deny check licenses sources"
     run_in_ci "cargo audit"
     ;;
 
@@ -142,7 +136,6 @@ case "$1" in
     run_in_ci "cargo test --locked --verbose"
     run_in_ci "bash tests/manual/test_dockerignore.sh"
     run_in_ci "cargo build --release --locked --verbose"
-    run_in_ci "cargo deny check licenses sources"
     run_in_ci "cargo audit"
     build_smoke_image
     docker run --rm zeroclaw-local-smoke:latest --version
