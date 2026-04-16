@@ -1,17 +1,7 @@
-# Project Snapshot & Triage Docs
+# Maintainer Notes
 
-Time-bound project status snapshots for planning documentation and operations work.
+Small maintainer-only notes that are still useful for the active NaraeClaw fork.
 
-## Current Snapshot
+- [trademark.md](trademark.md) — upstream attribution and naming guidance.
 
-- [project-triage-snapshot-2026-02-18.md](project-triage-snapshot-2026-02-18.md)
-
-## Scope
-
-Project snapshots are time-bound assessments of open PRs, issues, and documentation health. Use these to:
-
-- Identify documentation gaps driven by feature work
-- Prioritize docs maintenance alongside code changes
-- Track evolving PR/issue pressure over time
-
-For stable documentation classification (not time-bound), use [docs-inventory.md](docs-inventory.md).
+Keep project-state snapshots, generated inventories, and stale roadmap notes out of this directory unless they are actively maintained.

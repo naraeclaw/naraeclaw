@@ -20,4 +20,4 @@ Structured reference index for commands, providers, channels, config, and integr
 
 Use this collection when you need precise CLI/config details or provider integration patterns rather than step-by-step tutorials.
 
-When adding a new reference/integration doc, make sure it is linked in both [../SUMMARY.md](../SUMMARY.md) and [../maintainers/docs-inventory.md](../maintainers/docs-inventory.md).
+When adding a new reference or integration doc, make sure it is linked from [../SUMMARY.md](../SUMMARY.md) and the relevant category index.
