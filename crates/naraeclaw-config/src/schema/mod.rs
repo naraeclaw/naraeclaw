@@ -511,7 +511,7 @@ fn has_ollama_cloud_credential(config_api_key: Option<&str>) -> bool {
     })
 }
 
-/// Parse the `ZEROCLAW_EXTRA_HEADERS` environment variable value.
+/// Parse the `NARAECLAW_EXTRA_HEADERS`/`ZEROCLAW_EXTRA_HEADERS` environment variable value.
 ///
 /// Format: `Key:Value,Key2:Value2`
 ///
@@ -528,7 +528,9 @@ pub fn parse_extra_headers_env(raw: &str) -> Vec<(String, String)> {
             let key = key.trim();
             let value = value.trim();
             if key.is_empty() {
-                tracing::warn!("Ignoring extra header with empty name in ZEROCLAW_EXTRA_HEADERS");
+                tracing::warn!(
+                    "Ignoring extra header with empty name in NARAECLAW_EXTRA_HEADERS/ZEROCLAW_EXTRA_HEADERS"
+                );
                 continue;
             }
             result.push((key.to_string(), value.to_string()));
@@ -1336,7 +1338,7 @@ impl Config {
 
     /// Apply environment variable overrides to config
     pub fn apply_env_overrides(&mut self) {
-        // API Key: ZEROCLAW_API_KEY or API_KEY (generic)
+        // API Key: NARAECLAW_API_KEY, ZEROCLAW_API_KEY, or API_KEY (generic)
         if let Ok(key) = app_env("API_KEY").or_else(|_| std::env::var("API_KEY"))
             && !key.is_empty()
         {
@@ -1359,8 +1361,8 @@ impl Config {
         }
 
         // Provider override precedence:
-        // 1) ZEROCLAW_PROVIDER always wins when set.
-        // 2) ZEROCLAW_MODEL_PROVIDER/MODEL_PROVIDER (Codex app-server style).
+        // 1) NARAECLAW_PROVIDER always wins when set; ZEROCLAW_PROVIDER remains a fallback.
+        // 2) NARAECLAW_MODEL_PROVIDER/ZEROCLAW_MODEL_PROVIDER/MODEL_PROVIDER (Codex app-server style).
         // 3) Legacy PROVIDER is honored only when config still uses default provider.
         if let Ok(provider) = app_env("PROVIDER") {
             if !provider.is_empty() {
@@ -1382,14 +1384,14 @@ impl Config {
             }
         }
 
-        // Model: ZEROCLAW_MODEL or MODEL
+        // Model: NARAECLAW_MODEL, ZEROCLAW_MODEL, or MODEL
         if let Ok(model) = app_env("MODEL").or_else(|_| std::env::var("MODEL"))
             && !model.is_empty()
         {
             self.default_model = Some(model);
         }
 
-        // Provider HTTP timeout: ZEROCLAW_PROVIDER_TIMEOUT_SECS
+        // Provider HTTP timeout: NARAECLAW_PROVIDER_TIMEOUT_SECS or ZEROCLAW_PROVIDER_TIMEOUT_SECS
         if let Ok(timeout_secs) = app_env("PROVIDER_TIMEOUT_SECS")
             && let Ok(timeout_secs) = timeout_secs.parse::<u64>()
             && timeout_secs > 0
@@ -1397,7 +1399,7 @@ impl Config {
             self.provider_timeout_secs = timeout_secs;
         }
 
-        // Extra provider headers: ZEROCLAW_EXTRA_HEADERS
+        // Extra provider headers: NARAECLAW_EXTRA_HEADERS or ZEROCLAW_EXTRA_HEADERS
         // Format: "Key:Value,Key2:Value2"
         // Env var headers override config file headers with the same name.
         if let Ok(raw) = app_env("EXTRA_HEADERS") {
@@ -1409,7 +1411,7 @@ impl Config {
         // Apply named provider profile remapping (Codex app-server compatibility).
         self.apply_named_model_provider_profile();
 
-        // Workspace directory: ZEROCLAW_WORKSPACE
+        // Workspace directory: NARAECLAW_WORKSPACE or ZEROCLAW_WORKSPACE
         if let Ok(workspace) = app_env("WORKSPACE")
             && !workspace.is_empty()
         {
@@ -1418,7 +1420,7 @@ impl Config {
             self.workspace_dir = workspace_dir;
         }
 
-        // Open-skills opt-in flag: ZEROCLAW_OPEN_SKILLS_ENABLED
+        // Open-skills opt-in flag: NARAECLAW_OPEN_SKILLS_ENABLED or ZEROCLAW_OPEN_SKILLS_ENABLED
         if let Ok(flag) = app_env("OPEN_SKILLS_ENABLED")
             && !flag.trim().is_empty()
         {
@@ -1426,12 +1428,12 @@ impl Config {
                 "1" | "true" | "yes" | "on" => self.skills.open_skills_enabled = true,
                 "0" | "false" | "no" | "off" => self.skills.open_skills_enabled = false,
                 _ => tracing::warn!(
-                    "Ignoring invalid ZEROCLAW_OPEN_SKILLS_ENABLED (valid: 1|0|true|false|yes|no|on|off)"
+                    "Ignoring invalid NARAECLAW_OPEN_SKILLS_ENABLED/ZEROCLAW_OPEN_SKILLS_ENABLED (valid: 1|0|true|false|yes|no|on|off)"
                 ),
             }
         }
 
-        // Open-skills directory override: ZEROCLAW_OPEN_SKILLS_DIR
+        // Open-skills directory override: NARAECLAW_OPEN_SKILLS_DIR or ZEROCLAW_OPEN_SKILLS_DIR
         if let Ok(path) = app_env("OPEN_SKILLS_DIR") {
             let trimmed = path.trim();
             if !trimmed.is_empty() {
@@ -1439,7 +1441,7 @@ impl Config {
             }
         }
 
-        // Skills script-file audit override: ZEROCLAW_SKILLS_ALLOW_SCRIPTS
+        // Skills script-file audit override: NARAECLAW_SKILLS_ALLOW_SCRIPTS or ZEROCLAW_SKILLS_ALLOW_SCRIPTS
         if let Ok(flag) = app_env("SKILLS_ALLOW_SCRIPTS")
             && !flag.trim().is_empty()
         {
@@ -1447,12 +1449,12 @@ impl Config {
                 "1" | "true" | "yes" | "on" => self.skills.allow_scripts = true,
                 "0" | "false" | "no" | "off" => self.skills.allow_scripts = false,
                 _ => tracing::warn!(
-                    "Ignoring invalid ZEROCLAW_SKILLS_ALLOW_SCRIPTS (valid: 1|0|true|false|yes|no|on|off)"
+                    "Ignoring invalid NARAECLAW_SKILLS_ALLOW_SCRIPTS/ZEROCLAW_SKILLS_ALLOW_SCRIPTS (valid: 1|0|true|false|yes|no|on|off)"
                 ),
             }
         }
 
-        // Skills prompt mode override: ZEROCLAW_SKILLS_PROMPT_MODE
+        // Skills prompt mode override: NARAECLAW_SKILLS_PROMPT_MODE or ZEROCLAW_SKILLS_PROMPT_MODE
         if let Ok(mode) = app_env("SKILLS_PROMPT_MODE")
             && !mode.trim().is_empty()
         {
@@ -1460,36 +1462,36 @@ impl Config {
                 self.skills.prompt_injection_mode = parsed;
             } else {
                 tracing::warn!(
-                    "Ignoring invalid ZEROCLAW_SKILLS_PROMPT_MODE (valid: full|compact)"
+                    "Ignoring invalid NARAECLAW_SKILLS_PROMPT_MODE/ZEROCLAW_SKILLS_PROMPT_MODE (valid: full|compact)"
                 );
             }
         }
 
-        // Gateway port: ZEROCLAW_GATEWAY_PORT or PORT
+        // Gateway port: NARAECLAW_GATEWAY_PORT, ZEROCLAW_GATEWAY_PORT, or PORT
         if let Ok(port_str) = app_env("GATEWAY_PORT").or_else(|_| std::env::var("PORT"))
             && let Ok(port) = port_str.parse::<u16>()
         {
             self.gateway.port = port;
         }
 
-        // Gateway host: ZEROCLAW_GATEWAY_HOST or HOST
+        // Gateway host: NARAECLAW_GATEWAY_HOST, ZEROCLAW_GATEWAY_HOST, or HOST
         if let Ok(host) = app_env("GATEWAY_HOST").or_else(|_| std::env::var("HOST"))
             && !host.is_empty()
         {
             self.gateway.host = host;
         }
 
-        // Allow public bind: ZEROCLAW_ALLOW_PUBLIC_BIND
+        // Allow public bind: NARAECLAW_ALLOW_PUBLIC_BIND or ZEROCLAW_ALLOW_PUBLIC_BIND
         if let Ok(val) = app_env("ALLOW_PUBLIC_BIND") {
             self.gateway.allow_public_bind = val == "1" || val.eq_ignore_ascii_case("true");
         }
 
-        // Require pairing: ZEROCLAW_REQUIRE_PAIRING
+        // Require pairing: NARAECLAW_REQUIRE_PAIRING or ZEROCLAW_REQUIRE_PAIRING
         if let Ok(val) = app_env("REQUIRE_PAIRING") {
             self.gateway.require_pairing = val == "1" || val.eq_ignore_ascii_case("true");
         }
 
-        // Web dist dir: ZEROCLAW_WEB_DIST_DIR
+        // Web dist dir: NARAECLAW_WEB_DIST_DIR or ZEROCLAW_WEB_DIST_DIR
         if let Ok(path) = app_env("WEB_DIST_DIR") {
             let trimmed = path.trim();
             if !trimmed.is_empty() {
@@ -1497,7 +1499,7 @@ impl Config {
             }
         }
 
-        // Temperature: ZEROCLAW_TEMPERATURE
+        // Temperature: NARAECLAW_TEMPERATURE or ZEROCLAW_TEMPERATURE
         if let Ok(temp_str) = app_env("TEMPERATURE") {
             match temp_str.parse::<f64>() {
                 Ok(temp) if TEMPERATURE_RANGE.contains(&temp) => {
@@ -1505,7 +1507,7 @@ impl Config {
                 }
                 Ok(temp) => {
                     tracing::warn!(
-                        "Ignoring ZEROCLAW_TEMPERATURE={temp}: \
+                        "Ignoring NARAECLAW_TEMPERATURE/ZEROCLAW_TEMPERATURE={temp}: \
                          value out of range (expected {}..={})",
                         TEMPERATURE_RANGE.start(),
                         TEMPERATURE_RANGE.end()
@@ -1513,13 +1515,13 @@ impl Config {
                 }
                 Err(_) => {
                     tracing::warn!(
-                        "Ignoring ZEROCLAW_TEMPERATURE={temp_str:?}: not a valid number"
+                        "Ignoring NARAECLAW_TEMPERATURE/ZEROCLAW_TEMPERATURE={temp_str:?}: not a valid number"
                     );
                 }
             }
         }
 
-        // Reasoning override: ZEROCLAW_REASONING_ENABLED or REASONING_ENABLED
+        // Reasoning override: NARAECLAW_REASONING_ENABLED, ZEROCLAW_REASONING_ENABLED, or REASONING_ENABLED
         if let Ok(flag) =
             app_env("REASONING_ENABLED").or_else(|_| std::env::var("REASONING_ENABLED"))
         {
@@ -1541,14 +1543,14 @@ impl Config {
             }
         }
 
-        // Web search enabled: ZEROCLAW_WEB_SEARCH_ENABLED or WEB_SEARCH_ENABLED
+        // Web search enabled: NARAECLAW_WEB_SEARCH_ENABLED, ZEROCLAW_WEB_SEARCH_ENABLED, or WEB_SEARCH_ENABLED
         if let Ok(enabled) =
             app_env("WEB_SEARCH_ENABLED").or_else(|_| std::env::var("WEB_SEARCH_ENABLED"))
         {
             self.web_search.enabled = enabled == "1" || enabled.eq_ignore_ascii_case("true");
         }
 
-        // Web search provider: ZEROCLAW_WEB_SEARCH_PROVIDER or WEB_SEARCH_PROVIDER
+        // Web search provider: NARAECLAW_WEB_SEARCH_PROVIDER, ZEROCLAW_WEB_SEARCH_PROVIDER, or WEB_SEARCH_PROVIDER
         if let Ok(provider) =
             app_env("WEB_SEARCH_PROVIDER").or_else(|_| std::env::var("WEB_SEARCH_PROVIDER"))
         {
@@ -1558,7 +1560,7 @@ impl Config {
             }
         }
 
-        // Brave API key: ZEROCLAW_BRAVE_API_KEY or BRAVE_API_KEY
+        // Brave API key: NARAECLAW_BRAVE_API_KEY, ZEROCLAW_BRAVE_API_KEY, or BRAVE_API_KEY
         if let Ok(api_key) = app_env("BRAVE_API_KEY").or_else(|_| std::env::var("BRAVE_API_KEY")) {
             let api_key = api_key.trim();
             if !api_key.is_empty() {
@@ -1566,7 +1568,7 @@ impl Config {
             }
         }
 
-        // SearXNG instance URL: ZEROCLAW_SEARXNG_INSTANCE_URL or SEARXNG_INSTANCE_URL
+        // SearXNG instance URL: NARAECLAW_SEARXNG_INSTANCE_URL, ZEROCLAW_SEARXNG_INSTANCE_URL, or SEARXNG_INSTANCE_URL
         if let Ok(instance_url) =
             app_env("SEARXNG_INSTANCE_URL").or_else(|_| std::env::var("SEARXNG_INSTANCE_URL"))
         {
@@ -1576,7 +1578,7 @@ impl Config {
             }
         }
 
-        // Web search max results: ZEROCLAW_WEB_SEARCH_MAX_RESULTS or WEB_SEARCH_MAX_RESULTS
+        // Web search max results: NARAECLAW_WEB_SEARCH_MAX_RESULTS, ZEROCLAW_WEB_SEARCH_MAX_RESULTS, or WEB_SEARCH_MAX_RESULTS
         if let Ok(max_results) =
             app_env("WEB_SEARCH_MAX_RESULTS").or_else(|_| std::env::var("WEB_SEARCH_MAX_RESULTS"))
             && let Ok(max_results) = max_results.parse::<usize>()
@@ -1585,7 +1587,7 @@ impl Config {
             self.web_search.max_results = max_results;
         }
 
-        // Web search timeout: ZEROCLAW_WEB_SEARCH_TIMEOUT_SECS or WEB_SEARCH_TIMEOUT_SECS
+        // Web search timeout: NARAECLAW_WEB_SEARCH_TIMEOUT_SECS, ZEROCLAW_WEB_SEARCH_TIMEOUT_SECS, or WEB_SEARCH_TIMEOUT_SECS
         if let Ok(timeout_secs) =
             app_env("WEB_SEARCH_TIMEOUT_SECS").or_else(|_| std::env::var("WEB_SEARCH_TIMEOUT_SECS"))
             && let Ok(timeout_secs) = timeout_secs.parse::<u64>()
@@ -1594,7 +1596,7 @@ impl Config {
             self.web_search.timeout_secs = timeout_secs;
         }
 
-        // Storage provider key (optional backend override): ZEROCLAW_STORAGE_PROVIDER
+        // Storage provider key (optional backend override): NARAECLAW_STORAGE_PROVIDER or ZEROCLAW_STORAGE_PROVIDER
         if let Ok(provider) = app_env("STORAGE_PROVIDER") {
             let provider = provider.trim();
             if !provider.is_empty() {
@@ -1602,7 +1604,7 @@ impl Config {
             }
         }
 
-        // Storage connection URL (for remote backends): ZEROCLAW_STORAGE_DB_URL
+        // Storage connection URL (for remote backends): NARAECLAW_STORAGE_DB_URL or ZEROCLAW_STORAGE_DB_URL
         if let Ok(db_url) = app_env("STORAGE_DB_URL") {
             let db_url = db_url.trim();
             if !db_url.is_empty() {
@@ -1610,14 +1612,14 @@ impl Config {
             }
         }
 
-        // Storage connect timeout: ZEROCLAW_STORAGE_CONNECT_TIMEOUT_SECS
+        // Storage connect timeout: NARAECLAW_STORAGE_CONNECT_TIMEOUT_SECS or ZEROCLAW_STORAGE_CONNECT_TIMEOUT_SECS
         if let Ok(timeout_secs) = app_env("STORAGE_CONNECT_TIMEOUT_SECS")
             && let Ok(timeout_secs) = timeout_secs.parse::<u64>()
             && timeout_secs > 0
         {
             self.storage.provider.config.connect_timeout_secs = Some(timeout_secs);
         }
-        // Proxy enabled flag: ZEROCLAW_PROXY_ENABLED
+        // Proxy enabled flag: NARAECLAW_PROXY_ENABLED or ZEROCLAW_PROXY_ENABLED
         let explicit_proxy_enabled = app_env("PROXY_ENABLED")
             .ok()
             .as_deref()
@@ -1626,7 +1628,7 @@ impl Config {
             self.proxy.enabled = enabled;
         }
 
-        // Proxy URLs: ZEROCLAW_* wins, then generic *PROXY vars.
+        // Proxy URLs: NARAECLAW_* wins, then ZEROCLAW_* fallback, then generic *PROXY vars.
         let mut proxy_url_overridden = false;
         if let Ok(proxy_url) = app_env("HTTP_PROXY").or_else(|_| std::env::var("HTTP_PROXY")) {
             self.proxy.http_proxy = normalize_proxy_url_option(Some(&proxy_url));
@@ -1658,7 +1660,7 @@ impl Config {
             } else {
                 tracing::warn!(
                     scope = %scope_raw,
-                    "Ignoring invalid ZEROCLAW_PROXY_SCOPE (valid: environment|zeroclaw|services)"
+                    "Ignoring invalid NARAECLAW_PROXY_SCOPE/ZEROCLAW_PROXY_SCOPE (valid: environment|naraeclaw|services)"
                 );
             }
         }
@@ -2014,7 +2016,7 @@ mod tests {
         let msg = config_dir_creation_error(Path::new("/etc/naraeclaw"));
         assert!(msg.contains("/etc/naraeclaw"));
         assert!(msg.contains("OpenRC"));
-        assert!(msg.contains("zeroclaw"));
+        assert!(msg.contains("naraeclaw"));
     }
 
     #[test]
@@ -3959,6 +3961,13 @@ default_temperature = 0.7
 
     fn clear_proxy_env_test_vars() {
         for key in [
+            "NARAECLAW_PROXY_ENABLED",
+            "NARAECLAW_HTTP_PROXY",
+            "NARAECLAW_HTTPS_PROXY",
+            "NARAECLAW_ALL_PROXY",
+            "NARAECLAW_NO_PROXY",
+            "NARAECLAW_PROXY_SCOPE",
+            "NARAECLAW_PROXY_SERVICES",
             "ZEROCLAW_PROXY_ENABLED",
             "ZEROCLAW_HTTP_PROXY",
             "ZEROCLAW_HTTPS_PROXY",
@@ -3987,12 +3996,12 @@ default_temperature = 0.7
         assert!(config.api_key.is_none());
 
         // SAFETY: test-only, single-threaded test runner.
-        unsafe { std::env::set_var("ZEROCLAW_API_KEY", "sk-test-env-key") };
+        unsafe { std::env::set_var("NARAECLAW_API_KEY", "sk-test-env-key") };
         config.apply_env_overrides();
         assert_eq!(config.api_key.as_deref(), Some("sk-test-env-key"));
 
         // SAFETY: test-only, single-threaded test runner.
-        unsafe { std::env::remove_var("ZEROCLAW_API_KEY") };
+        unsafe { std::env::remove_var("NARAECLAW_API_KEY") };
     }
 
     #[test]
@@ -4000,6 +4009,8 @@ default_temperature = 0.7
         let _env_guard = env_override_lock().await;
         let mut config = Config::default();
 
+        // SAFETY: test-only, single-threaded test runner.
+        unsafe { std::env::remove_var("NARAECLAW_API_KEY") };
         // SAFETY: test-only, single-threaded test runner.
         unsafe { std::env::remove_var("ZEROCLAW_API_KEY") };
         // SAFETY: test-only, single-threaded test runner.

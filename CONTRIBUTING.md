@@ -270,7 +270,7 @@ Before requesting review, ensure all of the following are true:
 - Security impact and rollback path are explicitly described.
 - No personal/sensitive data is introduced in code/docs/tests/fixtures/logs/examples/commit messages.
 - Tests/fixtures/examples use neutral project-scoped wording (no identity-specific or first-person phrasing).
-- If identity-like wording is required, use NaraeClaw-centric labels only (for example: `NaraeClawAgent`, `NaraeClawOperator`, `zeroclaw_user`).
+- If identity-like wording is required, use NaraeClaw-centric labels only (for example: `NaraeClawAgent`, `NaraeClawOperator`, `naraeclaw_user`).
 - If docs were changed, update `docs/README.md` navigation and reciprocal links with related docs.
 - If a new operational doc was added, start from `docs/contributing/doc-template.md` and keep risk/rollback/troubleshooting sections where applicable.
 - Linked issue (or rationale for no issue) is included.
@@ -344,7 +344,7 @@ Use these defaults unless an existing subsystem pattern clearly overrides them.
 - **Trait implementers**: keep predictable suffixes (`*Provider`, `*Channel`, `*Tool`, `*Memory`, `*Observer`, `*RuntimeAdapter`).
 - **Factory keys**: keep lowercase and stable (`openai`, `discord`, `shell`); avoid adding aliases without migration need.
 - **Tests**: use behavior-oriented names (`subject_expected_behavior`) and neutral project-scoped fixtures.
-- **Identity-like labels**: if unavoidable, use NaraeClaw-native identifiers only (`NaraeClawAgent`, `zeroclaw_user`, `zeroclaw_node`).
+- **Identity-like labels**: if unavoidable, use NaraeClaw-native identifiers only (`NaraeClawAgent`, `naraeclaw_user`, `naraeclaw_node`).
 
 ## Architecture Boundary Rules (Required)
 
@@ -370,7 +370,7 @@ Use these quick examples to align implementation choices before opening a PR.
 - **Good test name**: `allowlist_denies_unknown_user`, `provider_returns_error_on_invalid_model`
 
 - **Bad identity-like label**: `john_user`, `alice_bot`
-- **Good identity-like label**: `NaraeClawAgent`, `zeroclaw_user`, `zeroclaw_node`
+- **Good identity-like label**: `NaraeClawAgent`, `naraeclaw_user`, `naraeclaw_node`
 
 ### Architecture boundary examples
 

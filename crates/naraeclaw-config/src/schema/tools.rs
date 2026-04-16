@@ -1430,7 +1430,8 @@ pub enum ProxyScope {
     Environment,
     /// Apply proxy to all NaraeClaw-managed HTTP traffic (default).
     #[default]
-    Zeroclaw,
+    #[serde(alias = "zeroclaw")]
+    Naraeclaw,
     /// Apply proxy only to explicitly listed service selectors.
     Services,
 }
@@ -1471,7 +1472,7 @@ impl Default for ProxyConfig {
             https_proxy: None,
             all_proxy: None,
             no_proxy: Vec::new(),
-            scope: ProxyScope::Zeroclaw,
+            scope: ProxyScope::Naraeclaw,
             services: Vec::new(),
         }
     }
@@ -1544,7 +1545,7 @@ impl ProxyConfig {
 
         match self.scope {
             ProxyScope::Environment => false,
-            ProxyScope::Zeroclaw => true,
+            ProxyScope::Naraeclaw => true,
             ProxyScope::Services => {
                 let service_key = service_key.trim().to_ascii_lowercase();
                 if service_key.is_empty() {
@@ -2377,7 +2378,7 @@ pub fn find_header_end(buf: &[u8]) -> Option<usize> {
 pub(super) fn parse_proxy_scope(raw: &str) -> Option<ProxyScope> {
     match raw.trim().to_ascii_lowercase().as_str() {
         "environment" | "env" => Some(ProxyScope::Environment),
-        "zeroclaw" | "internal" | "core" => Some(ProxyScope::Zeroclaw),
+        "naraeclaw" | "zeroclaw" | "internal" | "core" => Some(ProxyScope::Naraeclaw),
         "services" | "service" => Some(ProxyScope::Services),
         _ => None,
     }
