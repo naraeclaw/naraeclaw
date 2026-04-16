@@ -34,9 +34,6 @@ cargo test --test integration
 cargo test --test system
 cargo test --test integration <test-name>
 
-# Live tests require real API keys and are marked #[ignore]
-cargo test --test live -- --ignored
-
 # Development mode
 cargo run -- onboard
 cargo run -- agent
