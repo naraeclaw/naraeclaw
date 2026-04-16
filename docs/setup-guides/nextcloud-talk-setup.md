@@ -10,7 +10,7 @@ This guide covers native Nextcloud Talk integration for NaraeClaw.
 
 ## 2. Configuration
 
-Add this section in `~/.zeroclaw/config.toml`:
+Add this section in `~/.naraeclaw/config.toml`:
 
 ```toml
 [channels_config.nextcloud_talk]
@@ -18,9 +18,9 @@ base_url = "https://cloud.example.com"
 app_token = "nextcloud-talk-app-token"
 webhook_secret = "optional-webhook-secret"
 allowed_users = ["*"]
-# bot_name is the Nextcloud Talk display name of the bot (e.g. "zeroclaw").
+# bot_name is the Nextcloud Talk display name of the bot (e.g. "naraeclaw").
 # Used to ignore the bot's own messages and prevent feedback loops.
-# bot_name = "zeroclaw"
+# bot_name = "naraeclaw"
 ```
 
 Field reference:

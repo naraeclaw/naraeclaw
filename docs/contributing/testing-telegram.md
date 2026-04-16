@@ -58,7 +58,7 @@ cargo test telegram --lib
 ### Step 1: Run Automated Tests
 
 ```bash
-cd /Users/abdzsam/zeroclaw
+cd /Users/you/naraeclaw
 
 # Make scripts executable (already done)
 chmod +x tests/telegram/test_telegram_integration.sh tests/telegram/quick_test.sh
@@ -209,7 +209,7 @@ cargo update
 
 ```bash
 # Check config
-cat ~/.zeroclaw/config.toml | grep -A 5 telegram
+cat ~/.naraeclaw/config.toml | grep -A 5 telegram
 
 # Reconfigure
 naraeclaw onboard --channels-only
@@ -244,11 +244,11 @@ After all fixes, you should see:
 |--------|--------|---------|
 | Unit test pass | 24/24 | `cargo test telegram --lib` |
 | Build time | <30s | `time cargo build --release` |
-| Binary size | ~3-4MB | `ls -lh target/release/zeroclaw` |
+| Binary size | ~3-4MB | `ls -lh target/release/naraeclaw` |
 | Health check | <5s | `time naraeclaw channel doctor` |
 | First response | <3s | Manual test in Telegram |
 | Message split | <50ms | Check debug logs |
-| Memory usage | <10MB | `ps aux \| grep zeroclaw` |
+| Memory usage | <10MB | `ps aux \| grep naraeclaw` |
 
 ## 🔄 CI/CD Integration
 
@@ -298,6 +298,6 @@ If all tests pass:
 
 ## 📞 Support
 
-- Issues: https://github.com/zeroclaw-labs/zeroclaw/issues
+- Issues: https://github.com/naraeclaw/naraeclaw/issues
 - Docs: [testing-telegram.md](../../tests/telegram/testing-telegram.md)
 - Help: `naraeclaw --help`

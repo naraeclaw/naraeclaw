@@ -235,7 +235,7 @@ Each fallback provider resolves credentials independently using the standard res
 
 1. Explicit credential from config/CLI
 2. Provider-specific environment variable
-3. Generic fallback: `ZEROCLAW_API_KEY`, then `API_KEY`
+3. Generic fallback: `NARAECLAW_API_KEY`, then `API_KEY`
 
 **Important**: The primary provider's API key is not automatically reused by fallback providers. Set credentials for each provider separately.
 

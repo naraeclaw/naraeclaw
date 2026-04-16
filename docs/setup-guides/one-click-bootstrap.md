@@ -7,14 +7,14 @@ Last verified: **February 20, 2026**.
 ## Option 0: Homebrew (macOS/Linuxbrew)
 
 ```bash
-brew install zeroclaw
+brew install naraeclaw
 ```
 
 ## Option A (Recommended): Clone + local script
 
 ```bash
-git clone https://github.com/zeroclaw-labs/zeroclaw.git
-cd zeroclaw
+git clone https://github.com/naraeclaw/naraeclaw.git
+cd naraeclaw
 ./install.sh
 ```
 
@@ -69,7 +69,7 @@ Notes:
 ## Option B: Remote one-liner
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/zeroclaw-labs/zeroclaw/master/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/naraeclaw/naraeclaw/master/install.sh | bash
 ```
 
 For high-security environments, prefer Option A so you can review the script before execution.
@@ -88,21 +88,21 @@ This builds a local NaraeClaw image and launches onboarding inside a container w
 persisting config/workspace to `./.naraeclaw-docker`.
 
 Container CLI defaults to `docker`. If Docker CLI is unavailable and `podman` exists,
-the installer auto-falls back to `podman`. You can also set `ZEROCLAW_CONTAINER_CLI`
-explicitly (for example: `ZEROCLAW_CONTAINER_CLI=podman ./install.sh --docker`).
+the installer auto-falls back to `podman`. You can also set `NARAECLAW_CONTAINER_CLI`
+explicitly (for example: `NARAECLAW_CONTAINER_CLI=podman ./install.sh --docker`).
 
 For Podman, the installer runs with `--userns keep-id` and `:Z` volume labels so
 workspace/config mounts remain writable inside the container.
 
 If you add `--skip-build`, the installer skips local image build. It first tries the local
-Docker tag (`ZEROCLAW_DOCKER_IMAGE`, default: `zeroclaw-bootstrap:local`); if missing,
-it pulls `ghcr.io/zeroclaw-labs/zeroclaw:latest` and tags it locally before running.
+Docker tag (`NARAECLAW_DOCKER_IMAGE`, default: `naraeclaw-bootstrap:local`); if missing,
+it pulls `ghcr.io/naraeclaw/naraeclaw:latest` and tags it locally before running.
 
 ### Stopping and restarting a Docker/Podman container
 
 After `./install.sh --docker` finishes, the container exits. Your config and workspace
 are persisted in the data directory (default: `./.naraeclaw-docker`, or `~/.naraeclaw-docker`
-when bootstrapping via `curl | bash`). You can override this path with `ZEROCLAW_DOCKER_DATA_DIR`.
+when bootstrapping via `curl | bash`). You can override this path with `NARAECLAW_DOCKER_DATA_DIR`.
 
 **Do not re-run `install.sh`** to restart -- it will rebuild the image and re-run onboarding.
 Instead, start a new container from the existing image and mount the persisted data directory.
@@ -133,18 +133,18 @@ data directory without compose:
 
 ```bash
 # Docker
-docker run -d --name zeroclaw \
+docker run -d --name naraeclaw \
   --restart unless-stopped \
   -v "$PWD/.naraeclaw-docker/.naraeclaw:/naraeclaw-data/.naraeclaw" \
   -v "$PWD/.naraeclaw-docker/workspace:/naraeclaw-data/workspace" \
   -e HOME=/naraeclaw-data \
   -e NARAECLAW_WORKSPACE=/naraeclaw-data/workspace \
   -p 42617:42617 \
-  zeroclaw-bootstrap:local \
+  naraeclaw-bootstrap:local \
   gateway
 
 # Podman (add --userns keep-id and :Z volume labels)
-podman run -d --name zeroclaw \
+podman run -d --name naraeclaw \
   --restart unless-stopped \
   --userns keep-id \
   --user "$(id -u):$(id -g)" \
@@ -153,7 +153,7 @@ podman run -d --name zeroclaw \
   -e HOME=/naraeclaw-data \
   -e NARAECLAW_WORKSPACE=/naraeclaw-data/workspace \
   -p 42617:42617 \
-  zeroclaw-bootstrap:local \
+  naraeclaw-bootstrap:local \
   gateway
 ```
 
@@ -161,19 +161,19 @@ podman run -d --name zeroclaw \
 
 ```bash
 # Stop the container (preserves data)
-docker stop zeroclaw
+docker stop naraeclaw
 
 # Start a stopped container (config and workspace are intact)
-docker start zeroclaw
+docker start naraeclaw
 
 # View logs
-docker logs -f zeroclaw
+docker logs -f naraeclaw
 
 # Remove the container (data in volumes/.naraeclaw-docker is preserved)
-docker rm zeroclaw
+docker rm naraeclaw
 
 # Check health
-docker exec zeroclaw naraeclaw status
+docker exec naraeclaw naraeclaw status
 ```
 
 #### Environment variables
@@ -182,13 +182,13 @@ When running manually, pass provider configuration as environment variables
 or ensure they are already saved in the persisted `config.toml`:
 
 ```bash
-docker run -d --name zeroclaw \
+docker run -d --name naraeclaw \
   -e API_KEY="sk-..." \
   -e PROVIDER="openrouter" \
   -v "$PWD/.naraeclaw-docker/.naraeclaw:/naraeclaw-data/.naraeclaw" \
   -v "$PWD/.naraeclaw-docker/workspace:/naraeclaw-data/workspace" \
   -p 42617:42617 \
-  zeroclaw-bootstrap:local \
+  naraeclaw-bootstrap:local \
   gateway
 ```
 
@@ -204,14 +204,14 @@ saved in `.naraeclaw-docker/.naraeclaw/config.toml` and do not need to be passed
 Or with environment variables:
 
 ```bash
-ZEROCLAW_API_KEY="sk-..." ZEROCLAW_PROVIDER="openrouter" ./install.sh
+NARAECLAW_API_KEY="sk-..." NARAECLAW_PROVIDER="openrouter" ./install.sh
 ```
 
 ## Useful flags
 
 - `--install-system-deps`
 - `--install-rust`
-- `--skip-build` (in `--docker` mode: use local image if present, otherwise pull `ghcr.io/zeroclaw-labs/zeroclaw:latest`)
+- `--skip-build` (in `--docker` mode: use local image if present, otherwise pull `ghcr.io/naraeclaw/naraeclaw:latest`)
 - `--skip-install`
 - `--provider <id>`
 

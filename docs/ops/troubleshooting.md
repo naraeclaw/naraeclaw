@@ -72,7 +72,7 @@ CARGO_BUILD_JOBS=1 cargo build --release --locked
 
 Symptoms:
 
-- `cargo check` / `cargo build` appears stuck at `Checking zeroclaw` for a long time
+- `cargo check` / `cargo build` appears stuck at `Checking naraeclaw` for a long time
 - repeated `Blocking waiting for file lock on package cache` or `build directory`
 
 Why this happens in NaraeClaw:
@@ -113,17 +113,17 @@ pgrep -af "cargo (check|build|test)|cargo check|cargo build|cargo test"
 
 Stop unrelated cargo jobs before running your own build.
 
-### `zeroclaw` command not found after install
+### `naraeclaw` command not found after install
 
 Symptom:
 
-- install succeeds but shell cannot find `zeroclaw`
+- install succeeds but shell cannot find `naraeclaw`
 
 Fix:
 
 ```bash
 export PATH="$HOME/.cargo/bin:$PATH"
-which zeroclaw
+which naraeclaw
 ```
 
 Persist in your shell profile if needed.
@@ -206,7 +206,7 @@ journalctl --user -u naraeclaw.service -f
 ## Installer URL
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/zeroclaw-labs/zeroclaw/master/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/naraeclaw/naraeclaw/master/install.sh | bash
 ```
 
 ## Still Stuck?
@@ -214,7 +214,7 @@ curl -fsSL https://raw.githubusercontent.com/zeroclaw-labs/zeroclaw/master/insta
 Collect and include these outputs when filing an issue:
 
 ```bash
-zeroclaw --version
+naraeclaw --version
 naraeclaw status
 naraeclaw doctor
 naraeclaw channel doctor

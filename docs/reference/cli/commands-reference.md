@@ -243,6 +243,6 @@ New enum types require a one-line `HasPropKind` impl. See `CONTRIBUTING.md` for 
 To verify docs against your current binary quickly:
 
 ```bash
-zeroclaw --help
-zeroclaw <command> --help
+naraeclaw --help
+naraeclaw <command> --help
 ```

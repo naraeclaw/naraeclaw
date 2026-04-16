@@ -28,7 +28,7 @@ default_model = "your-model-name"
 
 ### Config File
 
-Edit `~/.zeroclaw/config.toml`:
+Edit `~/.naraeclaw/config.toml`:
 
 ```toml
 api_key = "your-api-key"
@@ -42,7 +42,7 @@ For `custom:` and `anthropic-custom:` providers, use the generic key env vars:
 
 ```bash
 export API_KEY="your-api-key"
-# or: export ZEROCLAW_API_KEY="your-api-key"
+# or: export NARAECLAW_API_KEY="your-api-key"
 naraeclaw agent
 ```
 
@@ -76,7 +76,7 @@ naraeclaw models refresh --provider llamacpp
 naraeclaw agent -m "hello"
 ```
 
-You do not need to export `ZEROCLAW_API_KEY=dummy` for this flow.
+You do not need to export `NARAECLAW_API_KEY=dummy` for this flow.
 
 ## SGLang Server
 
@@ -107,7 +107,7 @@ naraeclaw models refresh --provider sglang
 naraeclaw agent -m "hello"
 ```
 
-You do not need to export `ZEROCLAW_API_KEY=dummy` for this flow.
+You do not need to export `NARAECLAW_API_KEY=dummy` for this flow.
 
 ## vLLM Server
 
@@ -138,7 +138,7 @@ naraeclaw models refresh --provider vllm
 naraeclaw agent -m "hello"
 ```
 
-You do not need to export `ZEROCLAW_API_KEY=dummy` for this flow.
+You do not need to export `NARAECLAW_API_KEY=dummy` for this flow.
 
 ## Testing Configuration
 

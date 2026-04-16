@@ -28,7 +28,7 @@ agent-browser install              # macOS/Windows
 ### 2. Verify NaraeClaw Config
 
 The browser tool is enabled by default. To verify or customize, edit
-`~/.zeroclaw/config.toml`:
+`~/.naraeclaw/config.toml`:
 
 ```toml
 [browser]

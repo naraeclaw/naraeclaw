@@ -115,13 +115,13 @@ impl AuditLogger {
 ```toml
 [security.audit]
 enabled = true
-log_path = "~/.config/zeroclaw/audit.log"
+log_path = "~/.config/naraeclaw/audit.log"
 max_size_mb = 100
 rotate = "daily"  # daily | weekly | size
 
 # Tamper evidence
 sign_events = true
-signing_key_path = "~/.config/zeroclaw/audit.key"
+signing_key_path = "~/.config/naraeclaw/audit.key"
 
 # What to log
 log_commands = true
@@ -136,19 +136,19 @@ log_policy_violations = true
 
 ```bash
 # Show all commands executed by @alice
-zeroclaw audit --user @alice
+naraeclaw audit --user @alice
 
 # Show all high-risk commands
-zeroclaw audit --risk high
+naraeclaw audit --risk high
 
 # Show violations from last 24 hours
-zeroclaw audit --since 24h --violations-only
+naraeclaw audit --since 24h --violations-only
 
 # Export to JSON for analysis
-zeroclaw audit --format json --output audit.json
+naraeclaw audit --format json --output audit.json
 
 # Verify log integrity
-zeroclaw audit --verify-signatures
+naraeclaw audit --verify-signatures
 ```
 
 ---

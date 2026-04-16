@@ -36,7 +36,7 @@ cargo build --release
 
 ### 2.3 Config
 
-Edit `~/.zeroclaw/config.toml`:
+Edit `~/.naraeclaw/config.toml`:
 
 ```toml
 [channels_config.telegram]
@@ -94,7 +94,7 @@ If you need a **public URL** (e.g. WhatsApp webhook, external clients):
    [tunnel]
    provider = "tailscale"   # or "ngrok", "cloudflare"
    ```
-   Or use `zeroclaw tunnel` (see tunnel docs).
+   Or use `naraeclaw tunnel` (see tunnel docs).
 
 3. NaraeClaw will refuse `0.0.0.0` unless `allow_public_bind = true` or a tunnel is active.
 
@@ -191,7 +191,7 @@ NaraeClaw supports OpenRC for Alpine Linux and other distributions using the Ope
 
 - Alpine Linux (or another OpenRC-based distro)
 - Root or sudo access
-- A dedicated `zeroclaw` system user (created during install)
+- A dedicated `naraeclaw` system user (created during install)
 
 ### 7.2 Install Service
 
@@ -201,26 +201,26 @@ sudo naraeclaw service install
 ```
 
 This creates:
-- Init script: `/etc/init.d/zeroclaw`
-- Config directory: `/etc/zeroclaw/`
-- Log directory: `/var/log/zeroclaw/`
+- Init script: `/etc/init.d/naraeclaw`
+- Config directory: `/etc/naraeclaw/`
+- Log directory: `/var/log/naraeclaw/`
 
 ### 7.3 Configuration
 
 Manual config copy is usually not required.
 
-`sudo naraeclaw service install` automatically prepares `/etc/zeroclaw`, migrates existing runtime state from your user setup when available, and sets ownership/permissions for the `zeroclaw` service user.
+`sudo naraeclaw service install` automatically prepares `/etc/naraeclaw`, migrates existing runtime state from your user setup when available, and sets ownership/permissions for the `naraeclaw` service user.
 
-If no prior runtime state is available to migrate, create `/etc/zeroclaw/config.toml` before starting the service.
+If no prior runtime state is available to migrate, create `/etc/naraeclaw/config.toml` before starting the service.
 
 ### 7.4 Enable and Start
 
 ```bash
 # Add to default runlevel
-sudo rc-update add zeroclaw default
+sudo rc-update add naraeclaw default
 
 # Start the service
-sudo rc-service zeroclaw start
+sudo rc-service naraeclaw start
 
 # Check status
 sudo rc-service naraeclaw status
@@ -230,11 +230,11 @@ sudo rc-service naraeclaw status
 
 | Command | Description |
 |---------|-------------|
-| `sudo rc-service zeroclaw start` | Start the daemon |
-| `sudo rc-service zeroclaw stop` | Stop the daemon |
+| `sudo rc-service naraeclaw start` | Start the daemon |
+| `sudo rc-service naraeclaw stop` | Stop the daemon |
 | `sudo rc-service naraeclaw status` | Check service status |
-| `sudo rc-service zeroclaw restart` | Restart the daemon |
-| `sudo naraeclaw service status` | NaraeClaw status wrapper (uses `/etc/zeroclaw` config) |
+| `sudo rc-service naraeclaw restart` | Restart the daemon |
+| `sudo naraeclaw service status` | NaraeClaw status wrapper (uses `/etc/naraeclaw` config) |
 
 ### 7.6 Logs
 
@@ -242,21 +242,21 @@ OpenRC routes logs to:
 
 | Log | Path |
 |-----|------|
-| Access/stdout | `/var/log/zeroclaw/access.log` |
-| Errors/stderr | `/var/log/zeroclaw/error.log` |
+| Access/stdout | `/var/log/naraeclaw/access.log` |
+| Errors/stderr | `/var/log/naraeclaw/error.log` |
 
 View logs:
 
 ```bash
-sudo tail -f /var/log/zeroclaw/error.log
+sudo tail -f /var/log/naraeclaw/error.log
 ```
 
 ### 7.7 Uninstall
 
 ```bash
 # Stop and remove from runlevel
-sudo rc-service zeroclaw stop
-sudo rc-update del zeroclaw default
+sudo rc-service naraeclaw stop
+sudo rc-update del naraeclaw default
 
 # Remove init script
 sudo naraeclaw service uninstall
@@ -266,17 +266,17 @@ sudo naraeclaw service uninstall
 
 - OpenRC is **system-wide only** (no user-level services)
 - Requires `sudo` or root for all service operations
-- The service runs as the `zeroclaw:zeroclaw` user (least privilege)
-- Config must be at `/etc/zeroclaw/config.toml` (explicit path in init script)
-- If the `zeroclaw` user does not exist, install will fail with instructions to create it
+- The service runs as the `naraeclaw:naraeclaw` user (least privilege)
+- Config must be at `/etc/naraeclaw/config.toml` (explicit path in init script)
+- If the `naraeclaw` user does not exist, install will fail with instructions to create it
 
 ### 7.9 Checklist: Alpine/OpenRC Deployment
 
 - [ ] Install: `sudo naraeclaw service install`
-- [ ] Enable: `sudo rc-update add zeroclaw default`
-- [ ] Start: `sudo rc-service zeroclaw start`
+- [ ] Enable: `sudo rc-update add naraeclaw default`
+- [ ] Start: `sudo rc-service naraeclaw start`
 - [ ] Verify: `sudo rc-service naraeclaw status`
-- [ ] Check logs: `/var/log/zeroclaw/error.log`
+- [ ] Check logs: `/var/log/naraeclaw/error.log`
 
 ---
 

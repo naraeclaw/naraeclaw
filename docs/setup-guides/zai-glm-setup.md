@@ -26,7 +26,7 @@ naraeclaw onboard \
 
 ### Manual Configuration
 
-Edit `~/.zeroclaw/config.toml`:
+Edit `~/.naraeclaw/config.toml`:
 
 ```toml
 api_key = "YOUR_ZAI_API_KEY"
