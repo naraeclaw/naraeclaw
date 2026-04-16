@@ -1,7 +1,7 @@
 use naraeclaw_api::runtime_traits::RuntimeAdapter;
 use std::path::{Path, PathBuf};
 
-/// Native runtime — full access, runs on Mac/Linux/Windows/Docker/Raspberry Pi
+/// Native runtime — full access, runs on Mac/Linux/Windows/Docker.
 pub struct NativeRuntime;
 
 impl Default for NativeRuntime {

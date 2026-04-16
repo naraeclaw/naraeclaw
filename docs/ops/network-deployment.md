@@ -1,6 +1,6 @@
 # Network Deployment — NaraeClaw on a Server or Local Network
 
-This document covers deploying NaraeClaw on a Raspberry Pi or other host on your local network, with Telegram and optional webhook channels.
+This document covers deploying NaraeClaw on a Linux server or local network host, with Telegram and optional webhook channels.
 
 ---
 

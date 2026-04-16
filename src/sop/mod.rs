@@ -146,11 +146,11 @@ Some conditions here.
 
 ## Steps
 
-1. **Check readings** — Read sensor data and confirm.
-   - tools: gpio_read, memory_store
+1. **Check health** — Query service health and record the result.
+   - tools: http_request, memory_store
 
-2. **Stop service** — Disable the affected endpoint.
-   - tools: gpio_write, gpio_read
+2. **Restart service** — Restart the affected service.
+   - tools: shell, http_request
    - requires_confirmation: true
 
 3. **Notify operator** — Send alert.
@@ -161,15 +161,18 @@ Some conditions here.
         assert_eq!(steps.len(), 3);
 
         assert_eq!(steps[0].number, 1);
-        assert_eq!(steps[0].title, "Check readings");
-        assert!(steps[0].body.contains("Read sensor data"));
-        assert_eq!(steps[0].suggested_tools, vec!["gpio_read", "memory_store"]);
+        assert_eq!(steps[0].title, "Check health");
+        assert!(steps[0].body.contains("Query service health"));
+        assert_eq!(
+            steps[0].suggested_tools,
+            vec!["http_request", "memory_store"]
+        );
         assert!(!steps[0].requires_confirmation);
 
         assert_eq!(steps[1].number, 2);
-        assert_eq!(steps[1].title, "Close valve");
+        assert_eq!(steps[1].title, "Restart service");
         assert!(steps[1].requires_confirmation);
-        assert_eq!(steps[1].suggested_tools, vec!["gpio_write", "gpio_read"]);
+        assert_eq!(steps[1].suggested_tools, vec!["shell", "http_request"]);
 
         assert_eq!(steps[2].number, 3);
         assert_eq!(steps[2].title, "Notify operator");
@@ -428,25 +431,15 @@ type = "cron"
 expression = "0 */5 * * *"
 
 [[triggers]]
-type = "peripheral"
-board = "nucleo-f401re-0"
-signal = "pin_3"
-condition = "> 0"
-
-[[triggers]]
 type = "manual"
 "#;
         let manifest: SopManifest = toml::from_str(toml_str).unwrap();
-        assert_eq!(manifest.triggers.len(), 5);
+        assert_eq!(manifest.triggers.len(), 4);
 
         assert!(matches!(manifest.triggers[0], SopTrigger::Mqtt { .. }));
         assert!(matches!(manifest.triggers[1], SopTrigger::Webhook { .. }));
         assert!(matches!(manifest.triggers[2], SopTrigger::Cron { .. }));
-        assert!(matches!(
-            manifest.triggers[3],
-            SopTrigger::Peripheral { .. }
-        ));
-        assert!(matches!(manifest.triggers[4], SopTrigger::Manual));
+        assert!(matches!(manifest.triggers[3], SopTrigger::Manual));
     }
 
     #[test]
@@ -503,8 +496,8 @@ type = "manual"
     fn parse_steps_with_checkpoint_kind() {
         let md = r#"## Steps
 
-1. **Read data** — Read from sensor.
-   - tools: gpio_read
+1. **Read status** — Read current service status.
+   - tools: http_request
    - kind: execute
 
 2. **Review** — Human review checkpoint.

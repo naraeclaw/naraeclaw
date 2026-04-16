@@ -64,7 +64,6 @@ Use this grouping to decide where new docs belong.
 - `docs/sandboxing.md`
 - `docs/resource-limits.md`
 - `docs/audit-logging.md`
-- `docs/agnostic-security.md`
 - `docs/frictionless-security.md`
 - `docs/security-roadmap.md`
 
