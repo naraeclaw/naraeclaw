@@ -850,7 +850,7 @@ pub struct WhatsAppConfig {
     #[secret]
     pub verify_token: Option<String>,
     /// App secret from Meta Business Suite (for webhook signature verification)
-    /// Can also be set via `ZEROCLAW_WHATSAPP_APP_SECRET` environment variable
+    /// Can also be set via `NARAECLAW_WHATSAPP_APP_SECRET` (`ZEROCLAW_WHATSAPP_APP_SECRET` fallback)
     /// Only used in Cloud API mode
     #[serde(default)]
     #[secret]
@@ -1004,7 +1004,7 @@ pub struct NextcloudTalkConfig {
     pub app_token: String,
     /// Shared secret for webhook signature verification.
     ///
-    /// Can also be set via `ZEROCLAW_NEXTCLOUD_TALK_WEBHOOK_SECRET`.
+    /// Can also be set via `NARAECLAW_NEXTCLOUD_TALK_WEBHOOK_SECRET` (`ZEROCLAW_NEXTCLOUD_TALK_WEBHOOK_SECRET` fallback).
     #[serde(default)]
     #[secret]
     pub webhook_secret: Option<String>,
@@ -1015,7 +1015,7 @@ pub struct NextcloudTalkConfig {
     /// Overrides the global `[proxy]` setting for this channel only.
     #[serde(default)]
     pub proxy_url: Option<String>,
-    /// Display name of the bot in Nextcloud Talk (e.g. "zeroclaw").
+    /// Display name of the bot in Nextcloud Talk (e.g. "naraeclaw").
     /// Used to filter out the bot's own messages and prevent feedback loops.
     /// If not set, defaults to an empty string (no self-message filtering by name).
     #[serde(default)]

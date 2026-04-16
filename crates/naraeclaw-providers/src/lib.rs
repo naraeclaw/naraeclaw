@@ -703,7 +703,7 @@ pub struct ProviderRuntimeOptions {
     /// `None` uses the provider's built-in default (120s for compatible providers).
     pub provider_timeout_secs: Option<u64>,
     /// Extra HTTP headers to include in provider API requests.
-    /// These are merged from the config file and `ZEROCLAW_EXTRA_HEADERS` env var.
+    /// These are merged from the config file and `NARAECLAW_EXTRA_HEADERS` env var, with `ZEROCLAW_EXTRA_HEADERS` retained as a fallback.
     pub extra_headers: std::collections::HashMap<String, String>,
     /// Custom API path suffix for OpenAI-compatible providers
     /// (e.g. "/v2/generate" instead of the default "/chat/completions").
@@ -863,7 +863,7 @@ pub async fn api_error(provider: &str, response: reqwest::Response) -> anyhow::E
 /// Resolution order:
 /// 1. Explicitly provided `api_key` parameter (trimmed, filtered if empty)
 /// 2. Provider-specific environment variable (e.g., `ANTHROPIC_OAUTH_TOKEN`, `OPENROUTER_API_KEY`)
-/// 3. Generic fallback variables (`ZEROCLAW_API_KEY`, `API_KEY`)
+/// 3. Generic fallback variables (`NARAECLAW_API_KEY`, `ZEROCLAW_API_KEY`, `API_KEY`)
 ///
 /// For Anthropic, the provider-specific env var is `ANTHROPIC_OAUTH_TOKEN` (for setup-tokens)
 /// followed by `ANTHROPIC_API_KEY` (for regular API keys).

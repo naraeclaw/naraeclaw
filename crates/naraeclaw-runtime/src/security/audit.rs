@@ -221,27 +221,32 @@ pub struct CommandExecutionLog<'a> {
     pub duration_ms: u64,
 }
 
+fn audit_signing_key_env() -> std::result::Result<String, std::env::VarError> {
+    std::env::var("NARAECLAW_AUDIT_SIGNING_KEY")
+        .or_else(|_| std::env::var("ZEROCLAW_AUDIT_SIGNING_KEY"))
+}
+
 impl AuditLogger {
     /// Create a new audit logger.
     ///
     /// If the log file already exists, the chain state is recovered from the last
     /// entry so that new writes continue the existing hash chain.
     ///
-    /// If `config.sign_events` is true, requires `ZEROCLAW_AUDIT_SIGNING_KEY` env var
+    /// If `config.sign_events` is true, requires `NARAECLAW_AUDIT_SIGNING_KEY` env var
     /// to be set with a hex-encoded 32-byte key. Fails if key is missing or invalid.
     pub fn new(config: AuditConfig, naraeclaw_dir: PathBuf) -> Result<Self> {
         // Load and validate signing key if sign_events enabled
         let signing_key = if config.sign_events {
-            let key_hex = std::env::var("ZEROCLAW_AUDIT_SIGNING_KEY").map_err(|_| {
-                anyhow::anyhow!("sign_events enabled but ZEROCLAW_AUDIT_SIGNING_KEY not set")
+            let key_hex = audit_signing_key_env().map_err(|_| {
+                anyhow::anyhow!("sign_events enabled but NARAECLAW_AUDIT_SIGNING_KEY not set")
             })?;
 
             let key_bytes = hex::decode(&key_hex)
-                .map_err(|_| anyhow::anyhow!("ZEROCLAW_AUDIT_SIGNING_KEY must be hex-encoded"))?;
+                .map_err(|_| anyhow::anyhow!("NARAECLAW_AUDIT_SIGNING_KEY must be hex-encoded"))?;
 
             if key_bytes.len() != 32 {
                 bail!(
-                    "ZEROCLAW_AUDIT_SIGNING_KEY must be 32 bytes (64 hex chars), got {}",
+                    "NARAECLAW_AUDIT_SIGNING_KEY must be 32 bytes (64 hex chars), got {}",
                     key_bytes.len()
                 );
             }
@@ -418,7 +423,7 @@ fn recover_chain_state(log_path: &Path) -> ChainState {
 /// - Each `entry_hash` matches the recomputed `SHA-256(prev_hash || content)`.
 /// - `prev_hash` links to the preceding entry (or the genesis seed for the first).
 /// - Sequence numbers are contiguous starting from 0.
-/// - If a record has a `signature` field and `ZEROCLAW_AUDIT_SIGNING_KEY` is available,
+/// - If a record has a `signature` field and `NARAECLAW_AUDIT_SIGNING_KEY` is available,
 ///   verifies the HMAC-SHA256 signature over `entry_hash`.
 ///
 /// Returns `Ok(entry_count)` on success, or an error describing the first violation.
@@ -430,7 +435,7 @@ pub fn verify_chain(log_path: &Path) -> Result<u64> {
     let mut expected_sequence: u64 = 0;
 
     // Attempt to load signing key from environment (optional)
-    let signing_key = std::env::var("ZEROCLAW_AUDIT_SIGNING_KEY")
+    let signing_key = audit_signing_key_env()
         .ok()
         .and_then(|key_hex| hex::decode(&key_hex).ok())
         .filter(|key_bytes| key_bytes.len() == 32);
@@ -1002,7 +1007,7 @@ mod tests {
         if let Err(e) = result {
             let err_msg = e.to_string();
             assert!(
-                err_msg.contains("ZEROCLAW_AUDIT_SIGNING_KEY not set"),
+                err_msg.contains("NARAECLAW_AUDIT_SIGNING_KEY not set"),
                 "error: {}",
                 err_msg
             );

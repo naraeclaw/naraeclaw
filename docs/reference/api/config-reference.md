@@ -736,7 +736,7 @@ Linq Partner V3 API integration for iMessage, RCS, and SMS.
 Notes:
 
 - Webhook endpoint is `POST /linq`.
-- `ZEROCLAW_LINQ_SIGNING_SECRET` overrides `signing_secret` when set.
+- `NARAECLAW_LINQ_SIGNING_SECRET` overrides `signing_secret` when set.
 - Signatures use `X-Webhook-Signature` and `X-Webhook-Timestamp` headers; stale timestamps (>300s) are rejected.
 - See [channels-reference.md](channels-reference.md) for full config examples.
 
@@ -755,7 +755,7 @@ Native Nextcloud Talk bot integration (webhook receive + OCS send API).
 Notes:
 
 - Webhook endpoint is `POST /nextcloud-talk`.
-- `ZEROCLAW_NEXTCLOUD_TALK_WEBHOOK_SECRET` overrides `webhook_secret` when set.
+- `NARAECLAW_NEXTCLOUD_TALK_WEBHOOK_SECRET` overrides `webhook_secret` when set.
 - See [nextcloud-talk-setup.md](../../setup-guides/nextcloud-talk-setup.md) for setup and troubleshooting.
 
 ## Security-Relevant Defaults

@@ -6,10 +6,12 @@
 // ── Universal overrides ──────────────────────────────────────────────────────
 
 /// Universal API key override: checked before any provider-specific key.
+pub const NARAECLAW_API_KEY: &str = "NARAECLAW_API_KEY";
 pub const ZEROCLAW_API_KEY: &str = "ZEROCLAW_API_KEY";
 
 /// Universal base URL override for the active provider.
 /// Provider-specific `*_BASE_URL` vars take precedence when set.
+pub const NARAECLAW_PROVIDER_URL: &str = "NARAECLAW_PROVIDER_URL";
 pub const ZEROCLAW_PROVIDER_URL: &str = "ZEROCLAW_PROVIDER_URL";
 
 // ── Anthropic ────────────────────────────────────────────────────────────────

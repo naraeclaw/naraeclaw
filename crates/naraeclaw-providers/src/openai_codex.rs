@@ -11,8 +11,10 @@ use serde_json::Value;
 use std::path::PathBuf;
 
 const DEFAULT_CODEX_RESPONSES_URL: &str = "https://chatgpt.com/backend-api/codex/responses";
-const CODEX_RESPONSES_URL_ENV: &str = "ZEROCLAW_CODEX_RESPONSES_URL";
-const CODEX_BASE_URL_ENV: &str = "ZEROCLAW_CODEX_BASE_URL";
+const CODEX_RESPONSES_URL_ENV: &str = "NARAECLAW_CODEX_RESPONSES_URL";
+const LEGACY_CODEX_RESPONSES_URL_ENV: &str = "ZEROCLAW_CODEX_RESPONSES_URL";
+const CODEX_BASE_URL_ENV: &str = "NARAECLAW_CODEX_BASE_URL";
+const LEGACY_CODEX_BASE_URL_ENV: &str = "ZEROCLAW_CODEX_BASE_URL";
 const DEFAULT_CODEX_INSTRUCTIONS: &str =
     "You are NaraeClaw, a concise and helpful coding assistant.";
 
@@ -155,6 +157,7 @@ fn build_responses_url(base_or_endpoint: &str) -> anyhow::Result<String> {
 
 fn resolve_responses_url(options: &ProviderRuntimeOptions) -> anyhow::Result<String> {
     if let Some(endpoint) = std::env::var(CODEX_RESPONSES_URL_ENV)
+        .or_else(|_| std::env::var(LEGACY_CODEX_RESPONSES_URL_ENV))
         .ok()
         .and_then(|value| first_nonempty(Some(&value)))
     {
@@ -162,6 +165,7 @@ fn resolve_responses_url(options: &ProviderRuntimeOptions) -> anyhow::Result<Str
     }
 
     if let Some(base_url) = std::env::var(CODEX_BASE_URL_ENV)
+        .or_else(|_| std::env::var(LEGACY_CODEX_BASE_URL_ENV))
         .ok()
         .and_then(|value| first_nonempty(Some(&value)))
     {
@@ -310,6 +314,7 @@ fn clamp_reasoning_effort(model: &str, effort: &str) -> String {
 fn resolve_reasoning_effort(model_id: &str, configured: Option<&str>) -> String {
     let raw = configured
         .map(ToString::to_string)
+        .or_else(|| std::env::var("NARAECLAW_CODEX_REASONING_EFFORT").ok())
         .or_else(|| std::env::var("ZEROCLAW_CODEX_REASONING_EFFORT").ok())
         .and_then(|value| first_nonempty(Some(&value)))
         .unwrap_or_else(|| "xhigh".to_string())

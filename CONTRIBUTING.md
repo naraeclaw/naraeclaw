@@ -101,25 +101,25 @@ The repo includes a pre-push hook in `.githooks/` that enforces `./scripts/ci/ru
 For an opt-in strict lint pass during pre-push, set:
 
 ```bash
-ZEROCLAW_STRICT_LINT=1 git push
+NARAECLAW_STRICT_LINT=1 git push
 ```
 
 For an opt-in strict lint delta pass during pre-push (changed Rust lines only), set:
 
 ```bash
-ZEROCLAW_STRICT_DELTA_LINT=1 git push
+NARAECLAW_STRICT_DELTA_LINT=1 git push
 ```
 
 For an opt-in docs quality pass during pre-push (changed-line markdown gate), set:
 
 ```bash
-ZEROCLAW_DOCS_LINT=1 git push
+NARAECLAW_DOCS_LINT=1 git push
 ```
 
 For an opt-in docs links pass during pre-push (added-links gate), set:
 
 ```bash
-ZEROCLAW_DOCS_LINKS=1 git push
+NARAECLAW_DOCS_LINKS=1 git push
 ```
 
 For full CI parity in Docker, run:
@@ -147,10 +147,10 @@ NaraeClaw supports layered secret management for local development and CI hygien
     - `.env` files are Git-ignored and should stay local
     - Best for temporary/local API keys
 
-2. **Config file** (`~/.zeroclaw/config.toml`)
+2. **Config file** (`~/.naraeclaw/config.toml`)
     - Persistent setup for long-term use
     - When `secrets.encrypt = true` (default), secret values are encrypted before save
-    - Secret key is stored at `~/.zeroclaw/.secret_key` with restricted permissions
+    - Secret key is stored at `~/.naraeclaw/.secret_key` with restricted permissions
     - Use `naraeclaw onboard` for guided setup
 
 ### Runtime Resolution Rules
@@ -159,12 +159,12 @@ API key resolution follows this order:
 
 1. Explicit key passed from config/CLI
 2. Provider-specific env vars (`OPENROUTER_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, ...)
-3. Generic env vars (`ZEROCLAW_API_KEY`, `API_KEY`)
+3. Generic env vars (`NARAECLAW_API_KEY`, `API_KEY`)
 
 Provider/model config overrides:
 
-- `ZEROCLAW_PROVIDER` / `PROVIDER`
-- `ZEROCLAW_MODEL`
+- `NARAECLAW_PROVIDER` / `PROVIDER`
+- `NARAECLAW_MODEL`
 
 See `.env.example` for practical examples and currently supported provider key env vars.
 
@@ -211,7 +211,7 @@ If gitleaks is not installed, the pre-commit hook prints a warning and continues
 - API keys, tokens, passwords, or credentials (plain or encrypted)
 - OAuth tokens or session identifiers
 - Webhook signing secrets
-- `~/.zeroclaw/.secret_key` or similar key files
+- `~/.naraeclaw/.secret_key` or similar key files
 - Personal identifiers or real user data in tests/fixtures
 
 ### If a Secret Is Committed Accidentally
@@ -492,8 +492,8 @@ pub struct ChannelsConfig {
 ```
 
 That's it. The `#[secret]` annotation automatically:
-- Includes the field in `zeroclaw props list --secrets`
-- Makes it settable via `zeroclaw props set channels.your-channel.bot-token`
+- Includes the field in `naraeclaw props list --secrets`
+- Makes it settable via `naraeclaw props set channels.your-channel.bot-token`
 - Encrypts it on config save and decrypts on load
 - Converts the field name from `snake_case` to `kebab-case` in the CLI
 
