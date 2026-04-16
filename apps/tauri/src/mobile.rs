@@ -2,5 +2,5 @@
 
 #[tauri::mobile_entry_point]
 fn main() {
-    zeroclaw_desktop::run();
+    naraeclaw_desktop::run();
 }
