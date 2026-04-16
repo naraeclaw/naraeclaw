@@ -315,10 +315,10 @@ export default function Cron() {
         <div className="glass-card px-4 py-3 flex items-center justify-between">
           <div>
             <span className="text-sm font-medium" style={{ color: 'var(--pc-text-primary)' }}>
-              Catch up missed jobs on startup
+              시작 시 놓친 작업 실행
             </span>
             <p className="text-xs mt-0.5" style={{ color: 'var(--pc-text-muted)' }}>
-              Run all overdue jobs when ZeroClaw starts after downtime
+              NaraeClaw가 중단 후 다시 시작되면 기한이 지난 작업을 실행합니다
             </p>
           </div>
           <button
