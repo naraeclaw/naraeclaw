@@ -207,7 +207,7 @@ fn default_allowed_commands() -> Vec<String> {
         "pip".into(),
         "node".into(),
     ];
-    // `free` is Linux-only; it does not exist on macOS or other BSDs.
+    // `free` is Linux-only; it does not exist on macOS.
     #[cfg(target_os = "linux")]
     cmds.push("free".into());
     cmds

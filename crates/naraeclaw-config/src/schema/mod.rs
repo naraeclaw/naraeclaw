@@ -472,8 +472,8 @@ async fn resolve_runtime_config_dirs(
 
 fn config_dir_creation_error(path: &Path) -> String {
     format!(
-        "Failed to create config directory: {}. If running as an OpenRC service, \
-         ensure this path is writable by user 'naraeclaw'.",
+        "Failed to create config directory: {}. Ensure the configured path is writable by the \
+         user running naraeclaw.",
         path.display()
     )
 }
@@ -2012,10 +2012,9 @@ mod tests {
     }
 
     #[test]
-    async fn config_dir_creation_error_mentions_openrc_and_path() {
+    async fn config_dir_creation_error_mentions_path() {
         let msg = config_dir_creation_error(Path::new("/etc/naraeclaw"));
         assert!(msg.contains("/etc/naraeclaw"));
-        assert!(msg.contains("OpenRC"));
         assert!(msg.contains("naraeclaw"));
     }
 
@@ -2102,7 +2101,7 @@ mod tests {
     async fn runtime_config_default() {
         let r = RuntimeConfig::default();
         assert_eq!(r.kind, "native");
-        assert_eq!(r.docker.image, "alpine:3.20");
+        assert_eq!(r.docker.image, "debian:bookworm-slim");
         assert_eq!(r.docker.network, "none");
         assert_eq!(r.docker.memory_limit_mb, Some(512));
         assert_eq!(r.docker.cpu_limit, Some(1.0));

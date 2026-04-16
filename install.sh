@@ -140,8 +140,6 @@ Environment:
   NARAECLAW_CARGO_FEATURES    Extra cargo features for source builds (comma/space separated)
   NARAECLAW_BOOTSTRAP_MIN_RAM_MB   Minimum RAM threshold for source build preflight (default: 2048)
   NARAECLAW_BOOTSTRAP_MIN_DISK_MB  Minimum free disk threshold for source build preflight (default: 6144)
-  NARAECLAW_DISABLE_ALPINE_AUTO_DEPS
-                            Set to 1 to disable Alpine auto-install of missing prerequisites
 USAGE
 }
 
@@ -208,28 +206,11 @@ get_available_disk_mb() {
   fi
 }
 
-is_musl_linux() {
-  [[ "$(uname -s)" == "Linux" ]] || return 1
-
-  if [[ -f /etc/alpine-release ]]; then
-    return 0
-  fi
-
-  if have_cmd ldd && ldd --version 2>&1 | grep -qi 'musl'; then
-    return 0
-  fi
-
-  return 1
-}
-
 detect_release_target() {
   local os arch
   os="$(uname -s)"
   arch="$(uname -m)"
 
-  if is_musl_linux; then
-    return 1
-  fi
 
   case "$os:$arch" in
     Linux:x86_64)
@@ -237,12 +218,6 @@ detect_release_target() {
       ;;
     Linux:aarch64|Linux:arm64)
       echo "aarch64-unknown-linux-gnu"
-      ;;
-    Linux:armv7l)
-      echo "armv7-unknown-linux-gnueabihf"
-      ;;
-    Linux:armv6l)
-      echo "arm-unknown-linux-gnueabihf"
       ;;
     Darwin:x86_64)
       echo "x86_64-apple-darwin"
@@ -274,13 +249,6 @@ detect_device_class() {
       echo "desktop"
       ;;
     Linux)
-      # Raspberry Pi / ARM SBCs — treat as embedded (typically headless)
-      case "$arch" in
-        armv6l|armv7l)
-          echo "embedded"
-          return
-          ;;
-      esac
       # Check for a display server (X11 or Wayland)
       if [[ -n "${DISPLAY:-}" || -n "${WAYLAND_DISPLAY:-}" || -n "${XDG_SESSION_TYPE:-}" ]]; then
         echo "desktop"
@@ -368,11 +336,6 @@ install_prebuilt_binary() {
     return 1
   fi
 
-  if is_musl_linux; then
-    warn "Pre-built release binaries are not published for musl/Alpine yet."
-    warn "Falling back to source build."
-    return 1
-  fi
 
   target="$(detect_release_target || true)"
   if [[ -z "$target" ]]; then
@@ -481,46 +444,13 @@ run_pacman() {
   return "$pacman_rc"
 }
 
-ALPINE_PREREQ_PACKAGES=(
-  bash
-  build-base
-  pkgconf
-  git
-  curl
-  openssl-dev
-  perl
-  ca-certificates
-)
-ALPINE_MISSING_PKGS=()
-
-find_missing_alpine_prereqs() {
-  ALPINE_MISSING_PKGS=()
-  if ! have_cmd apk; then
-    return 0
-  fi
-
-  local pkg=""
-  for pkg in "${ALPINE_PREREQ_PACKAGES[@]}"; do
-    if ! apk info -e "$pkg" >/dev/null 2>&1; then
-      ALPINE_MISSING_PKGS+=("$pkg")
-    fi
-  done
-}
 
 install_system_deps() {
   step_dot "Installing system dependencies"
 
   case "$(uname -s)" in
     Linux)
-      if have_cmd apk; then
-        find_missing_alpine_prereqs
-        if [[ ${#ALPINE_MISSING_PKGS[@]} -eq 0 ]]; then
-          step_ok "Alpine prerequisites already installed"
-        else
-          step_dot "Installing Alpine prerequisites: ${ALPINE_MISSING_PKGS[*]}"
-          run_privileged apk add --no-cache "${ALPINE_MISSING_PKGS[@]}"
-        fi
-      elif have_cmd apt-get; then
+      if have_cmd apt-get; then
         run_privileged apt-get update -qq
         run_privileged apt-get install -y build-essential pkg-config git curl libssl-dev
       elif have_cmd dnf; then
@@ -1035,14 +965,6 @@ if [[ "$DOCKER_MODE" == true ]]; then
       warn "--install-rust is ignored with --docker."
   fi
 else
-  if [[ "$OS_NAME" == "Linux" && -z "${NARAECLAW_DISABLE_ALPINE_AUTO_DEPS:-}" ]] && have_cmd apk; then
-    find_missing_alpine_prereqs
-    if [[ ${#ALPINE_MISSING_PKGS[@]} -gt 0 && "$INSTALL_SYSTEM_DEPS" == false ]]; then
-      info "Detected Alpine with missing prerequisites: ${ALPINE_MISSING_PKGS[*]}"
-      info "Auto-enabling system dependency installation (set NARAECLAW_DISABLE_ALPINE_AUTO_DEPS=1 to disable)."
-      INSTALL_SYSTEM_DEPS=true
-    fi
-  fi
 
   if [[ "$INSTALL_SYSTEM_DEPS" == true ]]; then
     install_system_deps
@@ -1216,11 +1138,7 @@ if [[ "$FORCE_SOURCE_BUILD" == false ]]; then
       SKIP_BUILD=true
       SKIP_INSTALL=true
     elif [[ "$PREBUILT_ONLY" == true ]]; then
-      if is_musl_linux; then
-        error "Pre-built-only mode is not supported on musl/Alpine because releases do not include musl assets yet."
-      else
-        error "Pre-built-only mode requested, but no compatible release asset is available."
-      fi
+      error "Pre-built-only mode requested, but no compatible release asset is available."
       error "Try again later, or run with --force-source-build on a machine with enough RAM/disk."
       exit 1
     else
@@ -1272,17 +1190,6 @@ if [[ "$SKIP_BUILD" == false ]]; then
     cargo clean --release 2>/dev/null || true
   fi
 
-  # Determine cargo feature flags — disable prometheus on 32-bit targets
-  # (prometheus crate requires AtomicU64, unavailable on armv7l/armv6l)
-  _build_arch="$(uname -m)"
-  case "$_build_arch" in
-    armv7l|armv6l|armhf)
-      step_dot "32-bit ARM detected ($_build_arch) — disabling prometheus (requires 64-bit atomics)"
-      CARGO_NO_DEFAULT_FEATURES=true
-      append_cargo_feature "channel-nostr"
-      append_cargo_feature "skill-creation"
-      ;;
-  esac
   refresh_cargo_feature_args
   if [[ ${#CARGO_FEATURE_ARGS[@]} -gt 0 ]]; then
     step_dot "Cargo feature flags: ${CARGO_FEATURE_ARGS[*]}"
@@ -1384,12 +1291,6 @@ if [[ "$DEVICE_CLASS" == "desktop" ]]; then
 elif [[ "$DEVICE_CLASS" != "desktop" ]]; then
   # Non-desktop device — explain why companion app is not offered
   case "$DEVICE_CLASS" in
-    mobile)
-      step_dot "Mobile device — use the web dashboard at http://127.0.0.1:42617"
-      ;;
-    embedded)
-      step_dot "Embedded device ($(uname -m)) — use the web dashboard"
-      ;;
     container)
       step_dot "Container runtime — use the web dashboard"
       ;;

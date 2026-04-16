@@ -160,7 +160,7 @@ mod tests {
     #[test]
     fn docker_build_shell_command_includes_runtime_flags() {
         let cfg = DockerRuntimeConfig {
-            image: "alpine:3.20".into(),
+            image: "debian:bookworm-slim".into(),
             network: "none".into(),
             memory_limit_mb: Some(128),
             cpu_limit: Some(1.5),

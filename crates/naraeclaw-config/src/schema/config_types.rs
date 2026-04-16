@@ -2021,7 +2021,7 @@ pub fn default_runtime_kind() -> String {
 }
 
 pub fn default_docker_image() -> String {
-    "alpine:3.20".into()
+    "debian:bookworm-slim".into()
 }
 
 pub fn default_docker_network() -> String {
