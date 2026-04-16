@@ -25,7 +25,7 @@ Use this section for quick operational routing.
 
 Go to:
 
-- [Section 4](#4-mode-a--proxy-only-for-zeroclaw-internals)
+- [Section 4](#4-mode-a--proxy-only-for-naraeclaw-internals)
 
 ### 1.2 Proxy only selected services
 
@@ -63,7 +63,7 @@ Go to:
 
 | Scope | Affects | Exports env vars | Typical use |
 |---|---|---|---|
-| `zeroclaw` | NaraeClaw internal HTTP clients | No | Normal runtime proxying without process-level side effects |
+| `naraeclaw` | NaraeClaw internal HTTP clients | No | Normal runtime proxying without process-level side effects |
 | `services` | Only selected service keys/selectors | No | Fine-grained routing for specific providers/tools/channels |
 | `environment` | Runtime + process environment proxy variables | Yes | Integrations that require `HTTP_PROXY`/`HTTPS_PROXY`/`ALL_PROXY` |
 

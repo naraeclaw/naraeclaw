@@ -505,7 +505,7 @@ user_agent = "NaraeClaw/1.0"
 [proxy]
 enabled = false
 no_proxy = []
-scope = "zeroclaw"
+scope = "naraeclaw"
 services = []
 
 [identity]

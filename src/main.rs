@@ -913,7 +913,7 @@ async fn main() -> Result<()> {
     // Onboard auto-detects the environment: if stdin/stdout are a TTY and no
     // provider flags were given, it runs the full interactive wizard; otherwise
     // it runs the quick (scriptable) setup.  Use --quick to force quick setup,
-    // or set ZEROCLAW_INTERACTIVE=1 to force interactive mode when TTY
+    // or set NARAECLAW_INTERACTIVE=1 to force interactive mode when TTY
     // detection fails.  This means `curl … | bash` and
     // `naraeclaw onboard --api-key …` both take the fast path, while a bare
     // `naraeclaw onboard` in a terminal launches the wizard.

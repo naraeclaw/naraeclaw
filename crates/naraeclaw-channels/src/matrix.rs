@@ -399,7 +399,7 @@ impl MatrixChannel {
         }
 
         // Generate a new device_id
-        let device_id = format!("ZEROCLAW_{}", &uuid::Uuid::new_v4().to_string()[..8]);
+        let device_id = format!("NARAECLAW_{}", &uuid::Uuid::new_v4().to_string()[..8]);
         tracing::info!(
             "Matrix auto-generated device_id '{}'. \
              To keep this device stable, it has been saved locally. \
@@ -859,7 +859,7 @@ impl Channel for MatrixChannel {
         if self.voice_mode.load(Ordering::Relaxed) {
             self.voice_mode.store(false, Ordering::Relaxed);
             tracing::info!("Voice mode active, generating TTS reply");
-            let voice_work = std::path::PathBuf::from("/tmp/zeroclaw-voice");
+            let voice_work = std::path::PathBuf::from("/tmp/naraeclaw-voice");
             let _ = tokio::fs::create_dir_all(&voice_work).await;
             let mp3_path = voice_work.join("reply.mp3");
 
@@ -1878,12 +1878,12 @@ mod tests {
             vec![],
             None,
             None,
-            Some(PathBuf::from("/tmp/zeroclaw")),
+            Some(PathBuf::from("/tmp/naraeclaw")),
         );
 
         assert_eq!(
             ch.matrix_store_dir(),
-            Some(PathBuf::from("/tmp/zeroclaw/state/matrix"))
+            Some(PathBuf::from("/tmp/naraeclaw/state/matrix"))
         );
     }
 
