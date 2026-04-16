@@ -10,7 +10,7 @@
 #   5. Context overflow recovery (stress test)
 #
 # Usage:
-#   docker exec zeroclaw-dev bash /naraeclaw-data/workspace/test-harness.sh
+#   docker exec naraeclaw-dev bash /naraeclaw-data/workspace/test-harness.sh
 #   or: ./dev/test-harness.sh  (if running on host with gateway at localhost:42617)
 #
 # Prerequisites:
@@ -21,8 +21,8 @@
 
 set -euo pipefail
 
-BASE_URL="${ZEROCLAW_GATEWAY_URL:-http://localhost:42617}"
-WS_URL="${ZEROCLAW_WS_URL:-ws://localhost:42617/ws/chat}"
+BASE_URL="${NARAECLAW_GATEWAY_URL:-${ZEROCLAW_GATEWAY_URL:-http://localhost:42617}}"
+WS_URL="${NARAECLAW_WS_URL:-${ZEROCLAW_WS_URL:-ws://localhost:42617/ws/chat}}"
 PASS=0
 FAIL=0
 SKIP=0

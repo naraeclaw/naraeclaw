@@ -27,13 +27,13 @@ Run all commands from the repository root using the helper script:
 
 Builds the agent from source and starts both containers.
 
-### 2. Enter Agent Container (`zeroclaw-dev`)
+### 2. Enter Agent Container (`naraeclaw-dev`)
 
 ```bash
 ./dev/cli.sh agent
 ```
 
-Use this to run `zeroclaw` CLI commands manually, debug the binary, or check logs internally.
+Use this to run `naraeclaw` CLI commands manually, debug the binary, or check logs internally.
 
 - **Path**: `/naraeclaw-data`
 - **User**: `nobody` (65534)
@@ -60,7 +60,7 @@ Use this to act as the "user" or "environment" the agent interacts with.
     ```bash
     ./dev/cli.sh agent
     # inside container:
-    zeroclaw --version
+    naraeclaw --version
     ```
 
 ### 5. Persistence & Shared Workspace
@@ -154,7 +154,7 @@ Note: local `deny` focuses on license/source policy; advisory scanning is handle
 
 ### Isolation model
 
-- Rust compilation, tests, and audit/deny tools run in `zeroclaw-local-ci` container.
+- Rust compilation, tests, and audit/deny tools run in `naraeclaw-local-ci` container.
 - Your host filesystem is mounted at `/workspace`; no host Rust toolchain is required.
 - Cargo build artifacts are written to container volume `/ci-target` (not your host `target/`).
 - Docker smoke stage uses your Docker daemon to build image layers, but build steps execute in containers.
@@ -162,7 +162,7 @@ Note: local `deny` focuses on license/source policy; advisory scanning is handle
 ### Build cache notes
 
 - Both `Dockerfile` and `dev/ci/Dockerfile` use BuildKit cache mounts for Cargo registry/git data.
-- The root `Dockerfile` also caches Rust `target/` (`id=zeroclaw-target`) to speed repeat local image builds.
+- The root `Dockerfile` also caches Rust `target/` (the shared Rust target cache) to speed repeat local image builds.
 - Local CI reuses named Docker volumes for Cargo registry/git and target outputs.
 - `./dev/ci.sh docker-smoke` and `./dev/ci.sh all` now use `docker buildx` local cache at `.cache/buildx-smoke` when available.
 - The CI image keeps Rust toolchain defaults from `rust:1.92-slim` and installs pinned toolchain `1.92.0` (no custom `CARGO_HOME`/`RUSTUP_HOME` overrides), preventing repeated toolchain bootstrapping on each run.

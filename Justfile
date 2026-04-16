@@ -41,7 +41,7 @@ build-debug:
 clean:
     cargo clean
 
-# Run zeroclaw with example config (for development)
+# Run naraeclaw with example config (for development)
 dev *ARGS:
     cargo run -- {{ARGS}}
 
