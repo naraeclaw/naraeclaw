@@ -13,7 +13,7 @@ Treat privacy and neutrality as merge gates, not best-effort guidelines.
 - If identity-like context is unavoidable, use NaraeClaw-scoped roles/labels only (e.g., `NaraeClawAgent`, `NaraeClawOperator`, `zeroclaw_user`).
 - Recommended identity-safe naming palette:
     - actor labels: `NaraeClawAgent`, `NaraeClawOperator`, `NaraeClawMaintainer`, `zeroclaw_user`
-    - service/runtime labels: `zeroclaw_bot`, `zeroclaw_service`, `zeroclaw_runtime`, `zeroclaw_node`
+    - service/runtime labels: `zeroclaw_bot`, `zeroclaw_service`, `naraeclaw_runtime`, `zeroclaw_node`
     - environment labels: `zeroclaw_project`, `zeroclaw_workspace`, `zeroclaw_channel`
 - If reproducing external incidents, redact and anonymize all payloads before committing.
 - Before push, review `git diff --cached` specifically for accidental sensitive strings and identity leakage.

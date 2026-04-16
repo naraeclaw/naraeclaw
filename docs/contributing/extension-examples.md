@@ -21,7 +21,7 @@ The `spec()` method has a default implementation that composes the others.
 Register your tool in `src/tools/mod.rs` via `default_tools()`.
 
 ```rust
-// In your crate: use zeroclaw::tools::traits::{Tool, ToolResult};
+// In your crate: use naraeclaw::tools::traits::{Tool, ToolResult};
 
 use anyhow::Result;
 use async_trait::async_trait;
@@ -89,7 +89,7 @@ and reaction methods (`add_reaction`, `remove_reaction`).
 Register your channel in `src/channels/mod.rs` and add config to `ChannelsConfig` in `src/config/schema.rs`.
 
 ```rust
-// In your crate: use zeroclaw::channels::traits::{Channel, ChannelMessage, SendMessage};
+// In your crate: use naraeclaw::channels::traits::{Channel, ChannelMessage, SendMessage};
 
 use anyhow::Result;
 use async_trait::async_trait;
@@ -210,7 +210,7 @@ streaming methods return empty/error streams by default.
 Register your provider in `src/providers/mod.rs`.
 
 ```rust
-// In your crate: use zeroclaw::providers::traits::Provider;
+// In your crate: use naraeclaw::providers::traits::Provider;
 
 use anyhow::Result;
 use async_trait::async_trait;
@@ -281,7 +281,7 @@ Both `store()` and `recall()` accept an optional `session_id` for scoping.
 Register your backend in `src/memory/mod.rs`.
 
 ```rust
-// In your crate: use zeroclaw::memory::traits::{Memory, MemoryEntry, MemoryCategory};
+// In your crate: use naraeclaw::memory::traits::{Memory, MemoryEntry, MemoryCategory};
 
 use async_trait::async_trait;
 use std::collections::HashMap;

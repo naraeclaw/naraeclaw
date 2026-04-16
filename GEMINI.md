@@ -12,16 +12,16 @@
 The project is a modular Rust workspace, recently refactored for maximum maintainability:
 
 - **`naraeclaw` (Binary):** CLI entry point in `src/main.rs`.
-- **`zeroclaw-runtime`:** The core engine.
+- **`naraeclaw-runtime`:** The core engine.
   - `agent/`: Main execution loop with anti-narration and integrated scrubbing.
   - `security/`: **CredentialFilter** (unified leak detection), **SecretStore** (AEAD), and sandbox.
-- **`zeroclaw-channels`:** Platform integrations.
+- **`naraeclaw-channels`:** Platform integrations.
   - Optimized for **Telegram Webhooks**.
   - Uses a **Feature-gate system** to exclude non-core channels, minimizing binary size.
-- **`zeroclaw-config`:** Highly modularized configuration system.
+- **`naraeclaw-config`:** Highly modularized configuration system.
   - **`schema/` Directory:** Formerly a single 17k line file, now split into `mod.rs`, `config_types.rs`, `channels.rs`, `providers.rs`, `security.rs`, `tools.rs`, and `automation.rs`.
   - **Security Macros**: Automatically implements `Zeroize` on Drop for `#[secret]` fields.
-- **`zeroclaw-providers`:** LLM backend factory with centralized environment key management.
+- **`naraeclaw-providers`:** LLM backend factory with centralized environment key management.
 
 ## Development & Security Guide
 
@@ -41,7 +41,7 @@ The project is a modular Rust workspace, recently refactored for maximum maintai
 
 ## Key Files & Modules
 - `src/main.rs`: CLI definitions and thread-safe early initialization.
-- `crates/zeroclaw-runtime/src/security/leak_detector.rs`: The **CredentialFilter** engine.
-- `crates/zeroclaw-config/src/schema/mod.rs`: Entry point for the modularized config system.
-- `crates/zeroclaw-channels/src/telegram.rs`: Telegram Webhook implementation.
+- `crates/naraeclaw-runtime/src/security/leak_detector.rs`: The **CredentialFilter** engine.
+- `crates/naraeclaw-config/src/schema/mod.rs`: Entry point for the modularized config system.
+- `crates/naraeclaw-channels/src/telegram.rs`: Telegram Webhook implementation.
 - `Plan.md`: Historical record of architectural evolution and future roadmap.

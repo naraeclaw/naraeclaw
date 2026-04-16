@@ -281,7 +281,7 @@ From now on, even if the local crypto store is deleted, NaraeClaw will recover a
 For detailed E2EE diagnostics, run NaraeClaw with debug-level logging for the Matrix channel:
 
 ```bash
-RUST_LOG=zeroclaw::channels::matrix=debug naraeclaw daemon
+RUST_LOG=naraeclaw::channels::matrix=debug naraeclaw daemon
 ```
 
 This surfaces:
@@ -294,7 +294,7 @@ This surfaces:
 For even more detail from the Matrix SDK itself:
 
 ```bash
-RUST_LOG=zeroclaw::channels::matrix=debug,matrix_sdk_crypto=debug naraeclaw daemon
+RUST_LOG=naraeclaw::channels::matrix=debug,matrix_sdk_crypto=debug naraeclaw daemon
 ```
 
 ---

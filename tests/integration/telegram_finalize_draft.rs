@@ -1,8 +1,8 @@
+use naraeclaw::channels::Channel;
+use naraeclaw::channels::telegram::TelegramChannel;
 use serde_json::json;
 use wiremock::matchers::{body_partial_json, method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
-use zeroclaw::channels::Channel;
-use zeroclaw::channels::telegram::TelegramChannel;
 
 fn test_channel(mock_url: &str) -> TelegramChannel {
     TelegramChannel::new("TEST_TOKEN".into(), vec!["*".into()], false)

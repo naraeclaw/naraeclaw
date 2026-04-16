@@ -1,1 +1,1 @@
-pub use zeroclaw_channels::nostr::*;
+pub use naraeclaw_channels::nostr::*;

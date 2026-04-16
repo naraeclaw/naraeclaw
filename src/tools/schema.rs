@@ -1,1 +1,1 @@
-pub use zeroclaw_api::schema::*;
+pub use naraeclaw_api::schema::*;

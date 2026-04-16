@@ -147,7 +147,7 @@ mod verifiable_intent;
 use config::Config;
 
 // Re-export so binary modules can use crate::<CommandEnum> while keeping a single source of truth.
-pub use zeroclaw::{
+pub use naraeclaw::{
     ChannelCommands, CronCommands, GatewayCommands, IntegrationCommands, MigrateCommands,
     ServiceCommands, SkillCommands, SopCommands,
 };
@@ -277,7 +277,7 @@ AI 에이전트 루프를 시작합니다.
   naraeclaw gateway get-paircode       # 페어링 코드 확인")]
     Gateway {
         #[command(subcommand)]
-        gateway_command: Option<zeroclaw::GatewayCommands>,
+        gateway_command: Option<naraeclaw::GatewayCommands>,
     },
 
     /// ACP (Agent Control Protocol) 서버 시작 (stdio)
@@ -1098,8 +1098,10 @@ async fn main() -> Result<()> {
                 config.default_temperature = final_temperature;
 
                 let provider_name = config.default_provider.as_deref().unwrap_or("openai");
-                let provider =
-                    zeroclaw::providers::create_provider(provider_name, config.api_key.as_deref())?;
+                let provider = naraeclaw::providers::create_provider(
+                    provider_name,
+                    config.api_key.as_deref(),
+                )?;
                 match message {
                     Some(msg) => {
                         let response = provider
@@ -1156,8 +1158,8 @@ async fn main() -> Result<()> {
         } => {
             let final_temperature = temperature.unwrap_or(config.default_temperature);
 
-            zeroclaw_runtime::agent::loop_::register_cli_channel_fn(Box::new(|| {
-                Box::new(zeroclaw_channels::cli::CliChannel::new())
+            naraeclaw_runtime::agent::loop_::register_cli_channel_fn(Box::new(|| {
+                Box::new(naraeclaw_channels::cli::CliChannel::new())
             }));
 
             Box::pin(agent::run(
@@ -1192,7 +1194,7 @@ async fn main() -> Result<()> {
 
         Commands::Gateway { gateway_command } => {
             match gateway_command {
-                Some(zeroclaw::GatewayCommands::Restart { port, host }) => {
+                Some(naraeclaw::GatewayCommands::Restart { port, host }) => {
                     let (port, host) = resolve_gateway_addr(&config, port, host);
                     let addr = format!("{host}:{port}");
                     info!("🔄 Restarting NaraeClaw Gateway on {addr}");
@@ -1228,7 +1230,7 @@ async fn main() -> Result<()> {
                     log_gateway_start(&host, port);
                     Box::pin(run_gateway_if_enabled(&host, port, config, None)).await
                 }
-                Some(zeroclaw::GatewayCommands::GetPaircode { new }) => {
+                Some(naraeclaw::GatewayCommands::GetPaircode { new }) => {
                     let port = config.gateway.port;
                     let host = &config.gateway.host;
 
@@ -1276,7 +1278,7 @@ async fn main() -> Result<()> {
                     }
                     Ok(())
                 }
-                Some(zeroclaw::GatewayCommands::Start { port, host }) => {
+                Some(naraeclaw::GatewayCommands::Start { port, host }) => {
                     let (port, host) = resolve_gateway_addr(&config, port, host);
                     log_gateway_start(&host, port);
                     Box::pin(run_gateway_if_enabled(&host, port, config, None)).await
@@ -1310,16 +1312,16 @@ async fn main() -> Result<()> {
             }
             // Wire CLI channel for interactive mode
             #[cfg(feature = "agent-runtime")]
-            zeroclaw_runtime::agent::loop_::register_cli_channel_fn(Box::new(|| {
-                Box::new(zeroclaw_channels::cli::CliChannel::new())
+            naraeclaw_runtime::agent::loop_::register_cli_channel_fn(Box::new(|| {
+                Box::new(naraeclaw_channels::cli::CliChannel::new())
             }));
 
             // Wire cron delivery to the channels orchestrator
             #[cfg(feature = "agent-runtime")]
-            zeroclaw_runtime::cron::scheduler::register_delivery_fn(Box::new(
+            naraeclaw_runtime::cron::scheduler::register_delivery_fn(Box::new(
                 |config, channel, target, output| {
                     Box::pin(async move {
-                        zeroclaw_channels::orchestrator::deliver_announcement(
+                        naraeclaw_channels::orchestrator::deliver_announcement(
                             &config, &channel, &target, &output,
                         )
                         .await
@@ -1331,26 +1333,26 @@ async fn main() -> Result<()> {
                 #[cfg(feature = "gateway")]
                 gateway_start: Some(Box::new(|host, port, config, tx| {
                     Box::pin(async move {
-                        Box::pin(zeroclaw_gateway::run_gateway(&host, port, config, tx)).await
+                        Box::pin(naraeclaw_gateway::run_gateway(&host, port, config, tx)).await
                     })
                 })),
                 #[cfg(not(feature = "gateway"))]
                 gateway_start: None,
                 channels_start: Some(Box::new(|config| {
                     Box::pin(async move {
-                        Box::pin(zeroclaw_channels::orchestrator::start_channels(config)).await
+                        Box::pin(naraeclaw_channels::orchestrator::start_channels(config)).await
                     })
                 })),
                 mqtt_start: Some(Box::new(|mqtt_config| {
                     Box::pin(async move {
+                        use naraeclaw_config::schema::SopConfig;
+                        use naraeclaw_memory::NoneMemory;
+                        use naraeclaw_runtime::sop::{SopAuditLogger, SopEngine};
                         use std::sync::{Arc, Mutex};
-                        use zeroclaw_config::schema::SopConfig;
-                        use zeroclaw_memory::NoneMemory;
-                        use zeroclaw_runtime::sop::{SopAuditLogger, SopEngine};
 
                         let engine = Arc::new(Mutex::new(SopEngine::new(SopConfig::default())));
                         let audit = Arc::new(SopAuditLogger::new(Arc::new(NoneMemory)));
-                        zeroclaw_channels::orchestrator::mqtt::run_mqtt_sop_listener(
+                        naraeclaw_channels::orchestrator::mqtt::run_mqtt_sop_listener(
                             &mqtt_config,
                             engine,
                             audit,
@@ -1920,7 +1922,7 @@ async fn main() -> Result<()> {
         #[cfg(feature = "plugins-wasm")]
         Commands::Plugin { plugin_command } => match plugin_command {
             PluginCommands::List => {
-                let host = zeroclaw::plugins::host::PluginHost::new(&config.workspace_dir)?;
+                let host = naraeclaw::plugins::host::PluginHost::new(&config.workspace_dir)?;
                 let plugins = host.list_plugins();
                 if plugins.is_empty() {
                     println!("No plugins installed.");
@@ -1938,19 +1940,19 @@ async fn main() -> Result<()> {
                 Ok(())
             }
             PluginCommands::Install { source } => {
-                let mut host = zeroclaw::plugins::host::PluginHost::new(&config.workspace_dir)?;
+                let mut host = naraeclaw::plugins::host::PluginHost::new(&config.workspace_dir)?;
                 host.install(&source)?;
                 println!("Plugin installed from {source}");
                 Ok(())
             }
             PluginCommands::Remove { name } => {
-                let mut host = zeroclaw::plugins::host::PluginHost::new(&config.workspace_dir)?;
+                let mut host = naraeclaw::plugins::host::PluginHost::new(&config.workspace_dir)?;
                 host.remove(&name)?;
                 println!("Plugin '{name}' removed.");
                 Ok(())
             }
             PluginCommands::Info { name } => {
-                let host = zeroclaw::plugins::host::PluginHost::new(&config.workspace_dir)?;
+                let host = naraeclaw::plugins::host::PluginHost::new(&config.workspace_dir)?;
                 match host.get_plugin(&name) {
                     Some(info) => {
                         println!("Plugin: {} v{}", info.name, info.version);
@@ -3005,7 +3007,7 @@ async fn handle_auth_command(auth_command: AuthCommands, config: &Config) -> Res
 async fn run_gateway_if_enabled(
     host: &str,
     port: u16,
-    config: zeroclaw::config::Config,
+    config: naraeclaw::config::Config,
     tx: Option<tokio::sync::broadcast::Sender<serde_json::Value>>,
 ) -> anyhow::Result<()> {
     Box::pin(gateway::run_gateway(host, port, config, tx)).await
@@ -3016,7 +3018,7 @@ async fn run_gateway_if_enabled(
 async fn run_gateway_if_enabled(
     _host: &str,
     _port: u16,
-    _config: zeroclaw::config::Config,
+    _config: naraeclaw::config::Config,
     _tx: Option<tokio::sync::broadcast::Sender<serde_json::Value>>,
 ) -> anyhow::Result<()> {
     anyhow::bail!("Gateway feature is not enabled. Rebuild with --features gateway")

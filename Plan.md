@@ -48,7 +48,7 @@
 > 목표: CLI + 브라우저 조합 → **NaraeClaw 단일 데스크탑 앱** (macOS 우선)
 >
 > 현황: Tauri 2.0 앱(`apps/tauri/`), React 19 프론트엔드(`/web/src/`),
-> Axum Gateway(`zeroclaw-gateway`)가 이미 골격 구현돼 있음.
+> Axum Gateway(`naraeclaw-gateway`)가 이미 골격 구현돼 있음.
 > Gateway가 에이전트 런타임을 인프로세스로 임베드하고,
 > Tauri 앱은 WebView로 Gateway의 웹 UI를 렌더링하는 구조.
 
@@ -88,8 +88,8 @@
 | Tauri 앱 진입점 | `apps/tauri/src/lib.rs` |
 | 창·권한 설정 | `apps/tauri/tauri.conf.json` |
 | Gateway 클라이언트 | `apps/tauri/src/gateway_client.rs` |
-| Gateway 라우트 | `crates/zeroclaw-gateway/src/lib.rs` |
-| WebSocket 채팅 | `crates/zeroclaw-gateway/src/ws.rs` |
+| Gateway 라우트 | `crates/naraeclaw-gateway/src/lib.rs` |
+| WebSocket 채팅 | `crates/naraeclaw-gateway/src/ws.rs` |
 | React 앱 진입점 | `web/src/App.tsx` |
 | 채팅 페이지 | `web/src/pages/AgentChat.tsx` |
 
