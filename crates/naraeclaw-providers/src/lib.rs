@@ -695,7 +695,7 @@ fn zai_base_url(name: &str) -> Option<&'static str> {
 pub struct ProviderRuntimeOptions {
     pub auth_profile_override: Option<String>,
     pub provider_api_url: Option<String>,
-    pub zeroclaw_dir: Option<PathBuf>,
+    pub naraeclaw_dir: Option<PathBuf>,
     pub secrets_encrypt: bool,
     pub reasoning_enabled: Option<bool>,
     pub reasoning_effort: Option<String>,
@@ -721,7 +721,7 @@ impl Default for ProviderRuntimeOptions {
         Self {
             auth_profile_override: None,
             provider_api_url: None,
-            zeroclaw_dir: None,
+            naraeclaw_dir: None,
             secrets_encrypt: true,
             reasoning_enabled: None,
             reasoning_effort: None,
@@ -761,7 +761,7 @@ pub fn provider_runtime_options_from_config(
     ProviderRuntimeOptions {
         auth_profile_override: None,
         provider_api_url: config.api_url.clone(),
-        zeroclaw_dir: config.config_path.parent().map(PathBuf::from),
+        naraeclaw_dir: config.config_path.parent().map(PathBuf::from),
         secrets_encrypt: config.secrets.encrypt,
         reasoning_enabled: config.runtime.reasoning_enabled,
         reasoning_effort: config.runtime.reasoning_effort.clone(),
@@ -1226,10 +1226,10 @@ fn create_provider_with_url_and_options(
             )))
         }
         "gemini" | "google" | "google-gemini" => {
-            let state_dir = options.zeroclaw_dir.clone().unwrap_or_else(|| {
+            let state_dir = options.naraeclaw_dir.clone().unwrap_or_else(|| {
                 directories::UserDirs::new().map_or_else(
-                    || PathBuf::from(".zeroclaw"),
-                    |dirs| dirs.home_dir().join(".zeroclaw"),
+                    || PathBuf::from(".naraeclaw"),
+                    |dirs| dirs.home_dir().join(".naraeclaw"),
                 )
             });
             let auth_service = AuthService::new(&state_dir, options.secrets_encrypt);

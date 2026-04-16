@@ -828,7 +828,7 @@ MIIEowIBAAKCAQEA0ZPr5JeyVDonXsKhfq...
     #[test]
     fn media_markers_not_redacted_as_high_entropy() {
         let detector = LeakDetector::new();
-        let content = "Here is the image: [IMAGE:/Users/matt/.zeroclaw/workspace/skills/image-gen/images/20260324_135911.png]";
+        let content = "Here is the image: [IMAGE:/Users/matt/.naraeclaw/workspace/skills/image-gen/images/20260324_135911.png]";
         let result = detector.scan(content);
         assert!(
             matches!(result, LeakResult::Clean),
@@ -879,7 +879,7 @@ MIIEowIBAAKCAQEA0ZPr5JeyVDonXsKhfq...
     #[test]
     fn media_marker_image_path_not_redacted() {
         let detector = LeakDetector::new();
-        let content = "Here is your image: [IMAGE:/Users/matt/.zeroclaw/workspace/skills/image-gen/images/20260324_135911.png]";
+        let content = "Here is your image: [IMAGE:/Users/matt/.naraeclaw/workspace/skills/image-gen/images/20260324_135911.png]";
         let result = detector.scan(content);
         assert!(
             matches!(result, LeakResult::Clean),

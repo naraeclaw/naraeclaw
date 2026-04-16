@@ -834,7 +834,7 @@ fn runtime_defaults_from_config(config: &Config) -> ChannelRuntimeDefaults {
 
 fn runtime_config_path(ctx: &ChannelRuntimeContext) -> Option<PathBuf> {
     ctx.provider_runtime_options
-        .zeroclaw_dir
+        .naraeclaw_dir
         .as_ref()
         .map(|dir| dir.join("config.toml"))
 }
@@ -893,9 +893,9 @@ async fn load_runtime_defaults_from_config_file(path: &Path) -> Result<ChannelRu
         toml::from_str(&contents).with_context(|| format!("Failed to parse {}", path.display()))?;
     parsed.config_path = path.to_path_buf();
 
-    if let Some(zeroclaw_dir) = path.parent() {
+    if let Some(naraeclaw_dir) = path.parent() {
         let store =
-            naraeclaw_runtime::security::SecretStore::new(zeroclaw_dir, parsed.secrets.encrypt);
+            naraeclaw_runtime::security::SecretStore::new(naraeclaw_dir, parsed.secrets.encrypt);
         decrypt_optional_secret_for_runtime_reload(&store, &mut parsed.api_key, "config.api_key")?;
         // Decrypt TTS provider API keys for runtime reload
         if let Some(ref mut openai) = parsed.tts.openai {
@@ -7405,7 +7405,7 @@ BTC is currently around $65,000 based on latest tool output."#
             api_url: None,
             reliability: Arc::new(naraeclaw_config::schema::ReliabilityConfig::default()),
             provider_runtime_options: naraeclaw_providers::ProviderRuntimeOptions {
-                zeroclaw_dir: Some(temp.path().to_path_buf()),
+                naraeclaw_dir: Some(temp.path().to_path_buf()),
                 ..naraeclaw_providers::ProviderRuntimeOptions::default()
             },
             workspace_dir: Arc::new(std::env::temp_dir()),
@@ -10368,7 +10368,7 @@ This is an example JSON object for profile settings."#;
             runtime_ctx,
             naraeclaw_api::channel::ChannelMessage {
                 id: "msg-photo-1".to_string(),
-                sender: "zeroclaw_user".to_string(),
+                sender: "naraeclaw_user".to_string(),
                 reply_target: "chat-photo".to_string(),
                 content: "[IMAGE:/tmp/workspace/photo_99_1.jpg]\n\nWhat is this?".to_string(),
                 channel: "test-channel".to_string(),
@@ -10465,7 +10465,7 @@ This is an example JSON object for profile settings."#;
             Arc::clone(&runtime_ctx),
             naraeclaw_api::channel::ChannelMessage {
                 id: "msg-photo-1".to_string(),
-                sender: "zeroclaw_user".to_string(),
+                sender: "naraeclaw_user".to_string(),
                 reply_target: "chat-photo".to_string(),
                 content: "[IMAGE:/tmp/workspace/photo_99_1.jpg]\n\nWhat is this?".to_string(),
                 channel: "test-channel".to_string(),
@@ -10482,7 +10482,7 @@ This is an example JSON object for profile settings."#;
             Arc::clone(&runtime_ctx),
             naraeclaw_api::channel::ChannelMessage {
                 id: "msg-text-2".to_string(),
-                sender: "zeroclaw_user".to_string(),
+                sender: "naraeclaw_user".to_string(),
                 reply_target: "chat-photo".to_string(),
                 content: "What is WAL?".to_string(),
                 channel: "test-channel".to_string(),
@@ -10514,7 +10514,7 @@ This is an example JSON object for profile settings."#;
             .lock()
             .unwrap_or_else(|e| e.into_inner());
         let turns = histories
-            .peek("test-channel_chat-photo_zeroclaw_user")
+            .peek("test-channel_chat-photo_naraeclaw_user")
             .expect("history should exist for sender");
         assert_eq!(turns.len(), 2);
         assert_eq!(turns[0].role, "user");
@@ -10597,7 +10597,7 @@ This is an example JSON object for profile settings."#;
             Arc::clone(&runtime_ctx),
             naraeclaw_api::channel::ChannelMessage {
                 id: "msg-bad-1".to_string(),
-                sender: "zeroclaw_user".to_string(),
+                sender: "naraeclaw_user".to_string(),
                 reply_target: "chat-format".to_string(),
                 content: "trigger format error".to_string(),
                 channel: "test-channel".to_string(),
@@ -10614,7 +10614,7 @@ This is an example JSON object for profile settings."#;
             Arc::clone(&runtime_ctx),
             naraeclaw_api::channel::ChannelMessage {
                 id: "msg-text-2".to_string(),
-                sender: "zeroclaw_user".to_string(),
+                sender: "naraeclaw_user".to_string(),
                 reply_target: "chat-format".to_string(),
                 content: "What is WAL?".to_string(),
                 channel: "test-channel".to_string(),
@@ -10646,7 +10646,7 @@ This is an example JSON object for profile settings."#;
             .lock()
             .unwrap_or_else(|e| e.into_inner());
         let turns = histories
-            .peek("test-channel_chat-format_zeroclaw_user")
+            .peek("test-channel_chat-format_naraeclaw_user")
             .expect("history should exist for sender");
         assert_eq!(turns.len(), 2);
         assert_eq!(turns[0].role, "user");

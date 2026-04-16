@@ -229,7 +229,7 @@ impl AuditLogger {
     ///
     /// If `config.sign_events` is true, requires `ZEROCLAW_AUDIT_SIGNING_KEY` env var
     /// to be set with a hex-encoded 32-byte key. Fails if key is missing or invalid.
-    pub fn new(config: AuditConfig, zeroclaw_dir: PathBuf) -> Result<Self> {
+    pub fn new(config: AuditConfig, naraeclaw_dir: PathBuf) -> Result<Self> {
         // Load and validate signing key if sign_events enabled
         let signing_key = if config.sign_events {
             let key_hex = std::env::var("ZEROCLAW_AUDIT_SIGNING_KEY").map_err(|_| {
@@ -251,7 +251,7 @@ impl AuditLogger {
             None
         };
 
-        let log_path = zeroclaw_dir.join(&config.log_path);
+        let log_path = naraeclaw_dir.join(&config.log_path);
         let chain_state = recover_chain_state(&log_path);
         Ok(Self {
             log_path,
@@ -526,14 +526,14 @@ mod tests {
         let event = AuditEvent::new(AuditEventType::CommandExecution).with_actor(
             "telegram".to_string(),
             Some("123".to_string()),
-            Some("@zeroclaw_user".to_string()),
+            Some("@naraeclaw_user".to_string()),
         );
 
         assert!(event.actor.is_some());
         let actor = event.actor.as_ref().unwrap();
         assert_eq!(actor.channel, "telegram");
         assert_eq!(actor.user_id, Some("123".to_string()));
-        assert_eq!(actor.username, Some("@zeroclaw_user".to_string()));
+        assert_eq!(actor.username, Some("@naraeclaw_user".to_string()));
     }
 
     #[test]

@@ -86,7 +86,7 @@ After running automated tests, perform these manual checks:
 3. **Unauthorized user blocking**
 
     ```toml
-    # Edit ~/.zeroclaw/config.toml
+    # Edit ~/.naraeclaw/config.toml
     allowed_users = ["999999999"]
     ```
 
@@ -104,7 +104,7 @@ After running automated tests, perform these manual checks:
 5. **Mention-only mode (group chats)**
 
     ```toml
-    # Edit ~/.zeroclaw/config.toml
+    # Edit ~/.naraeclaw/config.toml
     [channels.telegram]
     mention_only = true
     ```
@@ -238,8 +238,8 @@ Expected values after all fixes:
 | Health check time      | <5s        | `time naraeclaw channel doctor`   |
 | First response time    | <3s        | Time from sending to receiving   |
 | Message split overhead | <50ms      | Check logs for timing            |
-| Memory usage           | <10MB      | `ps aux \| grep zeroclaw`        |
-| Binary size            | ~3-4MB     | `ls -lh target/release/zeroclaw` |
+| Memory usage           | <10MB      | `ps aux \| grep naraeclaw`        |
+| Binary size            | ~3-4MB     | `ls -lh target/release/naraeclaw` |
 | Unit test coverage     | 61/61 pass | `cargo test telegram --lib`      |
 
 ## 🐛 Debugging Failed Tests
@@ -268,7 +268,7 @@ curl "https://api.telegram.org/bot<TOKEN>/getMe"
 curl "https://api.telegram.org/bot<TOKEN>/getUpdates"
 
 # Validate config
-cat ~/.zeroclaw/config.toml | grep -A 3 "\[channels_config.telegram\]"
+cat ~/.naraeclaw/config.toml | grep -A 3 "\[channels_config.telegram\]"
 ```
 
 ### Debug Build Issues
@@ -349,4 +349,4 @@ naraeclaw channel doctor
 - [Telegram Bot API Documentation](https://core.telegram.org/bots/api)
 - [NaraeClaw Main README](../../README.md)
 - [Contributing Guide](../../CONTRIBUTING.md)
-- [Issue Tracker](https://github.com/zeroclaw-labs/zeroclaw/issues)
+- [Issue Tracker](https://github.com/naraeclaw-labs/naraeclaw/issues)

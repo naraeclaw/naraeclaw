@@ -995,7 +995,7 @@ impl GeminiProvider {
                 "Gemini API key not found. Options:\n\
                  1. Set GEMINI_API_KEY env var\n\
                  2. Run `gemini` CLI to authenticate (tokens will be reused)\n\
-                 3. Run `zeroclaw auth login --provider gemini`\n\
+                 3. Run `naraeclaw auth login --provider gemini`\n\
                  4. Get an API key from https://aistudio.google.com/app/apikey\n\
                  5. Run `naraeclaw onboard` to configure"
             )
@@ -1023,7 +1023,7 @@ impl GeminiProvider {
                     .await?
                     .ok_or_else(|| {
                         anyhow::anyhow!(
-                            "Gemini auth profile not found. Run `zeroclaw auth login --provider gemini`."
+                            "Gemini auth profile not found. Run `naraeclaw auth login --provider gemini`."
                         )
                     })?;
                 let proj = self.resolve_oauth_project(&token).await?;
@@ -1289,7 +1289,7 @@ impl Provider for GeminiProvider {
                         .await?
                         .ok_or_else(|| {
                             anyhow::anyhow!(
-                                "Gemini auth profile not found or expired. Run: zeroclaw auth login --provider gemini"
+                                "Gemini auth profile not found or expired. Run: naraeclaw auth login --provider gemini"
                             )
                         })?;
 

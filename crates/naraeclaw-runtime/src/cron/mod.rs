@@ -208,7 +208,7 @@ pub fn parse_delay(input: &str) -> Result<chrono::Duration> {
     Ok(duration)
 }
 
-#[cfg(all(test, zeroclaw_root_crate))] // Tests need root crate handle_command
+#[cfg(all(test, naraeclaw_root_crate))] // Tests need root crate handle_command
 mod tests {
     use super::*;
     use tempfile::TempDir;

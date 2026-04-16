@@ -397,7 +397,7 @@ default_temperature = 0.7
 
 [channels_config.telegram]
 bot_token = "test_token"
-allowed_users = ["zeroclaw_user"]
+allowed_users = ["naraeclaw_user"]
 
 [channels_config.discord]
 bot_token = "test_token"
@@ -477,7 +477,7 @@ fn config_toplevel_cli_section_with_whatsapp_parses() {
 [cli]
 
 [channels_config.whatsapp]
-session_path = "~/.zeroclaw/state/whatsapp-web/session.db"
+session_path = "~/.naraeclaw/state/whatsapp-web/session.db"
 allowed_numbers = ["*"]
 "#;
     let parsed: Config = toml::from_str(toml_str)
@@ -486,7 +486,7 @@ allowed_numbers = ["*"]
     let wa = parsed.channels_config.whatsapp.unwrap();
     assert_eq!(
         wa.session_path.as_deref(),
-        Some("~/.zeroclaw/state/whatsapp-web/session.db")
+        Some("~/.naraeclaw/state/whatsapp-web/session.db")
     );
     assert_eq!(wa.allowed_numbers, vec!["*".to_string()]);
 }
@@ -495,7 +495,7 @@ allowed_numbers = ["*"]
 fn config_only_whatsapp_channel_parses() {
     let toml_str = r#"
 [channels_config.whatsapp]
-session_path = "~/.zeroclaw/state/whatsapp-web/session.db"
+session_path = "~/.naraeclaw/state/whatsapp-web/session.db"
 allowed_numbers = ["*"]
 "#;
     let parsed: Config =
@@ -514,7 +514,7 @@ fn config_channels_explicit_cli_true_with_whatsapp() {
 cli = true
 
 [channels_config.whatsapp]
-session_path = "~/.zeroclaw/state/whatsapp-web/session.db"
+session_path = "~/.naraeclaw/state/whatsapp-web/session.db"
 allowed_numbers = ["*"]
 "#;
     let parsed: Config = toml::from_str(toml_str)
