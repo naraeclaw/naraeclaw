@@ -1,11 +1,7 @@
 name: Version Sync
 
-# Auto-sync all hardcoded version references whenever Cargo.toml
-# version changes on master. Also available as manual dispatch.
+# Sync hardcoded version references manually while the project is in fast development mode.
 on:
-  push:
-    branches: [master]
-    paths: [Cargo.toml]
   workflow_dispatch:
 
 permissions:

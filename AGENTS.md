@@ -164,35 +164,45 @@ Telegram latency-related code:
 
 When uncertain, classify as higher risk.
 
-## Worktree Rules
+## Fast Development Mode
 
-All implementation work starts in a dedicated git worktree. Do not commit directly on `master`.
+The project is currently in fast development mode until the desktop app and Korean-first runtime settle.
+
+Default branch policy during this phase:
+
+- Direct work on `master` is allowed for small, owner-approved changes.
+- Agents may commit on `master` when the user explicitly asks to commit, merge, or push quickly.
+- Pull requests are optional, not mandatory. Use PRs for larger changes, risky security/runtime work, or when the user asks for review.
+- Keep commits small and reversible. Prefer one coherent change per commit even when skipping the PR queue.
+- Run the fastest relevant validation before pushing. Do not block urgent iteration on the full historical CI matrix.
+
+Suggested fast validation:
 
 ```bash
-# 1. Start work by creating a worktree and branch.
-git worktree add ../naraeclaw-<owner> -b <owner>/<task-name>
-# Example: git worktree add ../naraeclaw-codex -b codex/telegram-webhook
-
-# 2. Work and commit only inside that worktree.
-
-# 3. Merge into master after review/validation.
-git merge <branch-name>
-
-# 4. Clean up the worktree and branch after merge.
-git worktree remove ../naraeclaw-<owner>
-git branch -d <branch-name>
+cargo fmt --all -- --check
+cargo check --workspace --exclude zeroclaw-desktop --locked
+cargo test --workspace --lib --locked
 ```
 
-Branch naming:
+Use targeted checks when the change scope is narrow. For docs-only changes, `git diff --check` is enough unless the edited docs have a dedicated checker.
 
-- `codex/<task-name>` — Codex-owned work
-- `claude/<task-name>` — Claude-owned work
-- `gemini/<task-name>` — Gemini-owned work
+## Worktree Guidance
 
-Worktree paths:
+Worktrees are optional coordination tools, not a hard requirement.
 
-- Main: `~/opensource/naraeclaw` — `master`, review and merge only
-- Agents: `~/opensource/naraeclaw-<owner>` — implementation workspace
+Use a dedicated worktree when:
+
+- multiple agents are editing in parallel;
+- a change is large or risky;
+- the user asks for isolated review before merge;
+- files overlap with active work in the main checkout.
+
+For isolated worktrees:
+
+```bash
+git worktree add ../naraeclaw-<owner> -b <owner>/<task-name>
+# Example: git worktree add ../naraeclaw-codex -b codex/telegram-webhook
+```
 
 Parallel work rules:
 
@@ -210,10 +220,10 @@ Parallel work rules:
 6. **Queue hygiene** — stacked PR: declare `Depends on #...`. Replacing old PR: declare `Supersedes #...`.
 
 Branch/commit/PR rules:
-- Start implementation in a task worktree per **Worktree Rules** above.
-- Work from a non-`master` branch. Open a PR to `master`; do not push directly.
-- Use conventional commit titles. Prefer small PRs (`size: XS/S/M`).
-- Follow `.github/pull_request_template.md` fully.
+- In fast development mode, direct commits and pushes to `master` are allowed when the user explicitly requests them.
+- Use short-lived branches or worktrees for large, risky, or parallel-agent work.
+- Use conventional commit titles. Keep commits small and easy to revert.
+- PRs are optional for fast iteration; when opening one, follow `.github/pull_request_template.md`.
 - Never commit secrets, personal data, or real identity information (see `@docs/contributing/pr-discipline.md`).
 
 ## Anti-Patterns
