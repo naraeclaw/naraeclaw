@@ -490,7 +490,6 @@ Notes:
 - `credentials_path` sets `GOOGLE_APPLICATION_CREDENTIALS` before each call.
 - `allowed_services` defaults to the built-in list if omitted or empty.
 - Validation rejects duplicate `(service, resource)` pairs and duplicate methods within a single entry.
-- See `docs/superpowers/specs/2026-03-19-google-workspace-operation-allowlist.md` for the full policy model and verified workflow examples.
 
 ## `[gateway]`
 

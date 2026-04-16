@@ -10,15 +10,8 @@
 services:
   naraeclaw:
     image: ghcr.io/naraeclaw/naraeclaw:latest
-    # For ARM64 environments where the distroless image exits immediately,
-    # switch to the Debian compatibility image instead:
-    # image: ghcr.io/naraeclaw/naraeclaw:debian
-    # Or build locally (distroless, no shell):
+    # Or build locally:
     # build: .
-    # Or build the Debian variant (includes bash, git, curl):
-    # build:
-    #   context: .
-    #   dockerfile: Dockerfile.debian
     container_name: naraeclaw
     restart: unless-stopped
     

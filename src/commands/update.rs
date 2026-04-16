@@ -164,7 +164,7 @@ fn find_asset_url(release: &serde_json::Value) -> Option<String> {
 ///
 /// Using full triples (e.g. `aarch64-unknown-linux-gnu` instead of the
 /// shorter `aarch64-unknown-linux`) prevents substring matches from
-/// selecting the wrong asset (e.g. an Android binary on a GNU/Linux host).
+/// selecting the wrong asset for the host platform.
 fn current_target_triple() -> &'static str {
     if cfg!(target_os = "macos") {
         if cfg!(target_arch = "aarch64") {
@@ -437,9 +437,9 @@ mod tests {
     }
 
     #[test]
-    fn find_asset_url_picks_correct_gnu_over_android() {
+    fn find_asset_url_picks_correct_gnu_over_other_linux_assets() {
         let release = make_release(&[
-            "naraeclaw-aarch64-linux-android.tar.gz",
+            "naraeclaw-aarch64-unknown-linux-musl.tar.gz",
             "naraeclaw-aarch64-unknown-linux-gnu.tar.gz",
             "naraeclaw-x86_64-unknown-linux-gnu.tar.gz",
             "naraeclaw-x86_64-apple-darwin.tar.gz",
@@ -449,10 +449,9 @@ mod tests {
         let url = find_asset_url(&release);
         assert!(url.is_some(), "should find an asset");
         let url = url.unwrap();
-        // Must NOT match the android binary
         assert!(
-            !url.contains("android"),
-            "should not select android binary, got: {url}"
+            url.contains("unknown-linux-gnu"),
+            "should select the GNU Linux binary, got: {url}"
         );
     }
 
