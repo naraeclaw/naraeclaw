@@ -238,7 +238,7 @@ pub struct WebAuthnConfig {
     /// Relying Party origin URL (e.g. "https://example.com"). Default: "http://localhost:42617".
     #[serde(default = "default_webauthn_rp_origin")]
     pub rp_origin: String,
-    /// Relying Party display name. Default: "ZeroClaw".
+    /// Relying Party display name. Default: "NaraeClaw".
     #[serde(default = "default_webauthn_rp_name")]
     pub rp_name: String,
 }
@@ -263,7 +263,7 @@ pub fn default_webauthn_rp_origin() -> String {
 }
 
 pub fn default_webauthn_rp_name() -> String {
-    "ZeroClaw".into()
+    "NaraeClaw".into()
 }
 
 /// OTP validation strategy.
@@ -376,7 +376,7 @@ pub struct EstopConfig {
 }
 
 pub fn default_estop_state_file() -> String {
-    "~/.zeroclaw/estop-state.json".to_string()
+    "~/.naraeclaw/estop-state.json".to_string()
 }
 
 impl Default for EstopConfig {
@@ -391,7 +391,7 @@ impl Default for EstopConfig {
 
 /// Nevis IAM integration configuration.
 ///
-/// When `enabled` is true, ZeroClaw validates incoming requests against a Nevis
+/// When `enabled` is true, NaraeClaw validates incoming requests against a Nevis
 /// Security Suite instance and maps Nevis roles to tool/workspace permissions.
 #[derive(Clone, Serialize, Deserialize, Configurable)]
 #[cfg_attr(feature = "schema-export", derive(schemars::JsonSchema))]
@@ -427,7 +427,7 @@ pub struct NevisConfig {
     #[serde(default)]
     pub jwks_url: Option<String>,
 
-    /// Nevis role to ZeroClaw permission mappings.
+    /// Nevis role to NaraeClaw permission mappings.
     #[serde(default)]
     pub role_mapping: Vec<NevisRoleMappingConfig>,
 
@@ -533,7 +533,7 @@ impl Default for NevisConfig {
     }
 }
 
-/// Maps a Nevis role to ZeroClaw tool permissions and workspace access.
+/// Maps a Nevis role to NaraeClaw tool permissions and workspace access.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema-export", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]

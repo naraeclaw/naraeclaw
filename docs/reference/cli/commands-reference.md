@@ -1,6 +1,6 @@
-# ZeroClaw Commands Reference
+# NaraeClaw Commands Reference
 
-This reference is derived from the current CLI surface (`zeroclaw --help`).
+This reference is derived from the current CLI surface (`naraeclaw --help`).
 
 Last verified: **March 26, 2026**.
 
@@ -32,13 +32,13 @@ Last verified: **March 26, 2026**.
 
 ### `onboard`
 
-- `zeroclaw onboard`
-- `zeroclaw onboard --channels-only`
-- `zeroclaw onboard --force`
-- `zeroclaw onboard --reinit`
-- `zeroclaw onboard --api-key <KEY> --provider <ID> --memory <sqlite|lucid|markdown|none>`
-- `zeroclaw onboard --api-key <KEY> --provider <ID> --model <MODEL_ID> --memory <sqlite|lucid|markdown|none>`
-- `zeroclaw onboard --api-key <KEY> --provider <ID> --model <MODEL_ID> --memory <sqlite|lucid|markdown|none> --force`
+- `naraeclaw onboard`
+- `naraeclaw onboard --channels-only`
+- `naraeclaw onboard --force`
+- `naraeclaw onboard --reinit`
+- `naraeclaw onboard --api-key <KEY> --provider <ID> --memory <sqlite|lucid|markdown|none>`
+- `naraeclaw onboard --api-key <KEY> --provider <ID> --model <MODEL_ID> --memory <sqlite|lucid|markdown|none>`
+- `naraeclaw onboard --api-key <KEY> --provider <ID> --model <MODEL_ID> --memory <sqlite|lucid|markdown|none> --force`
 
 `onboard` safety behavior:
 
@@ -46,14 +46,14 @@ Last verified: **March 26, 2026**.
   - Full onboarding (overwrite `config.toml`)
   - Provider-only update (update provider/model/API key while preserving existing channels, tunnel, memory, hooks, and other settings)
 - In non-interactive environments, existing `config.toml` causes a safe refusal unless `--force` is passed.
-- Use `zeroclaw onboard --channels-only` when you only need to rotate channel tokens/allowlists.
-- Use `zeroclaw onboard --reinit` to start fresh. This backs up your existing config directory with a timestamp suffix and creates a new configuration from scratch.
+- Use `naraeclaw onboard --channels-only` when you only need to rotate channel tokens/allowlists.
+- Use `naraeclaw onboard --reinit` to start fresh. This backs up your existing config directory with a timestamp suffix and creates a new configuration from scratch.
 
 ### `agent`
 
-- `zeroclaw agent`
-- `zeroclaw agent -m "Hello"`
-- `zeroclaw agent --provider <ID> --model <MODEL> --temperature <0.0-2.0>`
+- `naraeclaw agent`
+- `naraeclaw agent -m "Hello"`
+- `naraeclaw agent --provider <ID> --model <MODEL> --temperature <0.0-2.0>`
 
 Tip:
 
@@ -61,9 +61,9 @@ Tip:
 
 ### `acp`
 
-- `zeroclaw acp`
-- `zeroclaw acp --max-sessions <N>`
-- `zeroclaw acp --session-timeout <SECONDS>`
+- `naraeclaw acp`
+- `naraeclaw acp --max-sessions <N>`
+- `naraeclaw acp --session-timeout <SECONDS>`
 
 Start the ACP (Agent Control Protocol) server for IDE and tool integration.
 
@@ -75,21 +75,21 @@ Start the ACP (Agent Control Protocol) server for IDE and tool integration.
 
 ### `gateway` / `daemon`
 
-- `zeroclaw gateway [--host <HOST>] [--port <PORT>]`
-- `zeroclaw daemon [--host <HOST>] [--port <PORT>]`
+- `naraeclaw gateway [--host <HOST>] [--port <PORT>]`
+- `naraeclaw daemon [--host <HOST>] [--port <PORT>]`
 
 ### `estop`
 
-- `zeroclaw estop` (engage `kill-all`)
-- `zeroclaw estop --level network-kill`
-- `zeroclaw estop --level domain-block --domain "*.chase.com" [--domain "*.paypal.com"]`
-- `zeroclaw estop --level tool-freeze --tool shell [--tool browser]`
-- `zeroclaw estop status`
-- `zeroclaw estop resume`
-- `zeroclaw estop resume --network`
-- `zeroclaw estop resume --domain "*.chase.com"`
-- `zeroclaw estop resume --tool shell`
-- `zeroclaw estop resume --otp <123456>`
+- `naraeclaw estop` (engage `kill-all`)
+- `naraeclaw estop --level network-kill`
+- `naraeclaw estop --level domain-block --domain "*.chase.com" [--domain "*.paypal.com"]`
+- `naraeclaw estop --level tool-freeze --tool shell [--tool browser]`
+- `naraeclaw estop status`
+- `naraeclaw estop resume`
+- `naraeclaw estop resume --network`
+- `naraeclaw estop resume --domain "*.chase.com"`
+- `naraeclaw estop resume --tool shell`
+- `naraeclaw estop resume --otp <123456>`
 
 Notes:
 
@@ -99,23 +99,23 @@ Notes:
 
 ### `service`
 
-- `zeroclaw service install`
-- `zeroclaw service start`
-- `zeroclaw service stop`
-- `zeroclaw service restart`
-- `zeroclaw service status`
-- `zeroclaw service uninstall`
+- `naraeclaw service install`
+- `naraeclaw service start`
+- `naraeclaw service stop`
+- `naraeclaw service restart`
+- `naraeclaw service status`
+- `naraeclaw service uninstall`
 
 ### `cron`
 
-- `zeroclaw cron list`
-- `zeroclaw cron add <expr> [--tz <IANA_TZ>] <command>`
-- `zeroclaw cron add-at <rfc3339_timestamp> <command>`
-- `zeroclaw cron add-every <every_ms> <command>`
-- `zeroclaw cron once <delay> <command>`
-- `zeroclaw cron remove <id>`
-- `zeroclaw cron pause <id>`
-- `zeroclaw cron resume <id>`
+- `naraeclaw cron list`
+- `naraeclaw cron add <expr> [--tz <IANA_TZ>] <command>`
+- `naraeclaw cron add-at <rfc3339_timestamp> <command>`
+- `naraeclaw cron add-every <every_ms> <command>`
+- `naraeclaw cron once <delay> <command>`
+- `naraeclaw cron remove <id>`
+- `naraeclaw cron pause <id>`
+- `naraeclaw cron resume <id>`
 
 Notes:
 
@@ -124,29 +124,29 @@ Notes:
 
 ### `models`
 
-- `zeroclaw models refresh`
-- `zeroclaw models refresh --provider <ID>`
-- `zeroclaw models refresh --force`
+- `naraeclaw models refresh`
+- `naraeclaw models refresh --provider <ID>`
+- `naraeclaw models refresh --force`
 
 `models refresh` currently supports live catalog refresh for provider IDs: `openrouter`, `openai`, `anthropic`, `groq`, `mistral`, `deepseek`, `xai`, `together-ai`, `gemini`, `ollama`, `llamacpp`, `sglang`, `vllm`, `astrai`, `venice`, `fireworks`, `cohere`, `moonshot`, `glm`, `zai`, `qwen`, and `nvidia`.
 
 ### `doctor`
 
-- `zeroclaw doctor`
-- `zeroclaw doctor models [--provider <ID>] [--use-cache]`
-- `zeroclaw doctor traces [--limit <N>] [--event <TYPE>] [--contains <TEXT>]`
-- `zeroclaw doctor traces --id <TRACE_ID>`
+- `naraeclaw doctor`
+- `naraeclaw doctor models [--provider <ID>] [--use-cache]`
+- `naraeclaw doctor traces [--limit <N>] [--event <TYPE>] [--contains <TEXT>]`
+- `naraeclaw doctor traces --id <TRACE_ID>`
 
 `doctor traces` reads runtime tool/model diagnostics from `observability.runtime_trace_path`.
 
 ### `channel`
 
-- `zeroclaw channel list`
-- `zeroclaw channel start`
-- `zeroclaw channel doctor`
-- `zeroclaw channel bind-telegram <IDENTITY>`
-- `zeroclaw channel add <type> <json>`
-- `zeroclaw channel remove <name>`
+- `naraeclaw channel list`
+- `naraeclaw channel start`
+- `naraeclaw channel doctor`
+- `naraeclaw channel bind-telegram <IDENTITY>`
+- `naraeclaw channel add <type> <json>`
+- `naraeclaw channel remove <name>`
 
 Runtime in-chat commands (Telegram/Discord while channel server is running):
 
@@ -167,14 +167,14 @@ Channel runtime also watches `config.toml` and hot-applies updates to:
 
 ### `integrations`
 
-- `zeroclaw integrations info <name>`
+- `naraeclaw integrations info <name>`
 
 ### `skills`
 
-- `zeroclaw skills list`
-- `zeroclaw skills audit <source_or_name>`
-- `zeroclaw skills install <source>`
-- `zeroclaw skills remove <name>`
+- `naraeclaw skills list`
+- `naraeclaw skills audit <source_or_name>`
+- `naraeclaw skills install <source>`
+- `naraeclaw skills remove <name>`
 
 `<source>` accepts git remotes (`https://...`, `http://...`, `ssh://...`, and `git@host:owner/repo.git`) or a local filesystem path.
 
@@ -190,21 +190,21 @@ Skill manifests (`SKILL.toml`) support `prompts` and `[[tools]]`; both are injec
 
 ### `migrate`
 
-- `zeroclaw migrate openclaw [--source <path>] [--dry-run]`
+- `naraeclaw migrate openclaw [--source <path>] [--dry-run]`
 
 ### `config`
 
-- `zeroclaw config schema`
+- `naraeclaw config schema`
 
 `config schema` prints a JSON Schema (draft 2020-12) for the full `config.toml` contract to stdout.
 
 ### `completions`
 
-- `zeroclaw completions bash`
-- `zeroclaw completions fish`
-- `zeroclaw completions zsh`
-- `zeroclaw completions powershell`
-- `zeroclaw completions elvish`
+- `naraeclaw completions bash`
+- `naraeclaw completions fish`
+- `naraeclaw completions zsh`
+- `naraeclaw completions powershell`
+- `naraeclaw completions elvish`
 
 `completions` is stdout-only by design so scripts can be sourced directly without log/warning contamination.
 
@@ -213,15 +213,15 @@ Skill manifests (`SKILL.toml`) support `prompts` and `[[tools]]`; both are injec
 Manage individual config properties without editing `config.toml` directly.
 Properties are addressed by dotted path (e.g. `channels.matrix.mention-only`).
 
-- `zeroclaw props list` — list all properties with current values
-- `zeroclaw props list --secrets` — list only secret (encrypted) fields
-- `zeroclaw props list --filter channels.matrix` — filter by path prefix
-- `zeroclaw props get <path>` — get a single property value (secrets show set/unset status)
-- `zeroclaw props set <path> <value>` — set a property value
-- `zeroclaw props set <path>` — secret fields prompt for masked input; enum fields offer interactive selection
-- `zeroclaw props set --no-interactive <path> <value>` — scripted mode, no prompts
-- `zeroclaw props init <section>` — create an unconfigured section with defaults (`enabled=false`)
-- `zeroclaw props init` — initialize all unconfigured sections
+- `naraeclaw props list` — list all properties with current values
+- `naraeclaw props list --secrets` — list only secret (encrypted) fields
+- `naraeclaw props list --filter channels.matrix` — filter by path prefix
+- `naraeclaw props get <path>` — get a single property value (secrets show set/unset status)
+- `naraeclaw props set <path> <value>` — set a property value
+- `naraeclaw props set <path>` — secret fields prompt for masked input; enum fields offer interactive selection
+- `naraeclaw props set --no-interactive <path> <value>` — scripted mode, no prompts
+- `naraeclaw props init <section>` — create an unconfigured section with defaults (`enabled=false`)
+- `naraeclaw props init` — initialize all unconfigured sections
 
 Secret fields (API keys, tokens, passwords) are automatically detected via `#[secret]`
 annotations. When setting a secret, input is masked regardless of whether a value is
@@ -230,7 +230,7 @@ provided on the command line.
 Enum fields (e.g. `stream-mode`, `search-mode`) offer interactive selection via arrow
 keys when the value is omitted. Provide the value directly to skip the prompt.
 
-Shell tab-completion for property paths is included in `zeroclaw completions <shell>`.
+Shell tab-completion for property paths is included in `naraeclaw completions <shell>`.
 
 #### Adding new config fields
 

@@ -1,7 +1,7 @@
 # GEMINI.md - NaraeClaw Project Context
 
 ## Project Overview
-**NaraeClaw (나래클로)** is a lightweight, Korean-first AI agent runtime optimized for messaging platforms like Telegram. It is a highly optimized fork of ZeroClaw, focusing on low latency, in-memory security, and a streamlined developer experience.
+**NaraeClaw (나래클로)** is a lightweight, Korean-first AI agent runtime optimized for messaging platforms like Telegram. It is a highly optimized fork derived from ZeroClaw, focusing on low latency, in-memory security, and a streamlined developer experience.
 
 - **Primary Goal:** To provide a fast, responsive AI assistant with a "Korean-first" experience.
 - **Key Optimization:** High-performance **Telegram Webhooks** (Axum-based) and a modularized configuration system.

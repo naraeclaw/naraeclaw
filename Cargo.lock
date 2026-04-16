@@ -5153,7 +5153,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "11ec1bc47d34ae756616f387c11fd0595f86f2cc7e6473bde9e3ded30cb902a1"
 
 [[package]]
-name = "naraeclawlabs"
+name = "naraeclaw"
 version = "0.6.9"
 dependencies = [
  "anyhow",
@@ -5240,6 +5240,26 @@ dependencies = [
  "zeroclaw-tools",
  "zeroclaw-tui",
  "zip",
+]
+
+[[package]]
+name = "naraeclaw-desktop"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "objc2",
+ "objc2-app-kit",
+ "objc2-foundation",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-shell",
+ "tauri-plugin-single-instance",
+ "tauri-plugin-store",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]
@@ -11817,26 +11837,6 @@ dependencies = [
  "zeroclaw-api",
  "zeroclaw-macros",
  "zeroize",
-]
-
-[[package]]
-name = "zeroclaw-desktop"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "objc2",
- "objc2-app-kit",
- "objc2-foundation",
- "reqwest 0.12.28",
- "serde",
- "serde_json",
- "tauri",
- "tauri-build",
- "tauri-plugin-shell",
- "tauri-plugin-single-instance",
- "tauri-plugin-store",
- "tokio",
- "tracing",
 ]
 
 [[package]]

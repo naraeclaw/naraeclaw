@@ -360,7 +360,7 @@ impl Tool for ProxyConfigTool {
     }
 
     fn description(&self) -> &str {
-        "Manage ZeroClaw proxy settings (scope: environment | zeroclaw | services), including runtime and process env application"
+        "Manage NaraeClaw proxy settings (scope: environment | zeroclaw | services), including runtime and process env application"
     }
 
     fn parameters_schema(&self) -> Value {

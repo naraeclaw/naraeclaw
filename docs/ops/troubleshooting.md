@@ -1,4 +1,4 @@
-# ZeroClaw Troubleshooting
+# NaraeClaw Troubleshooting
 
 This guide focuses on common setup/runtime failures and fast resolution paths.
 
@@ -75,7 +75,7 @@ Symptoms:
 - `cargo check` / `cargo build` appears stuck at `Checking zeroclaw` for a long time
 - repeated `Blocking waiting for file lock on package cache` or `build directory`
 
-Why this happens in ZeroClaw:
+Why this happens in NaraeClaw:
 
 - Matrix E2EE stack (`matrix-sdk`, `ruma`, `vodozemac`) is large and expensive to type-check.
 - TLS + crypto native build scripts (`aws-lc-sys`, `ring`) add noticeable compile time.
@@ -135,11 +135,11 @@ Persist in your shell profile if needed.
 Checks:
 
 ```bash
-zeroclaw status
-zeroclaw doctor
+naraeclaw status
+naraeclaw doctor
 ```
 
-Verify `~/.zeroclaw/config.toml`:
+Verify `~/.naraeclaw/config.toml`:
 
 - `[gateway].host` (default `127.0.0.1`)
 - `[gateway].port` (default `42617`)
@@ -154,7 +154,7 @@ Checks:
 3. Re-run diagnostics:
 
 ```bash
-zeroclaw doctor
+naraeclaw doctor
 ```
 
 ## Channel Issues
@@ -168,14 +168,14 @@ Cause:
 Fix:
 
 - keep only one active runtime for that token
-- stop extra `zeroclaw daemon` / `zeroclaw channel start` processes
+- stop extra `naraeclaw daemon` / `naraeclaw channel start` processes
 
 ### Channel unhealthy in `channel doctor`
 
 Checks:
 
 ```bash
-zeroclaw channel doctor
+naraeclaw channel doctor
 ```
 
 Then verify channel-specific credentials + allowlist fields in config.
@@ -187,20 +187,20 @@ Then verify channel-specific credentials + allowlist fields in config.
 Checks:
 
 ```bash
-zeroclaw service status
+naraeclaw service status
 ```
 
 Recovery:
 
 ```bash
-zeroclaw service stop
-zeroclaw service start
+naraeclaw service stop
+naraeclaw service start
 ```
 
 Linux logs:
 
 ```bash
-journalctl --user -u zeroclaw.service -f
+journalctl --user -u naraeclaw.service -f
 ```
 
 ## Installer URL
@@ -215,9 +215,9 @@ Collect and include these outputs when filing an issue:
 
 ```bash
 zeroclaw --version
-zeroclaw status
-zeroclaw doctor
-zeroclaw channel doctor
+naraeclaw status
+naraeclaw doctor
+naraeclaw channel doctor
 ```
 
 Also include OS, install method, and sanitized config snippets (no secrets).

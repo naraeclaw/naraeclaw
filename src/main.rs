@@ -890,7 +890,7 @@ async fn main() -> Result<()> {
         // SAFETY: called before Tokio runtime and any threads are spawned.
         // No concurrent readers exist at this point in the process lifecycle.
         // Do NOT move this call into an async context or after runtime::block_on.
-        unsafe { std::env::set_var("ZEROCLAW_CONFIG_DIR", config_dir) };
+        unsafe { std::env::set_var("NARAECLAW_CONFIG_DIR", config_dir) };
     }
 
     // Completions must remain stdout-only and should not load config or initialize logging.
@@ -1001,7 +1001,10 @@ async fn main() -> Result<()> {
         let has_provider_flags =
             api_key.is_some() || provider.is_some() || model.is_some() || memory.is_some();
         let is_tty = std::io::stdin().is_terminal() && std::io::stdout().is_terminal();
-        let env_interactive = std::env::var("ZEROCLAW_INTERACTIVE").as_deref() == Ok("1");
+        let env_interactive = std::env::var("NARAECLAW_INTERACTIVE")
+            .or_else(|_| std::env::var("ZEROCLAW_INTERACTIVE"))
+            .as_deref()
+            == Ok("1");
 
         // TUI onboarding mode (ratatui-based)
         if use_tui {
@@ -1044,7 +1047,11 @@ async fn main() -> Result<()> {
         }
 
         // Auto-start channels if user said yes during wizard
-        if std::env::var("ZEROCLAW_AUTOSTART_CHANNELS").as_deref() == Ok("1") {
+        if std::env::var("NARAECLAW_AUTOSTART_CHANNELS")
+            .or_else(|_| std::env::var("ZEROCLAW_AUTOSTART_CHANNELS"))
+            .as_deref()
+            == Ok("1")
+        {
             Box::pin(channels::start_channels(config)).await?;
         }
         return Ok(());

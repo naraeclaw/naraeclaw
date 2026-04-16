@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# ZeroClaw Harness Layer — Docker Smoke Test
+# NaraeClaw Harness Layer — Docker Smoke Test
 #
 # Validates the 9-phase harness implementation:
 #   1. Memory store/recall via REST API
@@ -10,7 +10,7 @@
 #   5. Context overflow recovery (stress test)
 #
 # Usage:
-#   docker exec zeroclaw-dev bash /zeroclaw-data/workspace/test-harness.sh
+#   docker exec zeroclaw-dev bash /naraeclaw-data/workspace/test-harness.sh
 #   or: ./dev/test-harness.sh  (if running on host with gateway at localhost:42617)
 #
 # Prerequisites:
@@ -95,17 +95,17 @@ fi
 echo ""
 echo "=== Test 3: Memory Persistence (brain.db) ==="
 
-BRAIN_DB="/zeroclaw-data/workspace/memory/brain.db"
+BRAIN_DB="/naraeclaw-data/workspace/memory/brain.db"
 if [ -f "$BRAIN_DB" ]; then
     SIZE=$(stat -c%s "$BRAIN_DB" 2>/dev/null || stat -f%z "$BRAIN_DB" 2>/dev/null || echo "?")
     pass "brain.db exists (${SIZE} bytes)"
 else
     # Check alternate locations
-    FOUND=$(find /zeroclaw-data -name "brain.db" 2>/dev/null | head -1)
+    FOUND=$(find /naraeclaw-data -name "brain.db" 2>/dev/null | head -1)
     if [ -n "$FOUND" ]; then
         pass "brain.db found at $FOUND"
     else
-        fail "brain.db not found anywhere under /zeroclaw-data"
+        fail "brain.db not found anywhere under /naraeclaw-data"
     fi
 fi
 

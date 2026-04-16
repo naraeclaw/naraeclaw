@@ -1,0 +1,20 @@
+[Unit]
+Description=NaraeClaw agent runtime
+Documentation=https://github.com/naraeclaw/naraeclaw
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/naraeclaw
+ExecStart=/usr/local/bin/naraeclaw daemon
+Restart=on-failure
+RestartSec=5
+EnvironmentFile=-/etc/naraeclaw/naraeclaw.env
+Environment=RUST_LOG=info
+Environment=NARAECLAW_CONFIG_DIR=/var/lib/naraeclaw/.naraeclaw
+Environment=NARAECLAW_WORKSPACE=/var/lib/naraeclaw/workspace
+Environment=HOME=/var/lib/naraeclaw
+
+[Install]
+WantedBy=multi-user.target

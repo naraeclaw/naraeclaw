@@ -1,5 +1,5 @@
 #!/bin/bash
-# ZeroClaw Telegram Integration Test Suite
+# NaraeClaw Telegram Integration Test Suite
 # Automated testing script for Telegram channel functionality
 
 set -e  # Exit on error
@@ -187,10 +187,10 @@ if [ -f "$CONFIG_PATH" ]; then
             warn "User allowlist not set"
         fi
     else
-        warn "Telegram not configured - run 'zeroclaw onboard' first"
+        warn "Telegram not configured - run 'naraeclaw onboard' first"
     fi
 else
-    warn "No config file found - run 'zeroclaw onboard' first"
+    warn "No config file found - run 'naraeclaw onboard' first"
 fi
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -202,7 +202,7 @@ print_header "Phase 4: Health Check Tests"
 # Test 13: Health check timeout
 print_test "Health check timeout (should complete in <5s)"
 START_TIME=$(date +%s)
-HEALTH_OUTPUT=$(timeout 10 target/release/zeroclaw channel doctor 2>&1 || true)
+HEALTH_OUTPUT=$(timeout 10 target/release/naraeclaw channel doctor 2>&1 || true)
 END_TIME=$(date +%s)
 HEALTH_TIME=$((END_TIME - START_TIME))
 
@@ -290,7 +290,7 @@ cat << 'EOF'
 📱 Manual Test Checklist:
 
 1. [ ] Start the channel:
-   zeroclaw channel start
+   naraeclaw channel start
 
 2. [ ] Send a short message to your bot in Telegram:
    "Hello bot!"
@@ -315,7 +315,7 @@ cat << 'EOF'
    ✓ Verify: Responses have delays
 
 6. [ ] Check logs for errors:
-   RUST_LOG=debug zeroclaw channel start
+   RUST_LOG=debug naraeclaw channel start
    ✓ Verify: No unexpected errors
    ✓ Verify: "missing chat_id" appears for malformed messages
    ✓ Verify: Health check logs show "timed out" if needed

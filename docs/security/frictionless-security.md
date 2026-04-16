@@ -124,7 +124,7 @@ impl SandboxConfig {
 ### 3. First Run: Silent Logging
 
 ```bash
-$ zeroclaw agent -m "hello"
+$ naraeclaw agent -m "hello"
 
 # First time: silent detection
 [INFO] Detecting security features...
@@ -133,7 +133,7 @@ $ zeroclaw agent -m "hello"
 [INFO] ✓ Audit logging enabled (~/.config/zeroclaw/audit.log)
 
 # Subsequent runs: quiet
-$ zeroclaw agent -m "hello"
+$ naraeclaw agent -m "hello"
 [agent] Thinking...
 ```
 
@@ -175,13 +175,13 @@ Security Status:
   → 47 events logged today
 
 # Disable sandbox explicitly (writes to config)
-$ zeroclaw config set security.sandbox.enabled false
+$ naraeclaw config set security.sandbox.enabled false
 
 # Enable specific backend
-$ zeroclaw config set security.sandbox.backend firejail
+$ naraeclaw config set security.sandbox.backend firejail
 
 # Adjust limits
-$ zeroclaw config set security.resources.max_memory_mb 2048
+$ naraeclaw config set security.resources.max_memory_mb 2048
 ```
 
 ### 6. Graceful Degradation
@@ -266,7 +266,7 @@ impl Default for SandboxBackend {
 
 ### Before (Current)
 ```bash
-$ zeroclaw onboard
+$ naraeclaw onboard
 [1/9] Workspace Setup...
 [2/9] AI Provider...
 ...
@@ -276,7 +276,7 @@ $ zeroclaw onboard
 
 ### After (With Frictionless Security)
 ```bash
-$ zeroclaw onboard
+$ naraeclaw onboard
 [1/9] Workspace Setup...
 [2/9] AI Provider...
 ...

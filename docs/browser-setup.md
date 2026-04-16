@@ -1,10 +1,10 @@
 # Browser Automation Setup Guide
 
-This guide covers setting up browser automation capabilities in ZeroClaw, including both headless automation and GUI access via VNC.
+This guide covers setting up browser automation capabilities in NaraeClaw, including both headless automation and GUI access via VNC.
 
 ## Overview
 
-ZeroClaw supports multiple browser access methods:
+NaraeClaw supports multiple browser access methods:
 
 | Method | Use Case | Requirements |
 |--------|----------|--------------|
@@ -25,7 +25,7 @@ agent-browser install --with-deps  # Linux (includes system deps)
 agent-browser install              # macOS/Windows
 ```
 
-### 2. Verify ZeroClaw Config
+### 2. Verify NaraeClaw Config
 
 The browser tool is enabled by default. To verify or customize, edit
 `~/.zeroclaw/config.toml`:
@@ -50,7 +50,7 @@ allowed_domains = ["example.com", "docs.example.com"]
 ### 3. Test
 
 ```bash
-echo "Open https://example.com and tell me what it says" | zeroclaw agent
+echo "Open https://example.com and tell me what it says" | naraeclaw agent
 ```
 
 ## VNC Setup (GUI Access)
@@ -155,17 +155,17 @@ agent-browser screenshot /tmp/test.png
 agent-browser close
 ```
 
-### ZeroClaw Integration Tests
+### NaraeClaw Integration Tests
 
 ```bash
 # Content extraction
-echo "Open https://example.com and summarize it" | zeroclaw agent
+echo "Open https://example.com and summarize it" | naraeclaw agent
 
 # Navigation
-echo "Go to https://github.com/trending and list the top 3 repos" | zeroclaw agent
+echo "Go to https://github.com/trending and list the top 3 repos" | naraeclaw agent
 
 # Form interaction
-echo "Go to Wikipedia, search for 'Rust programming language', and summarize" | zeroclaw agent
+echo "Go to Wikipedia, search for 'Rust programming language', and summarize" | naraeclaw agent
 ```
 
 ## Troubleshooting
@@ -211,5 +211,5 @@ agent-browser get text body
 ## Related
 
 - [agent-browser Documentation](https://github.com/vercel-labs/agent-browser)
-- [ZeroClaw Configuration Reference](./config-reference.md)
+- [NaraeClaw Configuration Reference](./config-reference.md)
 - [Skills Documentation](../skills/)

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 이 프로젝트에 대해
 
-**NaraeClaw**는 [ZeroClaw](https://github.com/zeroclaw-labs/zeroclaw) 포크로, 한국어 우선·경량화를 목표로 합니다.
+**NaraeClaw**는 [ZeroClaw](https://github.com/zeroclaw-labs/zeroclaw)에서 출발한 포크로, 한국어 우선·경량화를 목표로 합니다.
 
 핵심 개선 완료 (2026-04-13 기준):
 - ✅ **텔레그램 Webhook 전환** — polling → webhook 완료 (응답 지연 제거)

@@ -68,14 +68,17 @@ impl PrometheusObserver {
         .expect("valid metric");
 
         let tokens_input_total = IntCounterVec::new(
-            prometheus::Opts::new("zeroclaw_tokens_input_total", "Total input tokens consumed"),
+            prometheus::Opts::new(
+                "naraeclaw_tokens_input_total",
+                "Total input tokens consumed",
+            ),
             &["provider", "model"],
         )
         .expect("valid metric");
 
         let tokens_output_total = IntCounterVec::new(
             prometheus::Opts::new(
-                "zeroclaw_tokens_output_total",
+                "naraeclaw_tokens_output_total",
                 "Total output tokens consumed",
             ),
             &["provider", "model"],
@@ -155,7 +158,7 @@ impl PrometheusObserver {
         .expect("valid metric");
 
         let tokens_used = prometheus::IntGauge::new(
-            "zeroclaw_tokens_used_last",
+            "naraeclaw_tokens_used_last",
             "Tokens used in the last request",
         )
         .expect("valid metric");
@@ -668,7 +671,7 @@ mod tests {
         obs.record_metric(&ObserverMetric::TokensUsed(200));
 
         let output = obs.encode();
-        assert!(output.contains("zeroclaw_tokens_used_last 200"));
+        assert!(output.contains("naraeclaw_tokens_used_last 200"));
     }
 
     #[test]
@@ -699,10 +702,10 @@ mod tests {
             r#"zeroclaw_llm_requests_total{model="claude-sonnet",provider="openrouter",success="true"} 2"#
         ));
         assert!(output.contains(
-            r#"zeroclaw_tokens_input_total{model="claude-sonnet",provider="openrouter"} 300"#
+            r#"naraeclaw_tokens_input_total{model="claude-sonnet",provider="openrouter"} 300"#
         ));
         assert!(output.contains(
-            r#"zeroclaw_tokens_output_total{model="claude-sonnet",provider="openrouter"} 130"#
+            r#"naraeclaw_tokens_output_total{model="claude-sonnet",provider="openrouter"} 130"#
         ));
     }
 
@@ -780,8 +783,8 @@ mod tests {
             r#"zeroclaw_llm_requests_total{model="llama3",provider="ollama",success="false"} 1"#
         ));
         // Token counters should not appear (no data recorded)
-        assert!(!output.contains("zeroclaw_tokens_input_total{"));
-        assert!(!output.contains("zeroclaw_tokens_output_total{"));
+        assert!(!output.contains("naraeclaw_tokens_input_total{"));
+        assert!(!output.contains("naraeclaw_tokens_output_total{"));
     }
 
     #[test]

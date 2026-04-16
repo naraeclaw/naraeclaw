@@ -5,7 +5,7 @@
 **한국어 우선 경량 AI 에이전트 런타임.**  
 텔레그램 등 메신저에서 즉시 응답하는 개인 AI 어시스턴트.
 
-ZeroClaw 포크 — 불필요한 기능을 제거하고 한국어 환경과 보안에 최적화되었습니다.
+NaraeClaw 포크 — 불필요한 기능을 제거하고 한국어 환경과 보안에 최적화되었습니다.
 
 ---
 
@@ -71,11 +71,11 @@ naraeclaw agent
 
 ## 라이선스 및 출처
 
-나래클로는 [ZeroClaw](https://github.com/zeroclaw-labs/zeroclaw)의 포크입니다.
+나래클로는 [ZeroClaw](https://github.com/zeroclaw-labs/zeroclaw)에서 출발한 포크입니다.
 
 - 라이선스: `MIT OR Apache-2.0`
 - 원본 프로젝트: ZeroClaw, Copyright 2025 ZeroClaw Labs
 - 포크 및 변경분: NaraeClaw contributors
 - 자세한 고지: [NOTICE](NOTICE), [LICENSE-MIT](LICENSE-MIT), [LICENSE-APACHE](LICENSE-APACHE)
 
-NaraeClaw는 공식 ZeroClaw 프로젝트가 아니며, upstream 프로젝트와의 제휴나 보증을 의미하지 않습니다.
+NaraeClaw는 공식 NaraeClaw 프로젝트가 아니며, upstream 프로젝트와의 제휴나 보증을 의미하지 않습니다.

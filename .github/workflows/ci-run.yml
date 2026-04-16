@@ -43,4 +43,4 @@ jobs:
         run: cargo fmt --all -- --check
 
       - name: Check workspace
-        run: cargo check --workspace --exclude zeroclaw-desktop
+        run: cargo check --workspace --exclude naraeclaw-desktop

@@ -3,7 +3,7 @@ name = "zeroclaw-macros"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Proc macros for ZeroClaw (config field derivation)"
+description = "Proc macros for NaraeClaw (config field derivation)"
 
 [lib]
 proc-macro = true

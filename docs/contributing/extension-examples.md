@@ -1,6 +1,6 @@
 # Extension Examples
 
-ZeroClaw's architecture is trait-driven and modular.
+NaraeClaw's architecture is trait-driven and modular.
 To add a new provider, channel, tool, or memory backend, implement the corresponding trait and register it in the factory module.
 
 This page contains minimal, working examples for each core extension point.
@@ -79,7 +79,7 @@ impl Tool for HttpGetTool {
 
 ## Channel (`src/channels/traits.rs`)
 
-Channels let ZeroClaw communicate through any messaging platform.
+Channels let NaraeClaw communicate through any messaging platform.
 
 **Required methods**: `name()`, `send(&SendMessage)`, `listen()`.
 Default implementations exist for `health_check()`, `start_typing()`, `stop_typing()`,
@@ -199,7 +199,7 @@ impl Channel for TelegramChannel {
 
 ## Provider (`src/providers/traits.rs`)
 
-Providers are LLM backend adapters. Each provider connects ZeroClaw to a different model API.
+Providers are LLM backend adapters. Each provider connects NaraeClaw to a different model API.
 
 **Required method**: `chat_with_system(system_prompt: Option<&str>, message: &str, model: &str, temperature: f64) -> Result<String>`.
 Everything else has default implementations:

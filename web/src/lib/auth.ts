@@ -1,11 +1,20 @@
-const TOKEN_KEY = 'zeroclaw_token';
+const TOKEN_KEY = 'naraeclaw_token';
+const LEGACY_TOKEN_KEY = 'zeroclaw_token';
 
 /**
  * Retrieve the stored authentication token.
  */
 export function getToken(): string | null {
   try {
-    return localStorage.getItem(TOKEN_KEY);
+    const token = localStorage.getItem(TOKEN_KEY);
+    if (token) return token;
+    const legacyToken = localStorage.getItem(LEGACY_TOKEN_KEY);
+    if (legacyToken) {
+      localStorage.setItem(TOKEN_KEY, legacyToken);
+      localStorage.removeItem(LEGACY_TOKEN_KEY);
+      return legacyToken;
+    }
+    return null;
   } catch {
     return null;
   }
@@ -28,6 +37,7 @@ export function setToken(token: string): void {
 export function clearToken(): void {
   try {
     localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(LEGACY_TOKEN_KEY);
   } catch {
     // Ignore
   }

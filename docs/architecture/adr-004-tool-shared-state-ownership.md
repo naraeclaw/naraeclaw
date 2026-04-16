@@ -8,7 +8,7 @@
 
 ## Context
 
-ZeroClaw tools execute in a multi-client environment where a single daemon
+NaraeClaw tools execute in a multi-client environment where a single daemon
 process serves requests from multiple connected clients simultaneously. Several
 tools already maintain long-lived shared state:
 

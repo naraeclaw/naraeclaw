@@ -1,6 +1,6 @@
-# ZeroClaw Repository Map
+# NaraeClaw Repository Map
 
-ZeroClaw is a Rust-first autonomous agent runtime. It receives messages from messaging platforms, routes them through an LLM, executes tool calls, persists memory, and returns responses. It can also run as a long-lived daemon.
+NaraeClaw is a Rust-first autonomous agent runtime. It receives messages from messaging platforms, routes them through an LLM, executes tool calls, persists memory, and returns responses. It can also run as a long-lived daemon.
 
 ## Runtime Flow
 
@@ -63,7 +63,7 @@ zeroclaw/
 
 | File | Lines | Role |
 |---|---|---|
-| `main.rs` | 1,977 | CLI entrypoint. Clap parser, command dispatch. All `zeroclaw <subcommand>` routing lives here. |
+| `main.rs` | 1,977 | CLI entrypoint. Clap parser, command dispatch. All `naraeclaw <subcommand>` routing lives here. |
 | `lib.rs` | 436 | Module declarations, visibility (`pub` vs `pub(crate)`), CLI command enums (`ServiceCommands`, `ChannelCommands`, `SkillCommands`, etc.) shared between lib and binary. |
 
 ### Core Runtime

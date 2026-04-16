@@ -768,7 +768,7 @@ pub async fn run_gateway(
                     .and_then(|p| p.parent().map(|d| d.join("web/dist")))
                     .unwrap_or_default(),
                 // Docker / packaged layout
-                std::path::PathBuf::from("/zeroclaw-data/web/dist"),
+                std::path::PathBuf::from("/naraeclaw-data/web/dist"),
             ];
             candidates
                 .into_iter()
@@ -784,7 +784,7 @@ pub async fn run_gateway(
     }
 
     let pfx = path_prefix.unwrap_or("");
-    println!("🦀 ZeroClaw Gateway listening on http://{display_addr}{pfx}");
+    println!("🦀 NaraeClaw Gateway listening on http://{display_addr}{pfx}");
     if let Some(ref url) = tunnel_url {
         println!("  🌐 Public URL: {url}");
     }
@@ -798,7 +798,7 @@ pub async fn run_gateway(
         println!("     Send: POST {pfx}/pair with header X-Pairing-Code: {code}");
     } else if pairing.require_pairing() {
         println!("  🔒 Pairing: ACTIVE (bearer token required)");
-        println!("     To pair a new device: zeroclaw gateway get-paircode --new");
+        println!("     To pair a new device: naraeclaw gateway get-paircode --new");
         println!();
     } else {
         println!("  ⚠️  Pairing: DISABLED (all requests accepted)");
@@ -1141,7 +1141,7 @@ pub async fn run_gateway(
                     });
                 }
                 _ = shutdown_signal.changed() => {
-                    tracing::info!("🦀 ZeroClaw Gateway shutting down...");
+                    tracing::info!("🦀 NaraeClaw Gateway shutting down...");
                     break;
                 }
             }
@@ -1154,7 +1154,7 @@ pub async fn run_gateway(
         )
         .with_graceful_shutdown(async move {
             let _ = shutdown_rx.changed().await;
-            tracing::info!("🦀 ZeroClaw Gateway shutting down...");
+            tracing::info!("🦀 NaraeClaw Gateway shutting down...");
         })
         .await?;
     }

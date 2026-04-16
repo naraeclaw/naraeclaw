@@ -102,10 +102,10 @@ Pass Rate:     100%
 
 ```bash
 # Guided setup
-zeroclaw onboard
+naraeclaw onboard
 
 # Or channels-only setup
-zeroclaw onboard --channels-only
+naraeclaw onboard --channels-only
 ```
 
 When prompted:
@@ -116,12 +116,12 @@ When prompted:
 ### Step 3: Verify Health
 
 ```bash
-zeroclaw channel doctor
+naraeclaw channel doctor
 ```
 
 **Expected output:**
 ```
-🩺 ZeroClaw Channel Doctor
+🩺 NaraeClaw Channel Doctor
 
   ✅ Telegram  healthy
 
@@ -134,7 +134,7 @@ Summary: 1 healthy, 0 unhealthy, 0 timed out
 
 ```bash
 # Terminal 1: Start the channel
-zeroclaw channel start
+naraeclaw channel start
 ```
 
 **In Telegram:**
@@ -212,7 +212,7 @@ cargo update
 cat ~/.zeroclaw/config.toml | grep -A 5 telegram
 
 # Reconfigure
-zeroclaw onboard --channels-only
+naraeclaw onboard --channels-only
 ```
 
 ### Issue: Health check fails
@@ -228,7 +228,7 @@ curl "https://api.telegram.org/bot<YOUR_TOKEN>/getMe"
 
 ```bash
 # Enable debug logging
-RUST_LOG=debug zeroclaw channel start
+RUST_LOG=debug naraeclaw channel start
 
 # Look for:
 # - "Telegram channel listening for messages..."
@@ -245,7 +245,7 @@ After all fixes, you should see:
 | Unit test pass | 24/24 | `cargo test telegram --lib` |
 | Build time | <30s | `time cargo build --release` |
 | Binary size | ~3-4MB | `ls -lh target/release/zeroclaw` |
-| Health check | <5s | `time zeroclaw channel doctor` |
+| Health check | <5s | `time naraeclaw channel doctor` |
 | First response | <3s | Manual test in Telegram |
 | Message split | <50ms | Check debug logs |
 | Memory usage | <10MB | `ps aux \| grep zeroclaw` |
@@ -278,9 +278,9 @@ Add to your workflow:
 
 5. **Monitor logs** for any issues:
    ```bash
-   zeroclaw daemon
+   naraeclaw daemon
    # or
-   RUST_LOG=info zeroclaw channel start
+   RUST_LOG=info naraeclaw channel start
    ```
 
 ## 🎉 Success!
@@ -300,4 +300,4 @@ If all tests pass:
 
 - Issues: https://github.com/zeroclaw-labs/zeroclaw/issues
 - Docs: [testing-telegram.md](../../tests/telegram/testing-telegram.md)
-- Help: `zeroclaw --help`
+- Help: `naraeclaw --help`

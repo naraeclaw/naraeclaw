@@ -1,6 +1,6 @@
 # scripts/ — Raspberry Pi Deployment Guide
 
-This directory contains everything needed to cross-compile ZeroClaw and deploy it to a Raspberry Pi over SSH.
+This directory contains everything needed to cross-compile NaraeClaw and deploy it to a Raspberry Pi over SSH.
 
 ## Contents
 
@@ -8,7 +8,7 @@ This directory contains everything needed to cross-compile ZeroClaw and deploy i
 |------|---------|
 | `deploy-rpi.sh` | One-shot cross-compile and deploy script |
 | `rpi-config.toml` | Production config template deployed to `~/.zeroclaw/config.toml` |
-| `zeroclaw.service` | systemd unit file installed on the Pi |
+| `naraeclaw.service` | systemd unit file installed on the Pi |
 | `99-act-led.rules` | udev rule for ACT LED sysfs access without sudo |
 
 ---
@@ -78,7 +78,7 @@ After the first deploy, you must set your API key on the Pi (see [First-Time Set
 4. **Copy binary** — SCPs the compiled binary to `$RPI_DIR/zeroclaw`.
 5. **Create `.env`** — writes an `.env` skeleton with an `ANTHROPIC_API_KEY=` placeholder to `$RPI_DIR/.env` with mode `600`. Skipped if the file already exists so an existing key is not overwritten.
 6. **Deploy config** — copies `rpi-config.toml` to `~/.zeroclaw/config.toml`, preserving any `api_key` already present in the file.
-7. **Install systemd service** — copies `zeroclaw.service` to `/etc/systemd/system/`, then enables and restarts it.
+7. **Install systemd service** — copies `naraeclaw.service` to `/etc/systemd/system/`, then enables and restarts it.
 8. **Hardware permissions** — adds the deploy user to the `gpio` group, copies `99-act-led.rules` to `/etc/udev/rules.d/`, and resets the ACT LED trigger.
 
 ---
@@ -98,7 +98,7 @@ The `.env` is loaded by the systemd service as an `EnvironmentFile`.
 
 ---
 
-## Interacting with ZeroClaw on the Pi
+## Interacting with NaraeClaw on the Pi
 
 Once the service is running the gateway listens on port **8080**.
 
@@ -128,7 +128,7 @@ curl -N -s -X POST http://raspberrypi.local:8080/api/chat \
 ### Follow service logs
 
 ```bash
-ssh pi@raspberrypi.local 'journalctl -u zeroclaw -f'
+ssh pi@raspberrypi.local 'journalctl -u naraeclaw -f'
 ```
 
 ---
@@ -137,7 +137,7 @@ ssh pi@raspberrypi.local 'journalctl -u zeroclaw -f'
 
 ### GPIO tools
 
-ZeroClaw is deployed with the `peripheral-rpi` feature, which enables two LLM-callable tools:
+NaraeClaw is deployed with the `peripheral-rpi` feature, which enables two LLM-callable tools:
 
 - **`gpio_read`** — reads a GPIO pin value via sysfs (`/sys/class/gpio/...`).
 - **`gpio_write`** — writes a GPIO pin value.
@@ -168,7 +168,7 @@ If a Total Phase Aardvark adapter is connected, the `hardware` feature enables I
 | `~/zeroclaw/zeroclaw` | compiled binary | Main agent binary |
 | `~/zeroclaw/.env` | created on first deploy | API key and environment variables |
 | `~/.zeroclaw/config.toml` | `rpi-config.toml` | Agent configuration |
-| `/etc/systemd/system/zeroclaw.service` | `zeroclaw.service` | systemd service unit |
+| `/etc/systemd/system/naraeclaw.service` | `naraeclaw.service` | systemd service unit |
 | `/etc/udev/rules.d/99-act-led.rules` | `99-act-led.rules` | ACT LED permissions |
 
 ---
@@ -192,7 +192,7 @@ To customise, edit `~/.zeroclaw/config.toml` directly on the Pi and restart the 
 
 ```bash
 ssh pi@raspberrypi.local 'sudo systemctl status zeroclaw'
-ssh pi@raspberrypi.local 'journalctl -u zeroclaw -n 50 --no-pager'
+ssh pi@raspberrypi.local 'journalctl -u naraeclaw -n 50 --no-pager'
 ```
 
 ### GPIO permission denied

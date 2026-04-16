@@ -1,4 +1,4 @@
-# ZeroClaw Config Reference (Operator-Oriented)
+# NaraeClaw Config Reference (Operator-Oriented)
 
 This is a high-signal reference for common config sections and defaults.
 
@@ -10,13 +10,13 @@ Config path resolution at startup:
 2. persisted `~/.zeroclaw/active_workspace.toml` marker (if present)
 3. default `~/.zeroclaw/config.toml`
 
-ZeroClaw logs the resolved config on startup at `INFO` level:
+NaraeClaw logs the resolved config on startup at `INFO` level:
 
 - `Config loaded` with fields: `path`, `workspace`, `source`, `initialized`
 
 Schema export command:
 
-- `zeroclaw config schema` (prints JSON Schema draft 2020-12 to stdout)
+- `naraeclaw config schema` (prints JSON Schema draft 2020-12 to stdout)
 
 ## Core Keys
 
@@ -43,9 +43,9 @@ Notes:
 - Alias values `opentelemetry` and `otlp` map to the same OTel backend.
 - Runtime traces are intended for debugging tool-call failures and malformed model tool payloads. They can contain model output text, so keep this disabled by default on shared hosts.
 - Query runtime traces with:
-  - `zeroclaw doctor traces --limit 20`
-  - `zeroclaw doctor traces --event tool_call_result --contains \"error\"`
-  - `zeroclaw doctor traces --id <trace-id>`
+  - `naraeclaw doctor traces --limit 20`
+  - `naraeclaw doctor traces --event tool_call_result --contains \"error\"`
+  - `naraeclaw doctor traces --id <trace-id>`
 
 Example:
 
@@ -171,7 +171,7 @@ Notes:
 - `fallback_providers` is a list of provider IDs to try in order when the primary provider fails (timeout, connection error, 503, rate limit after key rotation).
 - Each fallback provider resolves credentials independently using the standard resolution order: explicit config → provider-specific env var → `ZEROCLAW_API_KEY` → `API_KEY`.
 - `model_fallbacks` allows semantic fallbacks when a specific model is unavailable. Example: `{ "claude-opus-4-20250514" = ["claude-sonnet-4-20250514"] }`.
-- `api_keys` supplies additional API keys that ZeroClaw rotates through on `429` (rate limit) responses. The primary `api_key` (set globally or per-channel) is tried first.
+- `api_keys` supplies additional API keys that NaraeClaw rotates through on `429` (rate limit) responses. The primary `api_key` (set globally or per-channel) is tried first.
 - `provider_retries` applies before each fallback attempt. With `provider_retries = 2` and `provider_backoff_ms = 500`, the runtime retries with delays of 500ms, then 1000ms.
 - `channel_initial_backoff_secs` and `channel_max_backoff_secs` control exponential backoff for channel reconnection after transient failures.
 - `scheduler_poll_secs` controls how often the built-in scheduler checks for cron-triggered tasks.
@@ -230,7 +230,7 @@ Notes:
 - Domain patterns support wildcard `*`.
 - Category presets expand to curated domain sets during validation.
 - Invalid domain globs or unknown categories fail fast at startup.
-- When `enabled = true` and no OTP secret exists, ZeroClaw generates one and prints an enrollment URI once.
+- When `enabled = true` and no OTP secret exists, NaraeClaw generates one and prints an enrollment URI once.
 
 Example:
 
@@ -257,7 +257,7 @@ Notes:
 
 - Estop state is persisted atomically and reloaded on startup.
 - Corrupted/unreadable estop state falls back to fail-closed `kill_all`.
-- Use CLI command `zeroclaw estop` to engage and `zeroclaw estop resume` to clear levels.
+- Use CLI command `naraeclaw estop` to engage and `naraeclaw estop resume` to clear levels.
 
 ## `[agents.<name>]`
 
@@ -334,14 +334,14 @@ Notes:
 
 Notes:
 
-- Security-first default: ZeroClaw does **not** clone or sync `open-skills` unless `open_skills_enabled = true`.
+- Security-first default: NaraeClaw does **not** clone or sync `open-skills` unless `open_skills_enabled = true`.
 - Environment overrides:
   - `ZEROCLAW_OPEN_SKILLS_ENABLED` accepts `1/0`, `true/false`, `yes/no`, `on/off`.
   - `ZEROCLAW_OPEN_SKILLS_DIR` overrides the repository path when non-empty.
   - `ZEROCLAW_SKILLS_PROMPT_MODE` accepts `full` or `compact`.
 - Precedence for enable flag: `ZEROCLAW_OPEN_SKILLS_ENABLED` → `skills.open_skills_enabled` in `config.toml` → default `false`.
 - `prompt_injection_mode = "compact"` is recommended on low-context local models to reduce startup prompt size while keeping skill files available on demand.
-- Skill loading and `zeroclaw skills install` both apply a static security audit. Skills that contain symlinks, script-like files, high-risk shell payload snippets, or unsafe markdown link traversal are rejected.
+- Skill loading and `naraeclaw skills install` both apply a static security audit. Skills that contain symlinks, script-like files, high-risk shell payload snippets, or unsafe markdown link traversal are rejected.
 
 ## `[cost]`
 
@@ -502,7 +502,7 @@ Notes:
 | `allow_public_bind` | `false` | block accidental public exposure |
 | `path_prefix` | _(none)_ | URL path prefix for reverse-proxy deployments (e.g. `"/zeroclaw"`) |
 
-When deploying behind a reverse proxy that maps ZeroClaw to a sub-path,
+When deploying behind a reverse proxy that maps NaraeClaw to a sub-path,
 set `path_prefix` to that sub-path (e.g. `"/zeroclaw"`). All gateway
 routes will be served under this prefix. The value must start with `/`
 and must not end with `/`.
@@ -598,7 +598,7 @@ Upgrade strategy:
 
 1. Keep hints stable (`hint:reasoning`, `hint:semantic`).
 2. Update only `model = "...new-version..."` in the route entries.
-3. Validate with `zeroclaw doctor` before restart/rollout.
+3. Validate with `naraeclaw doctor` before restart/rollout.
 
 Natural-language config path:
 
@@ -676,7 +676,7 @@ Notes:
 - When a timeout occurs, users receive: `⚠️ Request timed out while waiting for the model. Please try again.`
 - Telegram-only interruption behavior is controlled with `channels_config.telegram.interrupt_on_new_message` (default `false`).
   When enabled, a newer message from the same sender in the same chat cancels the in-flight request and preserves interrupted user context.
-- While `zeroclaw channel start` is running, updates to `default_provider`, `default_model`, `default_temperature`, `api_key`, `api_url`, and `reliability.*` are hot-applied from `config.toml` on the next inbound message.
+- While `naraeclaw channel start` is running, updates to `default_provider`, `default_model`, `default_temperature`, `api_key`, `api_url`, and `reliability.*` are hot-applied from `config.toml` on the next inbound message.
 
 ### `[channels_config.nostr]`
 
@@ -769,10 +769,10 @@ Notes:
 After editing config:
 
 ```bash
-zeroclaw status
-zeroclaw doctor
-zeroclaw channel doctor
-zeroclaw service restart
+naraeclaw status
+naraeclaw doctor
+naraeclaw channel doctor
+naraeclaw service restart
 ```
 
 ## Related Docs

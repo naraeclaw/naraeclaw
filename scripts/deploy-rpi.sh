@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# deploy-rpi.sh — cross-compile ZeroClaw for Raspberry Pi and deploy via SSH.
+# deploy-rpi.sh — cross-compile NaraeClaw for Raspberry Pi and deploy via SSH.
 #
 # Cross-compilation (pick ONE — the script auto-detects):
 #
@@ -48,7 +48,7 @@ if [[ -n "${RPI_PASS:-}" ]]; then
   SCP_CMD="sshpass -p ${RPI_PASS} scp"
 fi
 
-echo "==> Building ZeroClaw for Raspberry Pi (${TARGET})"
+echo "==> Building NaraeClaw for Raspberry Pi (${TARGET})"
 echo "    Features: ${FEATURES}"
 echo "    Target host: ${RPI_USER}@${RPI_HOST}:${RPI_PORT}"
 echo ""
@@ -125,10 +125,10 @@ ls -lh "${BINARY}"
 
 # ── 2. Stop running service (if any) so binary can be overwritten ─────────────
 echo ""
-echo "==> Stopping zeroclaw service (if running)"
+echo "==> Stopping naraeclaw service (if running)"
 # shellcheck disable=SC2029
 ${SSH_CMD} ${SSH_OPTS} "${RPI_USER}@${RPI_HOST}" \
-  "sudo systemctl stop zeroclaw 2>/dev/null || true"
+  "sudo systemctl stop naraeclaw 2>/dev/null || true"
 
 # ── 3. Create remote directory ────────────────────────────────────────────────
 echo ""
@@ -177,17 +177,17 @@ if [[ -n "${EXISTING_API_KEY}" ]]; then
 fi
 
 # ── 6. Deploy and enable systemd service ─────────────────────────────────────
-SERVICE_DEST="/etc/systemd/system/zeroclaw.service"
+SERVICE_DEST="/etc/systemd/system/naraeclaw.service"
 echo ""
 echo "==> Installing systemd service (requires sudo on the Pi)"
-${SCP_CMD} ${SCP_OPTS} "scripts/zeroclaw.service" "${RPI_USER}@${RPI_HOST}:/tmp/zeroclaw.service"
+${SCP_CMD} ${SCP_OPTS} "scripts/naraeclaw.service" "${RPI_USER}@${RPI_HOST}:/tmp/naraeclaw.service"
 # shellcheck disable=SC2029
 ${SSH_CMD} ${SSH_OPTS} "${RPI_USER}@${RPI_HOST}" \
-  "sudo mv /tmp/zeroclaw.service ${SERVICE_DEST} && \
+  "sudo mv /tmp/naraeclaw.service ${SERVICE_DEST} && \
    sudo systemctl daemon-reload && \
-   sudo systemctl enable zeroclaw && \
-   sudo systemctl restart zeroclaw && \
-   sudo systemctl status zeroclaw --no-pager || true"
+   sudo systemctl enable naraeclaw && \
+   sudo systemctl restart naraeclaw && \
+   sudo systemctl status naraeclaw --no-pager || true"
 
 # ── 7. Runtime permissions ───────────────────────────────────────────────────
 echo ""
@@ -196,7 +196,7 @@ echo "==> Granting ${RPI_USER} access to GPIO group"
 ${SSH_CMD} ${SSH_OPTS} "${RPI_USER}@${RPI_HOST}" \
   "sudo usermod -aG gpio ${RPI_USER} || true"
 
-# ── 8. Reset ACT LED trigger so ZeroClaw can control it ──────────────────────
+# ── 8. Reset ACT LED trigger so NaraeClaw can control it ──────────────────────
 echo ""
 echo "==> Installing udev rule for ACT LED sysfs access by gpio group"
 ${SCP_CMD} ${SCP_OPTS} "scripts/99-act-led.rules" "${RPI_USER}@${RPI_HOST}:/tmp/99-act-led.rules"
@@ -216,8 +216,8 @@ ${SSH_CMD} ${SSH_OPTS} "${RPI_USER}@${RPI_HOST}" \
 echo ""
 echo "==> Deployment complete!"
 echo ""
-echo "    ZeroClaw is running at http://${RPI_HOST}:8080"
+echo "    NaraeClaw is running at http://${RPI_HOST}:8080"
 echo "    POST /api/chat  — chat with the agent"
 echo "    GET  /health    — health check"
 echo ""
-echo "    To check logs: ssh ${RPI_USER}@${RPI_HOST} 'journalctl -u zeroclaw -f'"
+echo "    To check logs: ssh ${RPI_USER}@${RPI_HOST} 'journalctl -u naraeclaw -f'"

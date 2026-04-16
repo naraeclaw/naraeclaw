@@ -1,4 +1,4 @@
-# Resource Limits for ZeroClaw
+# Resource Limits for NaraeClaw
 
 > ⚠️ **Status: Proposal / Roadmap**
 >
@@ -6,7 +6,7 @@
 > For current runtime behavior, see [config-reference.md](../reference/api/config-reference.md), [operations-runbook.md](operations-runbook.md), and [troubleshooting.md](troubleshooting.md).
 
 ## Problem
-ZeroClaw has rate limiting (20 actions/hour) but no resource caps. A runaway agent could:
+NaraeClaw has rate limiting (20 actions/hour) but no resource caps. A runaway agent could:
 - Exhaust available memory
 - Spin CPU at 100%
 - Fill disk with logs/output

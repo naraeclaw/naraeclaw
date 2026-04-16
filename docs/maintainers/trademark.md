@@ -1,7 +1,8 @@
 # Trademark and Fork Attribution Policy
 
-NaraeClaw is a fork of ZeroClaw. This document explains how this repository uses
-project names and attribution while avoiding confusion with the upstream project.
+NaraeClaw is a fork derived from ZeroClaw. This document explains how this
+repository uses project names and attribution while avoiding confusion with the
+upstream project.
 
 ## NaraeClaw Marks
 
@@ -14,7 +15,7 @@ The following names identify this fork:
 Use these names to refer to this repository, its binary, and its modified
 distribution.
 
-## Upstream ZeroClaw Attribution
+## Upstream Attribution
 
 ZeroClaw and ZeroClaw Labs refer to the upstream project and its maintainers.
 NaraeClaw preserves upstream attribution because this repository contains code
@@ -22,7 +23,7 @@ originally developed by ZeroClaw Labs.
 
 When mentioning the upstream project, use neutral fork language such as:
 
-> NaraeClaw is a fork of ZeroClaw.
+> NaraeClaw is a fork derived from ZeroClaw.
 
 Do not imply that NaraeClaw is the official ZeroClaw project or that ZeroClaw
 Labs endorses this fork unless that endorsement is explicitly documented by the
@@ -41,7 +42,7 @@ Forks and redistributions should retain:
 
 Allowed:
 
-- "NaraeClaw, a fork of ZeroClaw"
+- "NaraeClaw, a fork derived from ZeroClaw"
 - "based on ZeroClaw"
 - "derived from ZeroClaw under MIT OR Apache-2.0"
 

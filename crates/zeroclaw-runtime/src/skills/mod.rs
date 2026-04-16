@@ -109,7 +109,7 @@ fn warn_skipped_skill(path: &Path, summary: &str, allow_scripts: bool) {
         );
         eprintln!(
             "warning: skill '{}' was skipped because it contains script files. \
-             Set `skills.allow_scripts = true` in your zeroclaw config to enable it.",
+             Set `skills.allow_scripts = true` in your naraeclaw config to enable it.",
             path.file_name()
                 .map(|n| n.to_string_lossy().into_owned())
                 .unwrap_or_else(|| path.display().to_string()),
@@ -377,7 +377,7 @@ fn open_skills_enabled_from_sources(
         }
         if !raw.trim().is_empty() {
             tracing::warn!(
-                "Ignoring invalid ZEROCLAW_OPEN_SKILLS_ENABLED (valid: 1|0|true|false|yes|no|on|off)"
+                "Ignoring invalid NARAECLAW_OPEN_SKILLS_ENABLED (valid: 1|0|true|false|yes|no|on|off)"
             );
         }
     }
@@ -386,7 +386,9 @@ fn open_skills_enabled_from_sources(
 }
 
 fn open_skills_enabled(config_open_skills_enabled: Option<bool>) -> bool {
-    let env_override = std::env::var("ZEROCLAW_OPEN_SKILLS_ENABLED").ok();
+    let env_override = std::env::var("NARAECLAW_OPEN_SKILLS_ENABLED")
+        .or_else(|_| std::env::var("ZEROCLAW_OPEN_SKILLS_ENABLED"))
+        .ok();
     open_skills_enabled_from_sources(config_open_skills_enabled, env_override.as_deref())
 }
 
@@ -414,7 +416,9 @@ fn resolve_open_skills_dir_from_sources(
 }
 
 fn resolve_open_skills_dir(config_open_skills_dir: Option<&str>) -> Option<PathBuf> {
-    let env_dir = std::env::var("ZEROCLAW_OPEN_SKILLS_DIR").ok();
+    let env_dir = std::env::var("NARAECLAW_OPEN_SKILLS_DIR")
+        .or_else(|_| std::env::var("ZEROCLAW_OPEN_SKILLS_DIR"))
+        .ok();
     let home_dir = UserDirs::new().map(|dirs| dirs.home_dir().to_path_buf());
     resolve_open_skills_dir_from_sources(
         env_dir.as_deref(),
@@ -924,7 +928,7 @@ pub fn init_skills_dir(workspace_dir: &Path) -> Result<()> {
     if !readme.exists() {
         std::fs::write(
             &readme,
-            "# ZeroClaw Skills\n\n\
+            "# NaraeClaw Skills\n\n\
              Each subdirectory is a skill. Create a `SKILL.toml` or `SKILL.md` file inside.\n\n\
              ## SKILL.toml format\n\n\
              ```toml\n\
@@ -946,8 +950,8 @@ pub fn init_skills_dir(workspace_dir: &Path) -> Result<()> {
              The agent will read it and follow the instructions.\n\n\
              ## Installing community skills\n\n\
              ```bash\n\
-             zeroclaw skills install <source>\n\
-             zeroclaw skills list\n\
+             naraeclaw skills install <source>\n\
+             naraeclaw skills list\n\
              ```\n",
         )?;
     }

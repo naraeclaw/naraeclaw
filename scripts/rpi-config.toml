@@ -1,4 +1,4 @@
-# ZeroClaw — Raspberry Pi production configuration
+# NaraeClaw — Raspberry Pi production configuration
 #
 # Copy this to ~/.zeroclaw/config.toml on the Pi.
 # deploy-rpi.sh does this automatically.
@@ -473,7 +473,7 @@ enabled = false
 allowed_domains = []
 max_response_size = 1000000
 timeout_secs = 30
-user_agent = "ZeroClaw/1.0"
+user_agent = "NaraeClaw/1.0"
 
 [http_request.credential_profiles]
 
@@ -489,7 +489,7 @@ allowed_domains = ["*"]
 blocked_domains = []
 max_response_size = 500000
 timeout_secs = 30
-user_agent = "ZeroClaw/1.0"
+user_agent = "NaraeClaw/1.0"
 
 [web_search]
 enabled = false
@@ -504,7 +504,7 @@ exa_include_text = false
 jina_site_filters = []
 max_results = 5
 timeout_secs = 15
-user_agent = "ZeroClaw/1.0"
+user_agent = "NaraeClaw/1.0"
 
 [proxy]
 enabled = false

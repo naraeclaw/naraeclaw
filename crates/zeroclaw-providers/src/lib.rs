@@ -991,7 +991,7 @@ fn resolve_provider_credential(name: &str, credential_override: Option<&str>) ->
         return None;
     }
 
-    for env_var in ["ZEROCLAW_API_KEY", "API_KEY"] {
+    for env_var in ["NARAECLAW_API_KEY", "ZEROCLAW_API_KEY", "API_KEY"] {
         if let Ok(value) = std::env::var(env_var) {
             let value = value.trim();
             if !value.is_empty() {
@@ -1213,7 +1213,9 @@ fn create_provider_with_url_and_options(
         }
         // Ollama uses api_url for custom base URL (e.g. remote Ollama instance)
         "ollama" => {
-            let env_url = std::env::var("ZEROCLAW_PROVIDER_URL").ok();
+            let env_url = std::env::var("NARAECLAW_PROVIDER_URL")
+                .or_else(|_| std::env::var("ZEROCLAW_PROVIDER_URL"))
+                .ok();
 
             let api_url = env_url.as_deref().or(api_url);
 
@@ -1743,7 +1745,7 @@ fn create_provider_with_url_and_options(
         }
 
         _ => anyhow::bail!(
-            "Unknown provider: {name}. Check README for supported providers or run `zeroclaw onboard` to reconfigure.\n\
+            "Unknown provider: {name}. Check README for supported providers or run `naraeclaw onboard` to reconfigure.\n\
              Tip: Use \"custom:https://your-api.com\" for OpenAI-compatible endpoints.\n\
              Tip: Use \"anthropic-custom:https://your-api.com\" for Anthropic-compatible endpoints."
         ),
@@ -1959,7 +1961,7 @@ pub struct ProviderInfo {
     pub local: bool,
 }
 
-/// Return the list of all known providers for display in `zeroclaw providers list`.
+/// Return the list of all known providers for display in `naraeclaw providers list`.
 ///
 /// This is intentionally separate from the factory match in `create_provider`
 /// (display concern vs. construction concern).

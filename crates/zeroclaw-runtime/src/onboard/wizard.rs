@@ -268,7 +268,7 @@ pub async fn run_wizard(force: bool, callbacks: WizardCallbacks) -> Result<Confi
             // Signal to main.rs to call start_channels after wizard returns
             // SAFETY: called during single-threaded onboarding wizard before async runtime.
             unsafe { std::env::set_var("NARAECLAW_AUTOSTART_CHANNELS", "1") };
-            unsafe { std::env::set_var("ZEROCLAW_AUTOSTART_CHANNELS", "1") };
+            unsafe { std::env::set_var("NARAECLAW_AUTOSTART_CHANNELS", "1") };
         }
     }
 
@@ -322,7 +322,7 @@ pub async fn run_channels_repair_wizard(callbacks: WizardCallbacks) -> Result<Co
             // Signal to main.rs to call start_channels after wizard returns
             // SAFETY: called during single-threaded onboarding wizard before async runtime.
             unsafe { std::env::set_var("NARAECLAW_AUTOSTART_CHANNELS", "1") };
-            unsafe { std::env::set_var("ZEROCLAW_AUTOSTART_CHANNELS", "1") };
+            unsafe { std::env::set_var("NARAECLAW_AUTOSTART_CHANNELS", "1") };
         }
     }
 
@@ -386,7 +386,7 @@ async fn run_provider_update_wizard(workspace_dir: &Path, config_path: &Path) ->
             println!();
             // SAFETY: called during single-threaded onboarding wizard before async runtime.
             unsafe { std::env::set_var("NARAECLAW_AUTOSTART_CHANNELS", "1") };
-            unsafe { std::env::set_var("ZEROCLAW_AUTOSTART_CHANNELS", "1") };
+            unsafe { std::env::set_var("NARAECLAW_AUTOSTART_CHANNELS", "1") };
         }
     }
 

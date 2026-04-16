@@ -4,7 +4,7 @@ Cross-tool agent instructions for any AI coding assistant working on this reposi
 
 ## Project Identity
 
-NaraeClaw is a Korean-first, lightweight fork of [ZeroClaw](https://github.com/zeroclaw-labs/zeroclaw).
+NaraeClaw is a Korean-first, lightweight fork derived from [ZeroClaw](https://github.com/zeroclaw-labs/zeroclaw).
 
 V1 fork goals (all completed as of 2026-04-13):
 
@@ -177,7 +177,7 @@ Suggested fast validation:
 
 ```bash
 cargo fmt --all -- --check
-cargo check --workspace --exclude zeroclaw-desktop
+cargo check --workspace --exclude naraeclaw-desktop
 ```
 
 Use targeted tests when the change scope needs runtime coverage. The historical full lib-test suite still has known cleanup debt, so do not make fast CI depend on it until those tests are repaired. For docs-only changes, `git diff --check` is enough unless the edited docs have a dedicated checker.
