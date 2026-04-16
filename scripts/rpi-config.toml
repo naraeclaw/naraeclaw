@@ -1,9 +1,9 @@
 # NaraeClaw — Raspberry Pi production configuration
 #
-# Copy this to ~/.zeroclaw/config.toml on the Pi.
+# Copy this to ~/.naraeclaw/config.toml on the Pi.
 # deploy-rpi.sh does this automatically.
 #
-# API key is loaded from ~/.zeroclaw/.env (EnvironmentFile in systemd).
+# API key is loaded from ~/.naraeclaw/.env (EnvironmentFile in systemd).
 # Set it there as: ANTHROPIC_API_KEY=your-key-here
 # Or set api_key directly below (not recommended for version control).
 
@@ -103,7 +103,6 @@ non_cli_excluded_tools = [
     "model_routing_config",
     "channel_ack_config",
     "pushover",
-    "composio",
     "delegate",
     "screenshot",
     "image_info",
@@ -152,7 +151,7 @@ challenge_max_attempts = 3
 
 [security.estop]
 enabled = false
-state_file = "~/.zeroclaw/estop-state.json"
+state_file = "~/.naraeclaw/estop-state.json"
 require_otp_to_resume = true
 
 [security.syscall_anomaly]
@@ -413,7 +412,7 @@ auto_hydrate = true
 sqlite_journal_mode = "wal"
 
 [memory.qdrant]
-collection = "zeroclaw_memories"
+collection = "naraeclaw_memories"
 
 [storage.provider.config]
 provider = ""
@@ -443,9 +442,6 @@ webhook_secret = "mytoken123"
 enabled = false
 allowed_node_ids = []
 
-[composio]
-enabled = false
-entity_id = "default"
 
 [secrets]
 encrypt = true
@@ -617,7 +613,7 @@ max_duration_secs = 120
 
 [agents_ipc]
 enabled = false
-db_path = "~/.zeroclaw/agents.db"
+db_path = "~/.naraeclaw/agents.db"
 staleness_secs = 300
 
 [mcp]

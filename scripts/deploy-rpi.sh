@@ -18,7 +18,7 @@
 #   RPI_HOST        — hostname or IP of the Pi        (default: raspberrypi.local)
 #   RPI_USER        — SSH user on the Pi              (default: pi)
 #   RPI_PORT        — SSH port                        (default: 22)
-#   RPI_DIR         — remote deployment dir           (default: /home/$RPI_USER/zeroclaw)
+#   RPI_DIR         — remote deployment dir           (default: /home/$RPI_USER/naraeclaw)
 #   RPI_PASS        — SSH password (uses sshpass)     (default: prompt interactively)
 #   CROSS_TOOL      — force "zigbuild" or "cross"     (default: auto-detect)
 
@@ -27,10 +27,10 @@ set -euo pipefail
 RPI_HOST="${RPI_HOST:-raspberrypi.local}"
 RPI_USER="${RPI_USER:-pi}"
 RPI_PORT="${RPI_PORT:-22}"
-RPI_DIR="${RPI_DIR:-/home/${RPI_USER}/zeroclaw}"
+RPI_DIR="${RPI_DIR:-/home/${RPI_USER}/naraeclaw}"
 TARGET="aarch64-unknown-linux-gnu"
 FEATURES="hardware,peripheral-rpi"
-BINARY="target/${TARGET}/release/zeroclaw"
+BINARY="target/${TARGET}/release/naraeclaw"
 SSH_OPTS="-p ${RPI_PORT} -o StrictHostKeyChecking=no -o ConnectTimeout=10"
 # scp uses -P (uppercase) for port; ssh uses -p (lowercase)
 SCP_OPTS="-P ${RPI_PORT} -o StrictHostKeyChecking=no -o ConnectTimeout=10"
@@ -138,8 +138,8 @@ ${SSH_CMD} ${SSH_OPTS} "${RPI_USER}@${RPI_HOST}" "mkdir -p ${RPI_DIR}"
 
 # ── 4. Deploy binary ──────────────────────────────────────────────────────────
 echo ""
-echo "==> Deploying binary to ${RPI_USER}@${RPI_HOST}:${RPI_DIR}/zeroclaw"
-${SCP_CMD} ${SCP_OPTS} "${BINARY}" "${RPI_USER}@${RPI_HOST}:${RPI_DIR}/zeroclaw"
+echo "==> Deploying binary to ${RPI_USER}@${RPI_HOST}:${RPI_DIR}/naraeclaw"
+${SCP_CMD} ${SCP_OPTS} "${BINARY}" "${RPI_USER}@${RPI_HOST}:${RPI_DIR}/naraeclaw"
 
 # ── 4. Create .env skeleton (if it doesn't exist) ────────────────────────────
 ENV_DEST="${RPI_DIR}/.env"
@@ -159,11 +159,11 @@ else
 fi
 
 # ── 5. Deploy config ─────────────────────────────────────────────────────────
-CONFIG_DEST="/home/${RPI_USER}/.zeroclaw/config.toml"
+CONFIG_DEST="/home/${RPI_USER}/.naraeclaw/config.toml"
 echo ""
 echo "==> Deploying config to ${CONFIG_DEST}"
 # shellcheck disable=SC2029
-${SSH_CMD} ${SSH_OPTS} "${RPI_USER}@${RPI_HOST}" "mkdir -p /home/${RPI_USER}/.zeroclaw"
+${SSH_CMD} ${SSH_OPTS} "${RPI_USER}@${RPI_HOST}" "mkdir -p /home/${RPI_USER}/.naraeclaw"
 # Preserve existing api_key from the remote config if present.
 # shellcheck disable=SC2029
 EXISTING_API_KEY=$(${SSH_CMD} ${SSH_OPTS} "${RPI_USER}@${RPI_HOST}" \

@@ -4,7 +4,7 @@ Cross-tool agent instructions for any AI coding assistant working on this reposi
 
 ## Project Identity
 
-NaraeClaw is a Korean-first, lightweight fork derived from [ZeroClaw](https://github.com/zeroclaw-labs/zeroclaw).
+NaraeClaw is a Korean-first, lightweight autonomous agent runtime for server management, personal knowledge workflows, desktop, and web usage.
 
 V1 fork goals (all completed as of 2026-04-13):
 
@@ -85,7 +85,7 @@ Key extension points:
 
 1. Keep the CLI/runtime stable for server management and personal knowledge workflows.
 2. Continue desktop and web UX work without regressing the CLI path.
-3. Finish remaining `zeroclaw` legacy-name cleanup in small compatibility-aware passes.
+3. Remove stale upstream/device-era assumptions in small compatibility-aware passes.
 4. Prefer fast validation on `master` until the project settles.
 
 ## Stability Tiers
@@ -116,11 +116,11 @@ Tiers are promoted, never demoted, through deliberate team decision.
 
 - `src/main.rs` — CLI entrypoint and command routing
 - `src/lib.rs` — module re-exports and CLI command enum definitions
-- `crates/naraeclaw-api/` — public trait definitions (Provider, Channel, Tool, Memory, Observer, Peripheral)
+- `crates/naraeclaw-api/` — public trait definitions (Provider, Channel, Tool, Memory, Observer)
 - `crates/naraeclaw-config/` — schema, config loading/merging
 - `crates/naraeclaw-macros/` — Configurable derive macro
 - `crates/naraeclaw-providers/` — model providers and resilient wrapper
-- `crates/naraeclaw-channels/` — messaging platform integrations (30+ channels)
+- `crates/naraeclaw-channels/` — messaging platform integrations kept behind explicit Cargo features
 - `crates/naraeclaw-channels/src/orchestrator/` — channel lifecycle, routing, media pipeline
 - `crates/naraeclaw-tools/` — tool execution surface (shell, file, memory, browser)
 - `crates/naraeclaw-runtime/` — agent loop, security, cron, SOP, skills, onboarding wizard, observability

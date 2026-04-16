@@ -36,12 +36,12 @@ function load_env {
 }
 
 function ensure_config {
-    CONFIG_DIR="$HOST_TARGET_DIR/.zeroclaw"
+    CONFIG_DIR="$HOST_TARGET_DIR/.naraeclaw"
     CONFIG_FILE="$CONFIG_DIR/config.toml"
     WORKSPACE_DIR="$CONFIG_DIR/workspace"
 
     if [ ! -f "$CONFIG_FILE" ]; then
-        echo -e "${YELLOW}⚙️  Config file missing in target/.zeroclaw. Creating default dev config from template...${NC}"
+        echo -e "${YELLOW}⚙️  Config file missing in target/.naraeclaw. Creating default dev config from template...${NC}"
         mkdir -p "$WORKSPACE_DIR"
 
         # Copy template
@@ -80,7 +80,7 @@ case "$1" in
         echo -e "${GREEN}✅ Environment is running!${NC}"
         echo -e "   - Agent: http://127.0.0.1:42617"
         echo -e "   - Sandbox: running (background)"
-        echo -e "   - Config: target/.zeroclaw/config.toml (Edit locally to apply changes)"
+        echo -e "   - Config: target/.naraeclaw/config.toml (Edit locally to apply changes)"
         ;;
 
     down)
@@ -91,12 +91,12 @@ case "$1" in
 
     shell)
         echo -e "${GREEN}💻 Entering Sandbox (Ubuntu)... (Type 'exit' to leave)${NC}"
-        docker exec -it zeroclaw-sandbox /bin/bash
+        docker exec -it naraeclaw-sandbox /bin/bash
         ;;
 
     agent)
         echo -e "${GREEN}🤖 Entering Agent Container (NaraeClaw)... (Type 'exit' to leave)${NC}"
-        docker exec -it zeroclaw-dev /bin/bash
+        docker exec -it naraeclaw-dev /bin/bash
         ;;
 
     logs)
@@ -121,12 +121,12 @@ case "$1" in
         ;;
 
     clean)
-        echo -e "${RED}⚠️  WARNING: This will delete 'target/.zeroclaw' data and Docker volumes.${NC}"
+        echo -e "${RED}⚠️  WARNING: This will delete 'target/.naraeclaw' data and Docker volumes.${NC}"
         read -p "Are you sure? (y/N) " -n 1 -r
         echo
         if [[ $REPLY =~ ^[Yy]$ ]]; then
             docker compose -f "$COMPOSE_FILE" down -v
-            rm -rf "$HOST_TARGET_DIR/.zeroclaw"
+            rm -rf "$HOST_TARGET_DIR/.naraeclaw"
             echo -e "${GREEN}🧹 Cleaned up (playground/ workspace data remains intact).${NC}"
         else
             echo "Cancelled."

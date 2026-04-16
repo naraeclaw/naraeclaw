@@ -25,7 +25,7 @@ build_smoke_image() {
       --load
       --target dev
       --cache-to "type=local,dest=$SMOKE_CACHE_DIR,mode=max"
-      -t zeroclaw-local-smoke:latest
+      -t naraeclaw-local-smoke:latest
       .
     )
     if [ -f "$SMOKE_CACHE_DIR/index.json" ]; then
@@ -33,7 +33,7 @@ build_smoke_image() {
     fi
     docker buildx build "${build_args[@]}"
   else
-    DOCKER_BUILDKIT=1 docker build --target dev -t zeroclaw-local-smoke:latest .
+    DOCKER_BUILDKIT=1 docker build --target dev -t naraeclaw-local-smoke:latest .
   fi
 }
 
@@ -128,7 +128,7 @@ case "$1" in
 
   docker-smoke)
     build_smoke_image
-    docker run --rm zeroclaw-local-smoke:latest --version
+    docker run --rm naraeclaw-local-smoke:latest --version
     ;;
 
   all)
@@ -138,7 +138,7 @@ case "$1" in
     run_in_ci "cargo build --release --locked --verbose"
     run_in_ci "cargo audit"
     build_smoke_image
-    docker run --rm zeroclaw-local-smoke:latest --version
+    docker run --rm naraeclaw-local-smoke:latest --version
     ;;
 
   clean)
