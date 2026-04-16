@@ -21,6 +21,11 @@ pub struct LucidMemory {
     last_failure_at: Mutex<Option<Instant>>,
 }
 
+fn app_env(suffix: &str) -> std::result::Result<String, std::env::VarError> {
+    std::env::var(format!("NARAECLAW_{suffix}"))
+        .or_else(|_| std::env::var(format!("ZEROCLAW_{suffix}")))
+}
+
 impl LucidMemory {
     const DEFAULT_LUCID_CMD: &'static str = "lucid";
     const DEFAULT_TOKEN_BUDGET: usize = 200;
@@ -32,32 +37,32 @@ impl LucidMemory {
     const DEFAULT_FAILURE_COOLDOWN_MS: u64 = 15_000;
 
     pub fn new(workspace_dir: &Path, local: SqliteMemory) -> Self {
-        let lucid_cmd = std::env::var("ZEROCLAW_LUCID_CMD")
-            .unwrap_or_else(|_| Self::DEFAULT_LUCID_CMD.to_string());
+        let lucid_cmd =
+            app_env("LUCID_CMD").unwrap_or_else(|_| Self::DEFAULT_LUCID_CMD.to_string());
 
-        let token_budget = std::env::var("ZEROCLAW_LUCID_BUDGET")
+        let token_budget = app_env("LUCID_BUDGET")
             .ok()
             .and_then(|v| v.parse::<usize>().ok())
             .filter(|v| *v > 0)
             .unwrap_or(Self::DEFAULT_TOKEN_BUDGET);
 
         let recall_timeout = Self::read_env_duration_ms(
-            "ZEROCLAW_LUCID_RECALL_TIMEOUT_MS",
+            "LUCID_RECALL_TIMEOUT_MS",
             Self::DEFAULT_RECALL_TIMEOUT_MS,
             20,
         );
         let store_timeout = Self::read_env_duration_ms(
-            "ZEROCLAW_LUCID_STORE_TIMEOUT_MS",
+            "LUCID_STORE_TIMEOUT_MS",
             Self::DEFAULT_STORE_TIMEOUT_MS,
             50,
         );
         let local_hit_threshold = Self::read_env_usize(
-            "ZEROCLAW_LUCID_LOCAL_HIT_THRESHOLD",
+            "LUCID_LOCAL_HIT_THRESHOLD",
             Self::DEFAULT_LOCAL_HIT_THRESHOLD,
             1,
         );
         let failure_cooldown = Self::read_env_duration_ms(
-            "ZEROCLAW_LUCID_FAILURE_COOLDOWN_MS",
+            "LUCID_FAILURE_COOLDOWN_MS",
             Self::DEFAULT_FAILURE_COOLDOWN_MS,
             100,
         );
@@ -101,14 +106,14 @@ impl LucidMemory {
     }
 
     fn read_env_usize(name: &str, default: usize, min: usize) -> usize {
-        std::env::var(name)
+        app_env(name)
             .ok()
             .and_then(|v| v.parse::<usize>().ok())
             .map_or(default, |v| v.max(min))
     }
 
     fn read_env_duration_ms(name: &str, default_ms: u64, min_ms: u64) -> Duration {
-        let millis = std::env::var(name)
+        let millis = app_env(name)
             .ok()
             .and_then(|v| v.parse::<u64>().ok())
             .map_or(default_ms, |v| v.max(min_ms));

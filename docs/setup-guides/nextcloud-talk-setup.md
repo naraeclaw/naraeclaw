@@ -33,7 +33,7 @@ Field reference:
 
 Environment override:
 
-- `ZEROCLAW_NEXTCLOUD_TALK_WEBHOOK_SECRET` overrides `webhook_secret` when set.
+- `NARAECLAW_NEXTCLOUD_TALK_WEBHOOK_SECRET` overrides `webhook_secret` when set.
 
 ## 3. Gateway endpoint
 
