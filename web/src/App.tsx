@@ -16,7 +16,7 @@ import Pairing from './pages/Pairing';
 import Canvas from './pages/Canvas';
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import { DraftContext, useDraftStore } from './hooks/useDraft';
-import { setLocale, type Locale } from './lib/i18n';
+import { setLocale, t, type Locale } from './lib/i18n';
 import { loadLocale, saveLocale } from './contexts/ThemeContext';
 import { basePath } from './lib/basePath';
 import { getAdminPairCode } from './lib/api';
@@ -28,7 +28,7 @@ interface LocaleContextType {
 }
 
 export const LocaleContext = createContext<LocaleContextType>({
-  locale: 'en',
+  locale: 'ko',
   setAppLocale: () => {},
 });
 
@@ -66,10 +66,10 @@ export class ErrorBoundary extends Component<
         <div className="p-6">
           <div className="card p-6 w-full max-w-lg" style={{ borderColor: 'rgba(239, 68, 68, 0.3)' }}>
             <h2 className="text-lg font-semibold mb-2" style={{ color: 'var(--color-status-error)' }}>
-              화면을 불러오지 못했습니다
+              {t('error.render_title')}
             </h2>
             <p className="text-sm mb-4" style={{ color: 'var(--pc-text-muted)' }}>
-              렌더링 오류가 발생했습니다. 자세한 내용은 브라우저 콘솔을 확인하세요.
+              {t('error.render_desc')}
             </p>
             <pre className="text-xs rounded-lg p-3 overflow-x-auto whitespace-pre-wrap break-all font-mono" style={{ background: 'var(--pc-bg-base)', color: 'var(--color-status-error)' }}>
               {this.state.error.message}
@@ -78,7 +78,7 @@ export class ErrorBoundary extends Component<
               onClick={() => this.setState({ error: null })}
               className="btn-electric mt-6 px-4 py-2 text-sm font-medium"
             >
-              다시 시도
+              {t('common.retry')}
             </button>
           </div>
         </div>
@@ -121,7 +121,7 @@ function PairingDialog({ onPair }: { onPair: (code: string) => Promise<void> }) 
     try {
       await onPair(code);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : '페어링에 실패했습니다');
+      setError(err instanceof Error ? err.message : t('auth.pairing_failed'));
     } finally {
       setLoading(false);
     }
@@ -141,7 +141,7 @@ function PairingDialog({ onPair }: { onPair: (code: string) => Promise<void> }) 
           />
           <h1 className="text-2xl font-bold mb-2 text-gradient-blue">NaraeClaw</h1>
           <p className="text-sm" style={{ color: 'var(--pc-text-muted)' }}>
-            {displayCode ? '페어링 코드' : '터미널에 표시된 페어링 코드를 입력하세요'}
+            {displayCode ? t('auth.pairing_code') : t('auth.enter_code')}
           </p>
         </div>
 
@@ -151,7 +151,7 @@ function PairingDialog({ onPair }: { onPair: (code: string) => Promise<void> }) 
             <div className="text-4xl font-mono font-bold tracking-[0.4em] py-2" style={{ color: 'var(--pc-text-primary)' }}>
               {displayCode}
             </div>
-            <p className="text-xs mt-2" style={{ color: 'var(--pc-text-muted)' }}>아래에 이 코드를 입력하거나 다른 기기에서 사용하세요</p>
+            <p className="text-xs mt-2" style={{ color: 'var(--pc-text-muted)' }}>{t('auth.pairing_code_hint')}</p>
           </div>
         )}
 
@@ -160,7 +160,7 @@ function PairingDialog({ onPair }: { onPair: (code: string) => Promise<void> }) 
             type="text"
             value={code}
             onChange={(e) => setCode(e.target.value)}
-            placeholder="6자리 코드"
+            placeholder={t('auth.code_placeholder')}
             className="input-electric w-full px-4 py-4 text-center text-2xl tracking-[0.3em] font-medium mb-4"
             maxLength={6}
             autoFocus
@@ -176,9 +176,9 @@ function PairingDialog({ onPair }: { onPair: (code: string) => Promise<void> }) 
             {loading ? (
               <span className="flex items-center justify-center gap-2">
                 <span className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                페어링 중...
+                {t('auth.pairing_in_progress')}
               </span>
-            ) : '페어링'}
+            ) : t('auth.pair_button')}
           </button>
         </form>
       </div>
@@ -212,7 +212,7 @@ function AppContent() {
       <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--pc-bg-base)' }}>
         <div className="flex flex-col items-center gap-4 animate-fade-in">
           <div className="h-10 w-10 border-2 rounded-full animate-spin" style={{ borderColor: 'var(--pc-border)', borderTopColor: 'var(--pc-accent)' }} />
-          <p className="text-sm" style={{ color: 'var(--pc-text-muted)' }}>연결 중...</p>
+          <p className="text-sm" style={{ color: 'var(--pc-text-muted)' }}>{t('common.loading')}</p>
         </div>
       </div>
     );
