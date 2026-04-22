@@ -1,6 +1,6 @@
 # Network Deployment — NaraeClaw on a Server or Local Network
 
-This document covers deploying NaraeClaw on a Linux server or local network host, with Telegram and optional webhook channels.
+This document covers deploying NaraeClaw on a macOS, Windows, or Linux server or local network host, with Telegram and optional webhook channels.
 
 ---
 
@@ -12,7 +12,7 @@ This document covers deploying NaraeClaw on a Linux server or local network host
 | **Matrix sync (including E2EE)** | No | NaraeClaw syncs via Matrix client API; no inbound webhook required |
 | **Discord/Slack** | No | Same — outbound only |
 | **Nostr** | No | Connects to relays via WebSocket; outbound only |
-| **Gateway webhook** | Yes | POST /webhook, /whatsapp, /linq, /nextcloud-talk need a public URL |
+| **Gateway webhook** | Yes | POST /webhook, /whatsapp, /nextcloud-talk need a public URL |
 | **Gateway pairing** | Yes | If you pair clients via the gateway |
 
 **Key:** Telegram, Discord, Slack, and Nostr use **outbound connections** — NaraeClaw connects to external servers/relays. No port forwarding or public IP required.
@@ -23,7 +23,7 @@ This document covers deploying NaraeClaw on a Linux server or local network host
 
 ### 2.1 Prerequisites
 
-- Linux server or local machine
+- macOS, Windows, or Linux server or local machine
 - Network access to your chosen messaging provider or webhook tunnel
 
 ### 2.2 Install
@@ -105,7 +105,7 @@ Telegram uses **long-polling** by default:
 
 - NaraeClaw calls `https://api.telegram.org/bot{token}/getUpdates`
 - No inbound port or public IP needed
-- Works behind NAT, on RPi, in a home lab
+- Works behind NAT or behind a firewall without public exposure
 
 **Config:**
 

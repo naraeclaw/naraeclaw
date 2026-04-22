@@ -6,13 +6,7 @@ Cross-tool agent instructions for any AI coding assistant working on this reposi
 
 NaraeClaw is a Korean-first, lightweight autonomous agent runtime for server management, personal knowledge workflows, desktop, and web usage.
 
-V1 fork goals (all completed as of 2026-04-13):
-
-- ✅ **Telegram webhook migration** — replaced polling with Axum-based webhook handling.
-- ✅ **Lightweight defaults** — removed unnecessary channels from default Cargo features.
-- ✅ **Security hardening** — eliminated `unsafe set_var`, introduced `OnceLock`, `zeroize`, and `CredentialFilter`.
-
-Current focus: V2 desktop app porting (see `Plan.md`).
+The repository is currently in fast cleanup and consolidation mode. Keep the CLI, desktop, and web paths healthy, remove stale compatibility surfaces when they are no longer useful, and avoid growing new surface area without a concrete use case.
 
 Internal crate and binary names use `naraeclaw-*` / `naraeclaw`. Legacy `ZEROCLAW_*` environment variables are retained only as compatibility fallbacks.
 
@@ -20,19 +14,15 @@ Internal crate and binary names use `naraeclaw-*` / `naraeclaw`. Legacy `ZEROCLA
 
 ```bash
 # Format
-cargo fmt --all
 cargo fmt --all -- --check
 
 # Lint
-cargo clippy --all-targets -- -D warnings
+cargo clippy --workspace --exclude naraeclaw-desktop --all-targets -- -D warnings
 
 # Tests
-cargo test
-cargo test --lib
-cargo test --test component
-cargo test --test integration
-cargo test --test system
-cargo test --test integration <test-name>
+cargo test -p <crate-name> --lib
+cargo test -p <crate-name> <test-name>
+cargo test -p <crate-name> --test <integration-test-name>
 
 # Development mode
 cargo run -- onboard
@@ -82,7 +72,7 @@ Key extension points:
 
 1. Keep the CLI/runtime stable for server management and personal knowledge workflows.
 2. Continue desktop and web UX work without regressing the CLI path.
-3. Remove stale upstream/device-era assumptions in small compatibility-aware passes.
+3. Remove stale compatibility assumptions in small, scoped passes.
 4. Prefer fast validation on `master` until the project settles.
 
 ## Stability Tiers
@@ -97,8 +87,8 @@ Every workspace crate carries a stability tier per the Microkernel Architecture 
 | `naraeclaw-memory` | Beta | — |
 | `naraeclaw-infra` | Beta | — |
 | `naraeclaw-tool-call-parser` | Beta | Stable at v0.8.0 |
-| `naraeclaw-channels` | Experimental | Plugin migration at v1.0.0 |
-| `naraeclaw-tools` | Experimental | Plugin migration at v1.0.0 |
+| `naraeclaw-channels` | Experimental | Messaging platform integrations |
+| `naraeclaw-tools` | Experimental | Tool execution surface |
 | `naraeclaw-runtime` | Experimental | Agent runtime (agent loop, security, cron, SOP, skills, observability) |
 | `naraeclaw-gateway` | Experimental | Separate binary at v0.9.0 |
 | `naraeclaw-tui` | Experimental | TUI onboarding wizard |
@@ -142,11 +132,6 @@ Tiers are promoted, never demoted, through deliberate team decision.
 - `tests/support/` — shared mocks such as `MockProvider`, `MockChannel`, and `EchoTool`.
 - `tests/fixtures/traces/` — JSON fixture replay data for `TraceLlmProvider`.
 
-Telegram latency-related code:
-
-- `crates/naraeclaw-channels/src/telegram.rs:2871` — polling timeout of 30 seconds; target for webhook replacement.
-- `crates/naraeclaw-channels/src/telegram.rs:372` — draft update interval of 1000 ms.
-- `crates/naraeclaw-channels/src/orchestrator/mod.rs:1844` — memory recall query performed on every message.
 
 ## Risk Tiers
 
@@ -158,7 +143,7 @@ When uncertain, classify as higher risk.
 
 ## Fast Development Mode
 
-The project is currently in fast development mode until the desktop app and Korean-first runtime settle.
+The project is currently in fast development mode while the core CLI, desktop, and web paths settle.
 
 Default branch policy during this phase:
 
@@ -175,7 +160,7 @@ cargo fmt --all -- --check
 cargo check --workspace --exclude naraeclaw-desktop
 ```
 
-Use targeted tests when the change scope needs runtime coverage. The historical full lib-test suite still has known cleanup debt, so do not make fast CI depend on it until those tests are repaired. For docs-only changes, `git diff --check` is enough unless the edited docs have a dedicated checker.
+Use targeted tests when the change scope needs runtime coverage. Keep the historical full-suite checks out of the fast path until they are explicitly repaired. For docs-only changes, `git diff --check` is enough unless the edited docs have a dedicated checker.
 
 ## Worktree Guidance
 
@@ -211,7 +196,7 @@ Parallel work rules:
 6. **Queue hygiene** — stacked PR: declare `Depends on #...`. Replacing old PR: declare `Supersedes #...`.
 
 Branch/commit/PR rules:
-- In fast development mode, direct commits and pushes to `master` are allowed when the user explicitly requests them.
+- In fast development mode, direct commits and pushes to `master` are allowed when the user explicitly requests them or when the task is explicitly scoped for fast iteration.
 - Use short-lived branches or worktrees for large, risky, or parallel-agent work.
 - Use conventional commit titles. Keep commits small and easy to revert.
 - PRs are optional for fast iteration; when opening one, follow `.github/pull_request_template.md`.

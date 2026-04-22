@@ -1,0 +1,19 @@
+# Gemini Agent Ignore Patterns
+# Block non-essential directories to save search tokens
+
+/target
+/dist
+/node_modules
+/firmware
+/benches
+/docs/assets
+/web/dist
+/playground
+/.git
+/.worktrees
+/.claude
+/target-*
+*.db
+*.db-journal
+lcov.info
+rust_out

@@ -247,7 +247,7 @@ pub fn register_skill_tools(
     }
 }
 
-/// Create full tool registry including memory tools and optional Composio
+/// Create full tool registry including memory tools and external integrations
 #[allow(
     clippy::implicit_hasher,
     clippy::too_many_arguments,
@@ -289,7 +289,7 @@ pub fn all_tools(
     )
 }
 
-/// Create full tool registry including memory tools and optional Composio.
+/// Create full tool registry including memory tools and external integrations.
 #[allow(
     clippy::implicit_hasher,
     clippy::too_many_arguments,

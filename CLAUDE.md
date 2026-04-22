@@ -4,12 +4,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 이 프로젝트에 대해
 
-**NaraeClaw**는 [ZeroClaw](https://github.com/zeroclaw-labs/zeroclaw)에서 출발한 포크로, 한국어 우선·경량화를 목표로 합니다.
+**NaraeClaw**는 [ZeroClaw](https://github.com/zeroclaw-labs/zeroclaw)에서 출발한 포크로, macOS·Windows·Linux에서 동작하는 한국어 우선 경량 AI 에이전트 런타임입니다. CLI / Desktop / Web 표면을 우선으로 두고, 레거시 범위는 단계적으로 정리합니다.
 
-핵심 개선 완료 (2026-04-13 기준):
-- ✅ **텔레그램 Webhook 전환** — polling → webhook 완료 (응답 지연 제거)
-- ✅ **경량화** — 기본 feature에서 불필요한 채널 제거 완료
-- ✅ **보안 강화** — `unsafe set_var` 제거, `OnceLock`/`zeroize`/`CredentialFilter` 도입 완료
+현재 중점:
+- ✅ **브랜딩 정리** — 사용자 노출 문구를 NaraeClaw 기준으로 통일
+- ✅ **경량화** — 기본 범위에서 불필요한 채널·플러그인 제거
+- ✅ **보안 강화** — `unsafe set_var` 제거, `OnceLock`/`zeroize`/`CredentialFilter` 유지
 
 내부 크레이트명과 바이너리 이름은 `naraeclaw-*` / `naraeclaw`를 사용합니다. 기존 `ZEROCLAW_*` 환경변수는 호환 fallback으로만 유지합니다.
 
@@ -51,7 +51,7 @@ just dev      # cargo run --
 
 ## 아키텍처
 
-Rust edition 2024 워크스페이스. `naraeclaw` 바이너리(`src/main.rs`)는 기본적으로 `agent-runtime` feature가 켜져 있고, 이것이 대부분의 에이전트 서브시스템을 활성화합니다.
+Rust edition 2024 워크스페이스. `naraeclaw` 바이너리(`src/main.rs`)는 기본적으로 `agent-runtime` feature가 켜져 있고, CLI / Desktop / Web 중심의 에이전트 서브시스템을 활성화합니다.
 
 **메시지 흐름**: 수신 메시지 → `naraeclaw-channels` (전송 계층) → `naraeclaw-runtime/agent/` (에이전트 루프) → `naraeclaw-providers` (LLM 호출) → `naraeclaw-tools` (도구 실행) → 응답 전송
 
@@ -69,12 +69,14 @@ Rust edition 2024 워크스페이스. `naraeclaw` 바이너리(`src/main.rs`)는
 - `skills/`, `skillforge/` — 스킬 시스템
 - `onboard/` — TUI 온보딩 마법사
 
-**채널** (`crates/naraeclaw-channels/`): 각 채널은 `channel-<이름>` Cargo feature로 게이팅됨. `orchestrator/`가 채널 생명주기와 미디어 파이프라인 담당.
+**채널** (`crates/naraeclaw-channels/`): 각 채널은 `channel-<이름>` Cargo feature로 게이팅됨. `orchestrator/`가 채널 생명주기와 미디어 파이프라인을 담당합니다.
 
-**텔레그램 Webhook 관련 코드 위치:**
-- `crates/naraeclaw-channels/src/telegram.rs` — webhook 핸들러 (Axum 기반)
-- `crates/naraeclaw-channels/src/telegram.rs:372` — draft 업데이트 간격 1000ms
-- `crates/naraeclaw-channels/src/orchestrator/mod.rs` — 채널 생명주기 및 라우팅
+**핵심 코드 위치:**
+- `crates/naraeclaw-runtime/src/security/leak_detector.rs` — CredentialFilter 엔진
+- `crates/naraeclaw-runtime/src/service/mod.rs` — macOS/Windows/Linux 서비스 관리
+- `crates/naraeclaw-config/src/schema/mod.rs` — 설정 스키마 진입점
+- `apps/tauri/` — Desktop sidecar 및 창 관리
+- `web/` — Web UI와 설정 화면
 
 **Config** (`crates/naraeclaw-config/`): TOML 기반, `Configurable` derive 매크로로 스키마 자동 생성. Config 키는 공개 계약 — 변경 시 기본값과 마이그레이션 경로 문서화 필수.
 
@@ -84,10 +86,10 @@ Rust edition 2024 워크스페이스. `naraeclaw` 바이너리(`src/main.rs`)는
 
 핵심 V1 작업은 모두 완료됨. 현재 우선순위:
 
-1. **Gateway sidecar 번들링** — `naraeclaw agent` 실행파일을 Tauri sidecar로 묶어 앱 실행 시 자동 시작 (`apps/tauri/`)
-2. **창 기본 표시 + 브랜딩** — `visible: false` → `true`, 창 크기 저장, 아이콘·앱 이름 NaraeClaw
+1. **핵심 경로 안정화** — CLI / Desktop / Web의 기본 실행, 설정, 종료, 복원 흐름을 우선 검증
+2. **브랜딩 정리** — 창 기본 표시, 아이콘·앱 이름, 사용자 노출 문자열을 NaraeClaw 기준으로 통일
 3. **한국어 UI** — 웹 프론트엔드(`/web/src/`) 메뉴·버튼·안내 텍스트 한국어화
-4. **시스템 알림** — 텔레그램 메시지 수신 시 native notification
+4. **검증 단순화** — fmt / check / clippy / 핵심 테스트를 빠르게 돌리는 루프 유지
 
 자세한 계획: `Plan.md`
 

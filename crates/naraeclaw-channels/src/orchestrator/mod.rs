@@ -4106,8 +4106,8 @@ fn build_channel_by_id(config: &Config, channel_id: &str) -> Result<Arc<dyn Chan
         }
         other => anyhow::bail!(
             "Unknown channel '{other}'. Supported: telegram, discord, slack, mattermost, signal, \
-            matrix, whatsapp, nextcloud_talk, wati, linq, \
-            email, gmail_push, irc, twitter, discord_history, imessage, line"
+            matrix, whatsapp, nextcloud_talk, wati, \
+            email, gmail_push, twitter, discord_history, line"
         ),
     }
 }

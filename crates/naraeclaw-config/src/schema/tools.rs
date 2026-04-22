@@ -1,4 +1,4 @@
-//! 도구·프록시 설정 — Browser, HTTP, Shell, Composio, ClaudeCode/Codex/Gemini CLI, Proxy.
+//! 도구·프록시 설정 — Browser, HTTP, Shell, ClaudeCode/Codex/Gemini CLI, Proxy.
 #![allow(unused_imports)]
 use super::*;
 use crate::domain_matcher::DomainMatcher;
@@ -829,43 +829,43 @@ pub fn default_linkedin_api_version() -> String {
     "202602".to_string()
 }
 
-/// Plugin system configuration.
+/// Legacy plugin registry configuration kept for config compatibility.
 #[derive(Debug, Clone, Serialize, Deserialize, Configurable)]
 #[cfg_attr(feature = "schema-export", derive(schemars::JsonSchema))]
 #[prefix = "plugins"]
 pub struct PluginsConfig {
-    /// Enable the plugin system (default: false)
+    /// Enable the legacy plugin registry compatibility block (default: false)
     #[serde(default)]
     pub enabled: bool,
-    /// Directory where plugins are stored
+    /// Directory used by legacy plugin manifests
     #[serde(default = "default_plugins_dir")]
     pub plugins_dir: String,
-    /// Auto-discover and load plugins on startup
+    /// Auto-discover and load legacy plugin manifests on startup
     #[serde(default)]
     pub auto_discover: bool,
-    /// Maximum number of plugins that can be loaded
+    /// Maximum number of legacy plugins that can be loaded
     #[serde(default = "default_max_plugins")]
     pub max_plugins: usize,
-    /// Plugin signature verification security settings
+    /// Legacy plugin signature compatibility settings
     #[serde(default)]
     #[nested]
     pub security: PluginSecurityConfig,
 }
 
-/// Plugin signature verification configuration (`[plugins.security]`).
+/// Legacy plugin signature configuration (`[plugins.security]`).
 ///
-/// Controls Ed25519 signature verification for plugin manifests.
-/// In `strict` mode, only plugins signed by a trusted publisher key are loaded.
-/// In `permissive` mode, unsigned or untrusted plugins produce warnings but are
+/// Controls Ed25519 signature verification for legacy plugin manifests.
+/// In `strict` mode, only manifests signed by a trusted publisher key are loaded.
+/// In `permissive` mode, unsigned or untrusted manifests produce warnings but are
 /// still loaded. In `disabled` mode (the default), no signature checking occurs.
 #[derive(Debug, Clone, Serialize, Deserialize, Configurable)]
 #[cfg_attr(feature = "schema-export", derive(schemars::JsonSchema))]
 #[prefix = "plugins.security"]
 pub struct PluginSecurityConfig {
-    /// Signature enforcement mode: "disabled", "permissive", or "strict".
+    /// Signature enforcement mode for legacy plugin manifests: "disabled", "permissive", or "strict".
     #[serde(default = "default_signature_mode")]
     pub signature_mode: String,
-    /// Hex-encoded Ed25519 public keys of trusted plugin publishers.
+    /// Hex-encoded Ed25519 public keys of trusted legacy plugin publishers.
     #[serde(default)]
     pub trusted_publisher_keys: Vec<String>,
 }
