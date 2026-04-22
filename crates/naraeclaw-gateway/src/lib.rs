@@ -34,20 +34,9 @@ use naraeclaw_api::channel::{Channel, SendMessage};
 use naraeclaw_api::tool::ToolSpec;
 #[cfg(feature = "channel-wati")]
 use naraeclaw_channels::wati::WatiChannel;
-#[cfg(not(feature = "channel-wati"))]
-type WatiChannel = ();
-#[cfg(feature = "channel-email")]
-use naraeclaw_channels::gmail_push::GmailPushChannel;
-#[cfg(not(feature = "channel-email"))]
-type GmailPushChannel = ();
-#[cfg(feature = "channel-nextcloud")]
-use naraeclaw_channels::nextcloud_talk::NextcloudTalkChannel;
-#[cfg(not(feature = "channel-nextcloud"))]
-type NextcloudTalkChannel = ();
-#[cfg(feature = "channel-whatsapp-cloud")]
-use naraeclaw_channels::whatsapp::WhatsAppChannel;
-#[cfg(not(feature = "channel-whatsapp-cloud"))]
-type WhatsAppChannel = ();
+use naraeclaw_channels::{
+    gmail_push::GmailPushChannel, nextcloud_talk::NextcloudTalkChannel, whatsapp::WhatsAppChannel,
+};
 use parking_lot::Mutex;
 use std::collections::HashMap;
 use std::net::{IpAddr, SocketAddr};
@@ -56,6 +45,8 @@ use std::time::{Duration, Instant};
 use tower_http::limit::RequestBodyLimitLayer;
 use tower_http::timeout::TimeoutLayer;
 use uuid::Uuid;
+#[cfg(not(feature = "channel-wati"))]
+type WatiChannel = ();
 use naraeclaw_config::policy::SecurityPolicy;
 use naraeclaw_config::schema::Config;
 use naraeclaw_infra::session_backend::SessionBackend;
@@ -102,7 +93,6 @@ fn webhook_memory_key() -> String {
     format!("webhook_msg_{}", Uuid::new_v4())
 }
 
-#[cfg(feature = "channel-whatsapp-cloud")]
 fn whatsapp_memory_key(msg: &naraeclaw_api::channel::ChannelMessage) -> String {
     format!("whatsapp_{}_{}", msg.sender, msg.id)
 }
@@ -112,7 +102,6 @@ fn wati_memory_key(msg: &naraeclaw_api::channel::ChannelMessage) -> String {
     format!("wati_{}_{}", msg.sender, msg.id)
 }
 
-#[cfg(feature = "channel-nextcloud")]
 fn nextcloud_talk_memory_key(msg: &naraeclaw_api::channel::ChannelMessage) -> String {
     format!("nextcloud_talk_{}_{}", msg.sender, msg.id)
 }
@@ -559,7 +548,6 @@ pub async fn run_gateway(
         });
 
     // WhatsApp channel (if configured)
-    #[cfg(feature = "channel-whatsapp-cloud")]
     let whatsapp_channel: Option<Arc<WhatsAppChannel>> = config
         .channels_config
         .whatsapp
@@ -573,12 +561,9 @@ pub async fn run_gateway(
                 wa.allowed_numbers.clone(),
             ))
         });
-    #[cfg(not(feature = "channel-whatsapp-cloud"))]
-    let whatsapp_channel: Option<Arc<WhatsAppChannel>> = None;
 
     // WhatsApp app secret for webhook signature verification
     // Priority: environment variable > config file
-    #[cfg(feature = "channel-whatsapp-cloud")]
     let whatsapp_app_secret: Option<Arc<str>> = app_env("WHATSAPP_APP_SECRET")
         .ok()
         .and_then(|secret| {
@@ -595,8 +580,6 @@ pub async fn run_gateway(
             })
         })
         .map(Arc::from);
-    #[cfg(not(feature = "channel-whatsapp-cloud"))]
-    let whatsapp_app_secret: Option<Arc<str>> = None;
 
     // WATI channel (if configured)
     #[cfg(feature = "channel-wati")]
@@ -616,7 +599,6 @@ pub async fn run_gateway(
     let wati_channel: Option<Arc<WatiChannel>> = None;
 
     // Nextcloud Talk channel (if configured)
-    #[cfg(feature = "channel-nextcloud")]
     let nextcloud_talk_channel: Option<Arc<NextcloudTalkChannel>> =
         config.channels_config.nextcloud_talk.as_ref().map(|nc| {
             Arc::new(NextcloudTalkChannel::new(
@@ -626,12 +608,9 @@ pub async fn run_gateway(
                 nc.allowed_users.clone(),
             ))
         });
-    #[cfg(not(feature = "channel-nextcloud"))]
-    let nextcloud_talk_channel: Option<Arc<NextcloudTalkChannel>> = None;
 
     // Nextcloud Talk webhook secret for signature verification
     // Priority: environment variable > config file
-    #[cfg(feature = "channel-nextcloud")]
     let nextcloud_talk_webhook_secret: Option<Arc<str>> = app_env("NEXTCLOUD_TALK_WEBHOOK_SECRET")
         .ok()
         .and_then(|secret| {
@@ -652,19 +631,14 @@ pub async fn run_gateway(
                 })
         })
         .map(Arc::from);
-    #[cfg(not(feature = "channel-nextcloud"))]
-    let nextcloud_talk_webhook_secret: Option<Arc<str>> = None;
 
     // Gmail Push channel (if configured and enabled)
-    #[cfg(feature = "channel-email")]
     let gmail_push_channel: Option<Arc<GmailPushChannel>> = config
         .channels_config
         .gmail_push
         .as_ref()
         .filter(|gp| gp.enabled)
         .map(|gp| Arc::new(GmailPushChannel::new(gp.clone())));
-    #[cfg(not(feature = "channel-email"))]
-    let gmail_push_channel: Option<Arc<GmailPushChannel>> = None;
 
     // ── Session persistence for WS chat ─────────────────────
     let session_backend: Option<Arc<dyn SessionBackend>> = if config.gateway.session_persistence {
@@ -1550,7 +1524,6 @@ async fn handle_webhook(
 }
 
 /// `WhatsApp` verification query params
-#[cfg(feature = "channel-whatsapp-cloud")]
 #[derive(serde::Deserialize)]
 pub struct WhatsAppVerifyQuery {
     #[serde(rename = "hub.mode")]
@@ -1562,7 +1535,6 @@ pub struct WhatsAppVerifyQuery {
 }
 
 /// GET /whatsapp — Meta webhook verification
-#[cfg(feature = "channel-whatsapp-cloud")]
 async fn handle_whatsapp_verify(
     State(state): State<AppState>,
     Query(params): Query<WhatsAppVerifyQuery>,
@@ -1591,7 +1563,6 @@ async fn handle_whatsapp_verify(
 /// Verify `WhatsApp` webhook signature (`X-Hub-Signature-256`).
 /// Returns true if the signature is valid, false otherwise.
 /// See: <https://developers.facebook.com/docs/graph-api/webhooks/getting-started#verification-requests>
-#[cfg(feature = "channel-whatsapp-cloud")]
 pub fn verify_whatsapp_signature(app_secret: &str, body: &[u8], signature_header: &str) -> bool {
     use hmac::{Hmac, KeyInit, Mac};
     use sha2::Sha256;
@@ -1617,7 +1588,6 @@ pub fn verify_whatsapp_signature(app_secret: &str, body: &[u8], signature_header
 }
 
 /// POST /whatsapp — incoming message webhook
-#[cfg(feature = "channel-whatsapp-cloud")]
 async fn handle_whatsapp_message(
     State(state): State<AppState>,
     headers: HeaderMap,
@@ -1858,24 +1828,7 @@ async fn handle_wati_webhook() -> impl IntoResponse {
     )
 }
 
-#[cfg(not(feature = "channel-whatsapp-cloud"))]
-async fn handle_whatsapp_verify() -> impl IntoResponse {
-    (
-        StatusCode::NOT_FOUND,
-        "WhatsApp feature not enabled".to_string(),
-    )
-}
-
-#[cfg(not(feature = "channel-whatsapp-cloud"))]
-async fn handle_whatsapp_message() -> impl IntoResponse {
-    (
-        StatusCode::NOT_FOUND,
-        Json(serde_json::json!({"error": "WhatsApp feature not enabled"})),
-    )
-}
-
 /// POST /nextcloud-talk — incoming message webhook (Nextcloud Talk bot API)
-#[cfg(feature = "channel-nextcloud")]
 async fn handle_nextcloud_talk_webhook(
     State(state): State<AppState>,
     headers: HeaderMap,
@@ -1989,21 +1942,11 @@ async fn handle_nextcloud_talk_webhook(
     (StatusCode::OK, Json(serde_json::json!({"status": "ok"})))
 }
 
-#[cfg(not(feature = "channel-nextcloud"))]
-async fn handle_nextcloud_talk_webhook() -> impl IntoResponse {
-    (
-        StatusCode::NOT_FOUND,
-        Json(serde_json::json!({"error": "Nextcloud Talk feature not enabled"})),
-    )
-}
-
 /// Maximum request body size for the Gmail webhook endpoint (1 MB).
 /// Google Pub/Sub messages are typically under 10 KB.
-#[cfg(feature = "channel-email")]
 const GMAIL_WEBHOOK_MAX_BODY: usize = 1024 * 1024;
 
 /// POST /webhook/gmail — incoming Gmail Pub/Sub push notification
-#[cfg(feature = "channel-email")]
 async fn handle_gmail_push_webhook(
     State(state): State<AppState>,
     headers: HeaderMap,
@@ -2065,14 +2008,6 @@ async fn handle_gmail_push_webhook(
 
     // Acknowledge immediately — Google Pub/Sub requires a 2xx within ~10s
     (StatusCode::OK, Json(serde_json::json!({"status": "ok"})))
-}
-
-#[cfg(not(feature = "channel-email"))]
-async fn handle_gmail_push_webhook() -> impl IntoResponse {
-    (
-        StatusCode::NOT_FOUND,
-        Json(serde_json::json!({"error": "Email feature not enabled"})),
-    )
 }
 
 // ══════════════════════════════════════════════════════════════════════════════

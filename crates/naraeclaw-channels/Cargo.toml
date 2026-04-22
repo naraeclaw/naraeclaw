@@ -71,7 +71,9 @@ shellexpand = "3.1"
 
 [features]
 default = [
-    "channel-telegram", "channel-slack",
+    "channel-email", "channel-telegram", "channel-discord", "channel-slack",
+    "channel-signal", "channel-mattermost", "channel-notion", "channel-nextcloud",
+    "channel-webhook", "channel-acp-server", "channel-whatsapp-cloud",
 ]
 # Channels with optional deps
 channel-email = ["dep:lettre", "dep:mail-parser", "dep:async-imap"]
