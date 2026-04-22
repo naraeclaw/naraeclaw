@@ -1,22 +1,14 @@
-//! WASM sandbox runtime — in-process tool isolation via `wasmi`.
+//! Optional WASM runtime adapter behind the `runtime-wasm` feature.
 //!
-//! Provides capability-based sandboxing without Docker or external runtimes.
-//! Each WASM module runs with:
-//! - **Fuel limits**: prevents infinite loops (each instruction costs 1 fuel)
-//! - **Memory caps**: configurable per-module memory ceiling
-//! - **No filesystem access**: by default, tools are pure computation
-//! - **No network access**: unless explicitly allowlisted hosts are configured
-//!
-//! # Feature gate
-//! This module is only compiled when `--features runtime-wasm` is enabled.
-//! The default NaraeClaw binary excludes it to maintain the 4.6 MB size target.
+//! The default build does not compile this path. It remains available only for
+//! builds that explicitly opt into WASM execution.
 
 use super::traits::RuntimeAdapter;
 use naraeclaw_config::schema::WasmRuntimeConfig;
 use anyhow::{bail, Context, Result};
 use std::path::{Path, PathBuf};
 
-/// WASM sandbox runtime — executes tool modules in an isolated interpreter.
+/// Optional WASM runtime adapter — executes tool modules in an isolated interpreter.
 #[derive(Debug, Clone)]
 pub struct WasmRuntime {
     config: WasmRuntimeConfig,
@@ -87,7 +79,7 @@ impl WasmRuntime {
         if self.config.tools_dir.is_empty() {
             bail!("runtime.wasm.tools_dir cannot be empty");
         }
-        // Verify tools directory doesn't escape workspace
+        // Verify tools directory does not escape workspace
         if self.config.tools_dir.contains("..") {
             bail!("runtime.wasm.tools_dir must not contain '..' path traversal");
         }
@@ -186,7 +178,7 @@ impl WasmRuntime {
             })?;
         }
 
-        // Link host functions (minimal — pure sandboxing)
+        // Link host functions (minimal)
         let linker = Linker::new(&engine);
 
         // Instantiate module
@@ -246,7 +238,7 @@ impl WasmRuntime {
     ) -> Result<WasmExecutionResult> {
         bail!(
             "WASM runtime is not available in this build. \
-             Rebuild with `cargo build --features runtime-wasm` to enable WASM sandbox support. \
+             Rebuild with `cargo build --features runtime-wasm` to include the optional WASM runtime adapter. \
              Module requested: {module_name}"
         )
     }
@@ -281,7 +273,7 @@ impl RuntimeAdapter for WasmRuntime {
     }
 
     fn has_shell_access(&self) -> bool {
-        // WASM sandbox does NOT provide shell access — that's the point
+        // WASM runtime does not provide shell access
         false
     }
 

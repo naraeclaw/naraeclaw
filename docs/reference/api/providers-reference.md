@@ -287,7 +287,7 @@ Then provide one of the following credentials via environment variables:
 
 Optional:
 
-- `MINIMAX_OAUTH_REGION=global` or `cn` (defaults by provider alias)
+- `MINIMAX_OAUTH_REGION=global` (defaults by provider alias)
 - `MINIMAX_OAUTH_CLIENT_ID` to override the default OAuth client id
 
 Channel compatibility note:

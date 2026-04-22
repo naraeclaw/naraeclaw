@@ -685,8 +685,6 @@ fn send_message_with_subject_preserves_thread() {
 /// - Telegram: sender = chat_id (numeric), reply_target = chat_id
 /// - Discord: sender = user_id, reply_target = channel_id (distinct!)
 /// - Slack: sender = user_id, reply_target = channel_id (distinct!)
-/// - iMessage: sender = phone/email, reply_target = phone/email (same)
-/// - IRC: sender = nick, reply_target = channel_name (distinct!)
 /// - Email: sender = from@, reply_target = from@ (reply goes to sender)
 fn make_platform_message(platform: &str) -> ChannelMessage {
     match platform {
@@ -720,28 +718,6 @@ fn make_platform_message(platform: &str) -> ChannelMessage {
             channel: "slack".into(),
             timestamp: 1700000000,
             thread_ts: Some("1700000000.000001".into()),
-            interruption_scope_id: None,
-            attachments: vec![],
-        },
-        "imessage" => ChannelMessage {
-            id: "im_1".into(),
-            sender: "+15551234567".into(),
-            reply_target: "+15551234567".into(),
-            content: "hi".into(),
-            channel: "imessage".into(),
-            timestamp: 1700000000,
-            thread_ts: None,
-            interruption_scope_id: None,
-            attachments: vec![],
-        },
-        "irc" => ChannelMessage {
-            id: "irc_1".into(),
-            sender: "coolnick".into(),
-            reply_target: "#zeroclaw".into(),
-            content: "hi".into(),
-            channel: "irc".into(),
-            timestamp: 1700000000,
-            thread_ts: None,
             interruption_scope_id: None,
             attachments: vec![],
         },
@@ -800,17 +776,6 @@ fn make_platform_message(platform: &str) -> ChannelMessage {
             interruption_scope_id: None,
             attachments: vec![],
         },
-        "linq" => ChannelMessage {
-            id: "lq_1".into(),
-            sender: "+15551112222".into(),
-            reply_target: "+15551112222".into(),
-            content: "hi".into(),
-            channel: "linq".into(),
-            timestamp: 1700000000,
-            thread_ts: None,
-            interruption_scope_id: None,
-            attachments: vec![],
-        },
         "wati" => ChannelMessage {
             id: "wt_1".into(),
             sender: "+15553334444".into(),
@@ -841,14 +806,11 @@ const ALL_PLATFORMS: &[&str] = &[
     "telegram",
     "discord",
     "slack",
-    "imessage",
-    "irc",
     "email",
     "signal",
     "mattermost",
     "whatsapp",
     "nextcloud_talk",
-    "linq",
     "wati",
     "cli",
 ];
@@ -889,11 +851,11 @@ fn all_platforms_channel_field_matches_platform_name() {
     }
 }
 
-/// Discord, Slack, IRC, Mattermost, Nextcloud Talk all have
+/// Discord, Slack, Mattermost, and Nextcloud Talk all have
 /// reply_target != sender (channel-based platforms).
 #[test]
 fn channel_platforms_have_distinct_sender_and_reply_target() {
-    let channel_based = ["discord", "slack", "irc", "mattermost", "nextcloud_talk"];
+    let channel_based = ["discord", "slack", "mattermost", "nextcloud_talk"];
 
     for platform in &channel_based {
         let msg = make_platform_message(platform);
@@ -904,13 +866,11 @@ fn channel_platforms_have_distinct_sender_and_reply_target() {
     }
 }
 
-/// Telegram, iMessage, Email, Signal, WhatsApp, CLI, Linq, WATI
-/// are DM-style: reply_target == sender.
+/// Telegram, Email, Signal, WhatsApp, CLI, and WATI are DM-style:
+/// reply_target == sender.
 #[test]
 fn dm_platforms_have_same_sender_and_reply_target() {
-    let dm_platforms = [
-        "telegram", "imessage", "email", "signal", "whatsapp", "cli", "linq", "wati",
-    ];
+    let dm_platforms = ["telegram", "email", "signal", "whatsapp", "cli", "wati"];
 
     for platform in &dm_platforms {
         let msg = make_platform_message(platform);
@@ -1204,7 +1164,6 @@ async fn multi_channel_listen_produces_channel_tagged_messages() {
         MatrixTestChannel::new("telegram"),
         MatrixTestChannel::new("discord"),
         MatrixTestChannel::new("slack"),
-        MatrixTestChannel::new("irc"),
         MatrixTestChannel::new("email"),
     ];
 
@@ -1239,12 +1198,9 @@ async fn capability_matrix_spec() {
         "matrix",
         "signal",
         "email",
-        "imessage",
-        "irc",
         "whatsapp",
         "mattermost",
         "cli",
-        "linq",
         "wati",
         "nextcloud_talk",
     ] {

@@ -34,8 +34,8 @@ pub type NostrKeyValidator = Box<dyn Fn(&str) -> Result<String>>;
 /// Callbacks injected by the binary crate to wire wizard sections whose
 /// implementations live in downstream crates such as naraeclaw-channels.
 ///
-/// NOTE: Transitional bridge — see RFC #5574 Phase 2 D4. This struct will be
-/// replaced when `naraeclaw onboard` integrates with `PluginRegistry::install`.
+/// NOTE: Transitional bridge — this struct stays small so downstream setup
+/// logic can be wired in without expanding the core onboarding flow.
 #[derive(Default)]
 pub struct WizardCallbacks {
     /// Validate a Nostr private key string (hex or nsec) and return the
@@ -749,11 +749,6 @@ async fn run_quick_setup_with_home(
         "  {} Tunnel:     {}",
         style("✓").green().bold(),
         style("none (local only)").dim()
-    );
-    println!(
-        "  {} Composio:   {}",
-        style("✓").green().bold(),
-        style("disabled (sovereign mode)").dim()
     );
     println!();
     println!(
@@ -6896,8 +6891,8 @@ Do not overwrite me.",
 
         let mut config = Config::default();
         config.workspace_dir = tmp.path().to_path_buf();
-        // Use a non-provider channel key to keep this test deterministic and offline.
-        config.default_provider = Some("imessage".to_string());
+        // Use a non-provider key to keep this test deterministic and offline.
+        config.default_provider = Some("bogus-provider".to_string());
 
         let err = run_models_refresh(&config, None, true).await.unwrap_err();
         assert!(

@@ -108,7 +108,7 @@ pub fn install(config: &Config, init_system: InitSystem) -> Result<()> {
     } else if cfg!(target_os = "windows") {
         install_windows(config)
     } else {
-        anyhow::bail!("Service management is supported on macOS and Linux only");
+        anyhow::bail!("Service management is supported on macOS, Linux, and Windows only");
     }
 }
 
@@ -137,7 +137,7 @@ pub fn start(config: &Config, init_system: InitSystem) -> Result<()> {
         Ok(())
     } else {
         let _ = config;
-        anyhow::bail!("Service management is supported on macOS and Linux only")
+        anyhow::bail!("Service management is supported on macOS, Linux, and Windows only")
     }
 }
 
@@ -176,7 +176,7 @@ pub fn stop(config: &Config, init_system: InitSystem) -> Result<()> {
         Ok(())
     } else {
         let _ = config;
-        anyhow::bail!("Service management is supported on macOS and Linux only")
+        anyhow::bail!("Service management is supported on macOS, Linux, and Windows only")
     }
 }
 
@@ -215,7 +215,7 @@ pub fn restart(config: &Config, init_system: InitSystem) -> Result<()> {
         return Ok(());
     }
 
-    anyhow::bail!("Service management is supported on macOS and Linux only")
+    anyhow::bail!("Service management is supported on macOS, Linux, and Windows only")
 }
 
 fn restart_linux(init_system: InitSystem) -> Result<()> {
@@ -280,7 +280,7 @@ pub fn status(config: &Config, init_system: InitSystem) -> Result<()> {
         return Ok(());
     }
 
-    anyhow::bail!("Service management is supported on macOS and Linux only")
+    anyhow::bail!("Service management is supported on macOS, Linux, and Windows only")
 }
 
 fn status_linux(config: &Config, init_system: InitSystem) -> Result<()> {
@@ -481,7 +481,7 @@ pub fn uninstall(config: &Config, init_system: InitSystem) -> Result<()> {
         return Ok(());
     }
 
-    anyhow::bail!("Service management is supported on macOS and Linux only")
+    anyhow::bail!("Service management is supported on macOS, Linux, and Windows only")
 }
 
 fn uninstall_linux(config: &Config, init_system: InitSystem) -> Result<()> {

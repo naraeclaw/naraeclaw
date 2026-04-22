@@ -210,13 +210,13 @@ Add a new channel configuration.
 Provide the channel type and a JSON object with the required \
 configuration keys for that channel type.
 
-Supported types: telegram, discord, slack, whatsapp, matrix, imessage, email.
+Supported types: telegram, discord, slack, whatsapp, matrix, email.
 
 Examples:
   naraeclaw channel add telegram '{\"bot_token\":\"...\",\"name\":\"my-bot\"}'
   naraeclaw channel add discord '{\"bot_token\":\"...\",\"name\":\"my-discord\"}'")]
     Add {
-        /// Channel type (telegram, discord, slack, whatsapp, matrix, imessage, email)
+        /// Channel type (telegram, discord, slack, whatsapp, matrix, email)
         channel_type: String,
         /// Optional configuration as JSON
         config: String,
