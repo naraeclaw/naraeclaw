@@ -3887,6 +3887,7 @@ fn build_channel_by_id(config: &Config, channel_id: &str) -> Result<Arc<dyn Chan
                 .with_workspace_dir(config.workspace_dir.clone()),
             ))
         }
+        #[cfg(feature = "channel-discord")]
         "discord" => {
             let dc = config
                 .channels_config
@@ -3931,6 +3932,7 @@ fn build_channel_by_id(config: &Config, channel_id: &str) -> Result<Arc<dyn Chan
                 .with_cancel_reaction(sl.cancel_reaction.clone()),
             ))
         }
+        #[cfg(feature = "channel-mattermost")]
         "mattermost" => {
             let mm = config
                 .channels_config
@@ -3946,6 +3948,7 @@ fn build_channel_by_id(config: &Config, channel_id: &str) -> Result<Arc<dyn Chan
                 mm.mention_only.unwrap_or(false),
             )))
         }
+        #[cfg(feature = "channel-signal")]
         "signal" => {
             let sg = config
                 .channels_config
@@ -4011,6 +4014,7 @@ fn build_channel_by_id(config: &Config, channel_id: &str) -> Result<Arc<dyn Chan
                 anyhow::bail!("WhatsApp channel requires the `whatsapp-web` feature");
             }
         }
+        #[cfg(feature = "channel-nextcloud")]
         "nextcloud_talk" | "nextcloud-talk" => {
             let nc = config
                 .channels_config
@@ -4070,6 +4074,7 @@ fn build_channel_by_id(config: &Config, channel_id: &str) -> Result<Arc<dyn Chan
                 tw.allowed_users.clone(),
             )))
         }
+        #[cfg(feature = "channel-discord")]
         "discord_history" | "discord-history" => {
             let dh = config
                 .channels_config
@@ -4191,6 +4196,7 @@ fn collect_configured_channels(
         }
     }
 
+    #[cfg(feature = "channel-discord")]
     if let Some(ref dc) = config.channels_config.discord {
         if dc.enabled {
             channels.push(ConfiguredChannel {
@@ -4218,6 +4224,7 @@ fn collect_configured_channels(
         }
     }
 
+    #[cfg(feature = "channel-discord")]
     if let Some(ref dh) = config.channels_config.discord_history {
         if dh.enabled {
             match naraeclaw_memory::SqliteMemory::new_named(&config.workspace_dir, "discord") {
@@ -4274,6 +4281,7 @@ fn collect_configured_channels(
         }
     }
 
+    #[cfg(feature = "channel-mattermost")]
     if let Some(ref mm) = config.channels_config.mattermost {
         if mm.enabled {
             channels.push(ConfiguredChannel {
@@ -4334,6 +4342,7 @@ fn collect_configured_channels(
         );
     }
 
+    #[cfg(feature = "channel-signal")]
     if let Some(ref sig) = config.channels_config.signal {
         if sig.enabled {
             channels.push(ConfiguredChannel {
@@ -4366,6 +4375,7 @@ fn collect_configured_channels(
             match wa.backend_type() {
                 "cloud" => {
                     // Cloud API mode: requires phone_number_id, access_token, verify_token
+                    #[cfg(feature = "channel-whatsapp-cloud")]
                     if wa.is_cloud_config() {
                         channels.push(ConfiguredChannel {
                             display_name: "WhatsApp",
@@ -4381,9 +4391,17 @@ fn collect_configured_channels(
                                 .with_group_mention_patterns(wa.group_mention_patterns.clone()),
                             ),
                         });
-                    } else {
+                    }
+                    #[cfg(feature = "channel-whatsapp-cloud")]
+                    if !wa.is_cloud_config() {
                         tracing::warn!(
                             "WhatsApp Cloud API configured but missing required fields (phone_number_id, access_token, verify_token)"
+                        );
+                    }
+                    #[cfg(not(feature = "channel-whatsapp-cloud"))]
+                    {
+                        tracing::warn!(
+                            "WhatsApp Cloud API configured but this build was compiled without `channel-whatsapp-cloud`; skipping."
                         );
                     }
                 }
@@ -4457,6 +4475,7 @@ fn collect_configured_channels(
         }
     }
 
+    #[cfg(feature = "channel-nextcloud")]
     if let Some(ref nc) = config.channels_config.nextcloud_talk {
         if nc.enabled {
             channels.push(ConfiguredChannel {
@@ -4572,6 +4591,7 @@ fn collect_configured_channels(
         });
     }
 
+    #[cfg(feature = "channel-webhook")]
     if let Some(ref wh) = config.channels_config.webhook {
         if wh.enabled {
             channels.push(ConfiguredChannel {
@@ -5256,6 +5276,7 @@ pub async fn deliver_announcement(
             naraeclaw_api::channel::Channel::send(&ch, &SendMessage::new(&safe_output, target))
                 .await?;
         }
+        #[cfg(feature = "channel-discord")]
         "discord" => {
             let dc = config
                 .channels_config
@@ -5289,6 +5310,7 @@ pub async fn deliver_announcement(
             naraeclaw_api::channel::Channel::send(&ch, &SendMessage::new(&safe_output, target))
                 .await?;
         }
+        #[cfg(feature = "channel-signal")]
         "signal" => {
             let sg = config
                 .channels_config
