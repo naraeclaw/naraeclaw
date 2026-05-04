@@ -29,13 +29,8 @@ pub fn spawn_health_poller<R: Runtime>(app: AppHandle<R>, state: SharedState) {
             if healthy {
                 CONSECUTIVE_FAILURES.store(0, Ordering::Relaxed);
 
-                // Check Ollama health when provider is ollama.
-                let is_ollama = {
-                    let s = state.read().await;
-                    // Simple heuristic: check if gateway reports ollama as provider
-                    true // Always check — cheap HTTP call
-                };
-                if is_ollama {
+                // Always try to keep Ollama up — cheap local HTTP check.
+                {
                     let ollama_ok = reqwest::Client::new()
                         .get("http://127.0.0.1:11434/api/tags")
                         .timeout(std::time::Duration::from_secs(3))

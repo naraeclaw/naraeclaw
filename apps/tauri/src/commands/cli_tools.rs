@@ -20,12 +20,12 @@ const TOOLS: &[(&str, &str, &str)] = &[
     (
         "gemini",
         "Gemini CLI",
-        "npm install -g @anthropic-ai/gemini-cli",
+        "npm install -g @google/gemini-cli",
     ),
     (
-        "kiro-cli",
+        "kiro",
         "Kiro CLI",
-        "npm install -g @anthropic-ai/kiro-cli",
+        "npm install -g @aws/kiro-cli",
     ),
 ];
 
@@ -54,7 +54,7 @@ pub async fn list_cli_tools() -> Vec<CliToolInfo> {
 #[tauri::command]
 pub async fn run_cli_tool(tool: String, prompt: String) -> Result<String, String> {
     let bin = match tool.as_str() {
-        "claude" | "codex" | "gemini" | "kiro-cli" => tool.as_str(),
+        "claude" | "codex" | "gemini" | "kiro" => tool.as_str(),
         _ => return Err(format!("지원하지 않는 도구: {tool}")),
     };
 

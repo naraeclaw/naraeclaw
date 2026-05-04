@@ -207,14 +207,14 @@ mod tests {
 
     #[test]
     fn client_custom_url() {
-        let client = GatewayClient::new("https://zeroclaw.example.com:9999", None);
-        assert_eq!(client.base_url, "https://zeroclaw.example.com:9999");
+        let client = GatewayClient::new("https://naraeclaw.example.com:9999", None);
+        assert_eq!(client.base_url, "https://naraeclaw.example.com:9999");
     }
 
     #[test]
     fn auth_header_format() {
-        let client = GatewayClient::new("http://localhost", Some("zc_abc123"));
-        assert_eq!(client.auth_header().unwrap(), "Bearer zc_abc123");
+        let client = GatewayClient::new("http://localhost", Some("nc_abc123"));
+        assert_eq!(client.auth_header().unwrap(), "Bearer nc_abc123");
     }
 
     #[tokio::test]
