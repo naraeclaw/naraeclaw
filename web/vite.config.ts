@@ -7,7 +7,7 @@ const gatewayPort = process.env.NARAECLAW_GATEWAY_PORT ?? "42617";
 const gatewayTarget = `http://127.0.0.1:${gatewayPort}`;
 
 export default defineConfig(({ command }) => ({
-  base: command === "serve" ? "/" : "/_app/",
+  base: process.env.TAURI_ENV_PLATFORM ? "/" : command === "serve" ? "/" : "/_app/",
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {

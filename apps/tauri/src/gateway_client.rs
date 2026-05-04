@@ -130,6 +130,48 @@ impl GatewayClient {
         self.pair_with_code(&code).await
     }
 
+    /// Get raw channel list from gateway.
+    pub async fn list_channels_raw(&self) -> Result<serde_json::Value> {
+        self.get_json("/api/channels").await
+    }
+
+    /// Generic authenticated GET returning JSON.
+    pub async fn get_json(&self, path: &str) -> Result<serde_json::Value> {
+        let mut req = self.client.get(format!("{}{path}", self.base_url));
+        if let Some(auth) = self.auth_header() {
+            req = req.header("Authorization", auth);
+        }
+        let resp = req.send().await.context("GET request failed")?;
+        Ok(resp.json().await.unwrap_or(serde_json::json!(null)))
+    }
+
+    /// Generic authenticated POST with JSON body.
+    pub async fn post_json(
+        &self,
+        path: &str,
+        body: &serde_json::Value,
+    ) -> Result<serde_json::Value> {
+        let mut req = self
+            .client
+            .post(format!("{}{path}", self.base_url))
+            .json(body);
+        if let Some(auth) = self.auth_header() {
+            req = req.header("Authorization", auth);
+        }
+        let resp = req.send().await.context("POST request failed")?;
+        Ok(resp.json().await.unwrap_or(serde_json::json!(null)))
+    }
+
+    /// Generic authenticated DELETE returning JSON.
+    pub async fn delete_json(&self, path: &str) -> Result<serde_json::Value> {
+        let mut req = self.client.delete(format!("{}{path}", self.base_url));
+        if let Some(auth) = self.auth_header() {
+            req = req.header("Authorization", auth);
+        }
+        let resp = req.send().await.context("DELETE request failed")?;
+        Ok(resp.json().await.unwrap_or(serde_json::json!(null)))
+    }
+
     pub async fn send_webhook_message(&self, message: &str) -> Result<serde_json::Value> {
         let mut req = self
             .client

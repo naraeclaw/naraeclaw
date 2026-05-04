@@ -1,4 +1,13 @@
 pub mod agent;
+pub mod channel_config;
 pub mod channels;
+pub mod cli_tools;
+pub mod computer_use;
+pub mod config;
+pub mod file_ops;
 pub mod gateway;
+pub mod knowledge;
 pub mod pairing;
+pub mod remote;
+pub mod resources;
+pub mod scheduler;

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Puzzle, Check, Zap, Clock } from 'lucide-react';
 import type { Integration } from '@/types/api';
 import { getIntegrations } from '@/lib/api';
@@ -34,6 +35,7 @@ function statusBadge(status: Integration['status']) {
 }
 
 export default function Integrations() {
+  const navigate = useNavigate();
   const [integrations, setIntegrations] = useState<Integration[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -141,6 +143,15 @@ export default function Integrations() {
                         {badge.label}
                       </span>
                     </div>
+                    {integration.status === 'Available' && (
+                      <button
+                        onClick={() => navigate('/channels')}
+                        className="mt-3 w-full py-1.5 rounded-lg text-xs font-semibold"
+                        style={{ background: 'var(--pc-accent)', color: 'white' }}
+                      >
+                        연결하기
+                      </button>
+                    )}
                   </div>
                 );
               })}

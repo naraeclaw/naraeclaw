@@ -72,38 +72,89 @@ fn resolve_binary() -> PathBuf {
 
 /// Spawn `naraeclaw agent` in the background.
 ///
-/// Safe to call multiple times — only spawns once. The gateway port is
-/// inherited from `NARAECLAW_GATEWAY_PORT` / `ZEROCLAW_GATEWAY_PORT` env vars
-/// if set, otherwise the binary uses its compiled-in default (42617).
+/// Safe to call multiple times — only spawns once. If a previous sidecar
+/// exited unexpectedly, the slot is cleared and a new one is spawned.
+/// The gateway port is inherited from `NARAECLAW_GATEWAY_PORT` /
+/// `ZEROCLAW_GATEWAY_PORT` env vars if set, otherwise the binary uses its
+/// compiled-in default (42617).
 pub async fn spawn_agent() -> Result<()> {
     let mut slot = sidecar_slot().lock().await;
-    if slot.is_some() {
-        return Ok(());
+
+    // If a previous child exited, clear the slot so we can respawn.
+    if let Some(child) = slot.as_mut() {
+        match child.try_wait() {
+            Ok(Some(status)) => {
+                tracing::warn!("naraeclaw agent sidecar exited with {status}, respawning");
+                *slot = None;
+            }
+            Ok(None) => return Ok(()), // still running
+            Err(_) => {
+                *slot = None;
+            }
+        }
     }
 
     let binary = resolve_binary();
     tracing::info!("Starting naraeclaw agent sidecar: {}", binary.display());
 
     let child = tokio::process::Command::new(&binary)
-        .arg("agent")
+        .args(["daemon"])
+        .stderr(std::process::Stdio::piped())
         .spawn()
         .with_context(|| format!("Failed to spawn naraeclaw at '{}'", binary.display()))?;
 
     *slot = Some(child);
+
+    // Brief wait to catch immediate failures (e.g. port conflict).
+    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+    if let Some(child) = slot.as_mut() {
+        if let Ok(Some(status)) = child.try_wait() {
+            let _ = slot.take();
+            anyhow::bail!(
+                "Gateway exited immediately ({}). Port 42617 may be in use.",
+                status
+            );
+        }
+    }
+
     Ok(())
 }
 
-/// Kill the agent sidecar if it is running.
+/// Gracefully stop the agent sidecar.
 ///
-/// Called on `RunEvent::Exit` to ensure the gateway process does not outlive
-/// the Tauri app.
+/// On Unix, sends SIGTERM first and waits up to 5 seconds for the process
+/// to exit cleanly before falling back to SIGKILL. On other platforms,
+/// kills immediately. Called on `RunEvent::Exit` to ensure the gateway
+/// process does not outlive the Tauri app.
 pub async fn shutdown_agent() {
     let mut slot = sidecar_slot().lock().await;
-    if let Some(mut child) = slot.take() {
-        if let Err(e) = child.kill().await {
-            tracing::warn!("Failed to kill naraeclaw agent sidecar: {e}");
-        } else {
-            tracing::info!("naraeclaw agent sidecar stopped");
+    let Some(mut child) = slot.take() else {
+        return;
+    };
+
+    // Try graceful shutdown on Unix.
+    #[cfg(unix)]
+    {
+        if let Some(pid) = child.id() {
+            // Send SIGTERM via the kill command.
+            let _ = std::process::Command::new("kill")
+                .args(["-TERM", &pid.to_string()])
+                .status();
+            // Wait up to 5 seconds for clean exit.
+            for _ in 0..50 {
+                tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+                if let Ok(Some(_)) = child.try_wait() {
+                    tracing::info!("naraeclaw agent sidecar stopped gracefully");
+                    return;
+                }
+            }
+            tracing::warn!("naraeclaw agent sidecar did not exit after SIGTERM, sending SIGKILL");
         }
+    }
+
+    if let Err(e) = child.kill().await {
+        tracing::warn!("Failed to kill naraeclaw agent sidecar: {e}");
+    } else {
+        tracing::info!("naraeclaw agent sidecar stopped");
     }
 }

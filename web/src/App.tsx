@@ -14,6 +14,11 @@ import Logs from './pages/Logs';
 import Doctor from './pages/Doctor';
 import Pairing from './pages/Pairing';
 import Canvas from './pages/Canvas';
+import Onboarding from './pages/Onboarding';
+import ChannelSetup from './pages/ChannelSetup';
+import CliTools from './pages/CliTools';
+import RemoteServers from './pages/RemoteServers';
+import Wiki from './pages/Wiki';
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import { DraftContext, useDraftStore } from './hooks/useDraft';
 import { setLocale, t, type Locale } from './lib/i18n';
@@ -226,6 +231,7 @@ function AppContent() {
     <DraftContext.Provider value={draftStore}>
       <LocaleContext.Provider value={{ locale, setAppLocale }}>
         <Routes>
+          <Route path="/onboarding" element={<Onboarding />} />
           <Route element={<Layout />}>
             <Route path="/" element={<Dashboard />} />
             <Route path="/agent" element={<AgentChat />} />
@@ -239,6 +245,10 @@ function AppContent() {
             <Route path="/doctor" element={<Doctor />} />
             <Route path="/pairing" element={<Pairing />} />
             <Route path="/canvas" element={<Canvas />} />
+            <Route path="/channels" element={<ChannelSetup />} />
+            <Route path="/cli-tools" element={<CliTools />} />
+            <Route path="/remote" element={<RemoteServers />} />
+            <Route path="/wiki" element={<Wiki />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>

@@ -830,6 +830,12 @@ pub fn default_linkedin_api_version() -> String {
 }
 
 /// Legacy plugin registry configuration kept for config compatibility.
+///
+/// **Deprecated**: This block is not connected to any runtime functionality.
+/// It exists only so that existing `config.toml` files with a `[plugins]`
+/// section continue to parse without error. It will be removed in a future
+/// release. Do not add new fields here.
+#[deprecated(note = "Legacy compatibility stub — will be removed in a future release")]
 #[derive(Debug, Clone, Serialize, Deserialize, Configurable)]
 #[cfg_attr(feature = "schema-export", derive(schemars::JsonSchema))]
 #[prefix = "plugins"]
@@ -891,6 +897,7 @@ pub fn default_max_plugins() -> usize {
     50
 }
 
+#[allow(deprecated)]
 impl Default for PluginsConfig {
     fn default() -> Self {
         Self {

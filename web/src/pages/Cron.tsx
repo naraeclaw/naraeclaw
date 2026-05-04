@@ -151,6 +151,8 @@ export default function Cron() {
   const [expandedJob, setExpandedJob] = useState<string | null>(null);
   const [settings, setSettings] = useState<CronSettings | null>(null);
   const [togglingCatchUp, setTogglingCatchUp] = useState(false);
+  const [naturalInput, setNaturalInput] = useState('');
+  const [naturalSending, setNaturalSending] = useState(false);
 
   // Unified modal: null = closed, 'add' = adding, CronJob = editing
   const [modalJob, setModalJob] = useState<CronJob | 'add' | null>(null);
@@ -308,6 +310,41 @@ export default function Cron() {
         >
           <Plus className="h-4 w-4" />{t('cron.add_job')}
         </button>
+      </div>
+
+      {/* 자연어 예약 입력 */}
+      <div className="glass-card px-4 py-3 mb-4">
+        <form onSubmit={async (e) => {
+          e.preventDefault();
+          if (!naturalInput.trim() || naturalSending) return;
+          setNaturalSending(true);
+          try {
+            const { isTauri } = await import('../lib/tauri');
+            if (isTauri()) {
+              const { invoke } = await import('@tauri-apps/api/core');
+              await invoke('create_task_natural', { description: naturalInput });
+            }
+            setNaturalInput('');
+            setTimeout(fetchJobs, 2000);
+          } catch {}
+          setNaturalSending(false);
+        }} className="flex gap-2">
+          <input
+            type="text"
+            value={naturalInput}
+            onChange={e => setNaturalInput(e.target.value)}
+            placeholder="예: 매일 아침 9시에 서버 상태 알려줘"
+            className="flex-1 px-3 py-2 rounded-lg text-sm"
+            style={{ background: 'var(--pc-bg-secondary)', color: 'var(--pc-text-primary)', border: '1px solid var(--pc-border)' }}
+          />
+          <button
+            type="submit"
+            disabled={!naturalInput.trim() || naturalSending}
+            className="btn-electric px-4 py-2 text-sm"
+          >
+            {naturalSending ? '전송 중...' : '예약'}
+          </button>
+        </form>
       </div>
 
       {/* Catch-up toggle */}

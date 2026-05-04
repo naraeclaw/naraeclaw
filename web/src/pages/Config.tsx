@@ -11,6 +11,7 @@ import { t } from '@/lib/i18n';
 import { useConfigState } from './config/useConfigState';
 import ConfigFormView from './config/ConfigFormView';
 import ConfigTomlEditor from './config/ConfigTomlEditor';
+import OllamaSettings from './config/OllamaSettings';
 
 export default function Config() {
   const {
@@ -110,7 +111,10 @@ export default function Config() {
 
       {/* Content: Form or TOML editor */}
       {mode === 'form' ? (
-        <ConfigFormView config={parsedConfig} onUpdate={updateField} />
+        <>
+          <ConfigFormView config={parsedConfig} onUpdate={updateField} />
+          <OllamaSettings />
+        </>
       ) : (
         <ConfigTomlEditor value={rawToml} onChange={updateRawToml} />
       )}

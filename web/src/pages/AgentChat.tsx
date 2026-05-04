@@ -44,6 +44,7 @@ export default function AgentChat() {
   const [typing, setTyping] = useState(false);
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [dragOver, setDragOver] = useState(false);
 
   const wsRef = useRef<WebSocketClient | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -263,7 +264,27 @@ export default function AgentChat() {
             },
           ]);
           if (msg.code === 'AGENT_INIT_FAILED' || msg.code === 'AUTH_ERROR' || msg.code === 'PROVIDER_ERROR') {
-            setError(`Configuration error: ${msg.message}. Please check your provider settings (API key, model, etc.).`);
+            const errMsg = msg.message || '';
+            setError(`Configuration error: ${errMsg}. Please check your provider settings (API key, model, etc.).`);
+            // Auto-repair broken Ollama model
+            if (errMsg.includes('unable to load model')) {
+              (async () => {
+                try {
+                  const { isTauri } = await import('../lib/tauri');
+                  if (!isTauri()) return;
+                  const { invoke } = await import('@tauri-apps/api/core');
+                  const config = await invoke<Record<string, unknown>>('get_config');
+                  const model = (config?.default_model as string) || '';
+                  if (model) {
+                    setError(`모델 손상 감지 — ${model} 자동 재설치 중...`);
+                    await invoke('ollama_repair_model', { model });
+                    setError(`${model} 재설치 완료. 다시 메시지를 보내보세요.`);
+                  }
+                } catch (e: any) {
+                  setError(`모델 자동 재설치 실패: ${e}`);
+                }
+              })();
+            }
           } else if (msg.code === 'INVALID_JSON' || msg.code === 'UNKNOWN_MESSAGE_TYPE' || msg.code === 'EMPTY_CONTENT') {
             setError(`Message error: ${msg.message}`);
           }
@@ -324,6 +345,18 @@ export default function AgentChat() {
       e.preventDefault();
       handleSend();
     }
+    // Ctrl+Shift+V: paste clipboard content as analysis request
+    if (e.key === 'V' && (e.ctrlKey || e.metaKey) && e.shiftKey) {
+      e.preventDefault();
+      navigator.clipboard.readText().then(text => {
+        if (!text.trim() || !wsRef.current || !connected) return;
+        const msg = `클립보드 내용을 분석해줘:\n\n${text}`;
+        wsRef.current.sendMessage(msg);
+        setMessages(prev => [...prev, {
+          id: generateUUID(), role: 'user', content: msg, timestamp: new Date(),
+        }]);
+      }).catch(() => {});
+    }
   };
 
   const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -375,7 +408,31 @@ export default function AgentChat() {
       {error && (
         <div className="px-4 py-2 border-b flex items-center gap-2 text-sm animate-fade-in" style={{ background: 'rgba(239, 68, 68, 0.08)', borderColor: 'rgba(239, 68, 68, 0.2)', color: '#f87171', }}>
           <AlertCircle className="h-4 w-4 shrink-0" />
-          {error}
+          <span className="flex-1">{error}</span>
+          {error.includes('unable to load model') && (
+            <button
+              onClick={async () => {
+                try {
+                  const { isTauri } = await import('../lib/tauri');
+                  if (!isTauri()) return;
+                  const { invoke } = await import('@tauri-apps/api/core');
+                  const config = await invoke<Record<string, unknown>>('get_config');
+                  const model = (config?.default_model as string) || '';
+                  if (model) {
+                    setError(`${model} 재설치 중...`);
+                    await invoke('ollama_repair_model', { model });
+                    setError(null);
+                  }
+                } catch (e: any) {
+                  setError(`재설치 실패: ${e}`);
+                }
+              }}
+              className="px-3 py-1 rounded text-xs font-semibold"
+              style={{ background: '#4a9eff', color: '#fff' }}
+            >
+              모델 재설치
+            </button>
+          )}
         </div>
       )}
 
@@ -486,7 +543,37 @@ export default function AgentChat() {
       </div>
 
       {/* Input area */}
-      <div className="border-t p-4" style={{ borderColor: 'var(--pc-border)', background: 'var(--pc-bg-surface)' }}>
+      <div
+        className="border-t p-4"
+        style={{
+          borderColor: dragOver ? 'var(--pc-accent)' : 'var(--pc-border)',
+          background: dragOver ? 'var(--pc-accent-glow)' : 'var(--pc-bg-surface)',
+          transition: 'all 0.2s',
+        }}
+        onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={async e => {
+          e.preventDefault();
+          setDragOver(false);
+          const files = Array.from(e.dataTransfer.files);
+          if (files.length === 0) return;
+          for (const file of files) {
+            const text = await file.text().catch(() => `[바이너리 파일: ${file.name}]`);
+            const msg = `파일 '${file.name}'의 내용을 분석해줘:\n\n\`\`\`\n${text.slice(0, 10000)}\n\`\`\``;
+            if (wsRef.current && connected) {
+              wsRef.current.sendMessage(msg);
+              setMessages(prev => [...prev, {
+                id: generateUUID(), role: 'user', content: msg, timestamp: new Date(),
+              }]);
+            }
+          }
+        }}
+      >
+        {dragOver && (
+          <div className="text-center text-sm mb-2" style={{ color: 'var(--pc-accent)' }}>
+            📎 파일을 놓으면 에이전트에게 전달됩니다
+          </div>
+        )}
         <div className="flex items-center gap-3 max-w-4xl mx-auto">
           <textarea
             ref={inputRef}
@@ -494,7 +581,7 @@ export default function AgentChat() {
             value={input}
             onChange={handleTextareaChange}
             onKeyDown={handleKeyDown}
-            placeholder={connected ? t('agent.type_message') : t('agent.connecting')}
+            placeholder={connected ? `${t('agent.type_message')} (@claude, @gemini으로 도구 지정)` : t('agent.connecting')}
             disabled={!connected}
             className="input-electric flex-1 px-4 text-sm resize-none disabled:opacity-40"
             style={{ minHeight: '44px', maxHeight: '200px', paddingTop: '10px', paddingBottom: '10px' }}

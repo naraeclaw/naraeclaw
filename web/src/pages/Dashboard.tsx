@@ -129,6 +129,13 @@ const STATUS_CARDS = [
     getSub: (s: StatusResponse) =>
       `${t("dashboard.paired")}: ${s.paired ? t("dashboard.paired_yes") : t("dashboard.paired_no")}`,
   },
+  {
+    icon: Cpu,
+    accent: "#06b6d4",
+    labelKey: "dashboard.ollama",
+    getValue: (s: StatusResponse) => s.provider === "ollama" ? "연결됨" : "미사용",
+    getSub: (s: StatusResponse) => s.provider === "ollama" ? s.model ?? "" : "",
+  },
 ];
 
 const TABS: { id: TabId; labelKey: string; icon: typeof LayoutDashboard }[] = [

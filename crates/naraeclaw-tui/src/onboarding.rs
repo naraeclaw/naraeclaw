@@ -1483,29 +1483,26 @@ fn render_welcome(frame: &mut Frame, area: Rect) {
     let lines = vec![
         Line::from(""),
         Line::from(Span::styled(
-            "\u{250c}  NaraeClaw setup",
+            "\u{250c}  NaraeClaw 설정",
             theme::heading_style(),
         )),
         Line::from(Span::styled("\u{2502}", theme::border_style())),
         Line::from(vec![
             Span::styled("\u{2502}  ", theme::border_style()),
             Span::styled(
-                "Welcome to NaraeClaw \u{2014} the fastest, smallest AI assistant.",
+                "NaraeClaw \u{2014} 서버 관리와 개인 지식을 위한 경량 에이전트.",
                 theme::body_style(),
             ),
         ]),
         Line::from(vec![
             Span::styled("\u{2502}  ", theme::border_style()),
-            Span::styled(
-                "This wizard will configure your agent in under 60 seconds.",
-                theme::dim_style(),
-            ),
+            Span::styled("60초 안에 에이전트를 설정합니다.", theme::dim_style()),
         ]),
         Line::from(Span::styled("\u{2502}", theme::border_style())),
         Line::from(vec![
             Span::styled("\u{2514}  ", theme::border_style()),
             Span::styled(
-                "Press Enter to begin...",
+                "Enter를 눌러 시작하세요...",
                 theme::heading_style().add_modifier(Modifier::SLOW_BLINK),
             ),
         ]),

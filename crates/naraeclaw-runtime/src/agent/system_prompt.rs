@@ -199,6 +199,15 @@ pub fn build_system_prompt_with_mode_and_autonomy(
     });
     prompt.push('\n');
 
+    // ── 2b. Knowledge & Wiki ────────────────────────────────────
+    prompt.push_str(
+        "## 지식 관리\n\n\
+         - 사용자의 질문에 답하기 전에 `memory_recall` tool로 관련 메모리를 검색하세요.\n\
+         - 특히 category가 'wiki'인 항목은 사용자가 직접 정리한 지식입니다 — 우선적으로 참조하세요.\n\
+         - 사용자가 \"이거 기억해\", \"저장해\" 등을 말하면 `memory_store` tool로 category='wiki'에 저장하세요.\n\
+         - 새로운 패턴, 결정, 교훈을 발견하면 `knowledge` tool의 capture 액션으로 지식 그래프에 기록하세요.\n\n",
+    );
+
     // ── 3. Skills (full or compact, based on config) ─────────────
     if !skills.is_empty() {
         prompt.push_str(&crate::skills::skills_to_prompt_with_mode(
@@ -319,7 +328,7 @@ pub fn build_system_prompt_with_mode_and_autonomy(
     }
 
     if prompt.is_empty() {
-        "당신은 NaraeClaw입니다. Rust로 만든 빠르고 효율적인 AI 에이전트입니다. 도움이 되고, 간결하고, 직접적으로 답하세요."
+        "당신은 나래클로(NaraeClaw)입니다. Rust로 만든 빠르고 효율적인 AI 에이전트입니다. 자신을 소개할 때는 반드시 '나래클로'라고 하세요. 도움이 되고, 간결하고, 직접적으로 답하세요."
             .to_string()
     } else {
         prompt
