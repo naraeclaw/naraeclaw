@@ -1,20 +1,13 @@
 # cargo-deny configuration
 # https://embarkstudios.github.io/cargo-deny/
 #
-# NOTE: cargo-deny >= 0.18.6 required — 0.18.5 fails to parse CVSS 4.0 advisories
-# (upstream issue: https://github.com/EmbarkStudios/cargo-deny/issues/xxx).
+# NOTE: cargo-deny 0.18.5 fails to parse some newer CVSS 4.0 advisories.
 # Upgrade: cargo install cargo-deny --version ">=0.18.6"
 
 [advisories]
-version = 2
 # RustSec advisory database
 db-path = "~/.cargo/advisory-db"
 db-urls = ["https://github.com/rustsec/advisory-db"]
-
-vulnerability = "deny"
-unmaintained = "warn"
-yanked = "warn"
-notice = "warn"
 
 ignore = [
     # ── rumqttc: rustls-webpki 0.102.x upstream issue ─────────────────────
@@ -49,6 +42,8 @@ allow = [
     "Zlib",
     "OpenSSL",
     "BSL-1.0",          # Boost Software License (used by some crypto libs)
+    "MPL-2.0",          # option-ext via dirs-sys
+    "CDLA-Permissive-2.0", # webpki-roots trust anchor data
 ]
 
 # Crates whose license we explicitly accept even if non-standard.
@@ -58,13 +53,11 @@ exceptions = [
 ]
 
 [bans]
-version = 2
 multiple-versions = "warn"
 wildcards = "warn"
 deny = []
 
 [sources]
-version = 2
 unknown-registry = "warn"
 unknown-git = "warn"
 allow-registry = ["https://github.com/rust-lang/crates.io-index"]
