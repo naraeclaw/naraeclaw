@@ -290,6 +290,7 @@ pub fn run() {
             commands::scheduler::list_tasks,
             commands::scheduler::create_task_natural,
             commands::scheduler::delete_task,
+            commands::computer_use::request_computer_use_approval,
             commands::computer_use::take_screenshot,
             commands::computer_use::mouse_action,
             commands::computer_use::keyboard_type,

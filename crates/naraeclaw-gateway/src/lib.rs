@@ -1606,18 +1606,32 @@ async fn handle_admin_paircode_new(
     }
 }
 
-/// GET /pair/code — fetch the initial pairing code (no auth, no localhost restriction).
+/// GET /pair/code — fetch the initial pairing code (loopback only).
 ///
-/// This endpoint is intentionally public so that Docker and remote users can see
-/// the pairing code on the web dashboard without needing terminal access. It only
-/// returns a code when the gateway is in its initial un-paired state (no devices
-/// paired yet and a pairing code exists). Once the first device pairs, this
-/// endpoint stops returning a code.
-async fn handle_pair_code(State(state): State<AppState>) -> impl IntoResponse {
+/// Restricted to localhost connections so that a gateway accidentally bound to
+/// a public interface cannot expose the pairing code to the first external
+/// requester who would then pre-empt legitimate setup. Docker/VM users should
+/// map the port locally (`-p 127.0.0.1:42617:42617`) and use the admin
+/// dashboard over loopback instead.
+///
+/// Returns a code only when in the initial un-paired state; once the first
+/// device pairs, the code is no longer returned.
+async fn handle_pair_code(
+    State(state): State<AppState>,
+    ConnectInfo(peer): ConnectInfo<SocketAddr>,
+) -> impl IntoResponse {
+    // Only expose pairing codes to loopback connections.
+    if !peer.ip().is_loopback() {
+        let body = serde_json::json!({
+            "success": false,
+            "error": "Pairing code is only accessible from localhost",
+        });
+        return (StatusCode::FORBIDDEN, Json(body));
+    }
+
     let require = state.pairing.require_pairing();
     let is_paired = state.pairing.is_paired();
 
-    // Only expose the code during initial setup (before first pairing)
     let code = if require && !is_paired {
         state.pairing.pairing_code()
     } else {
