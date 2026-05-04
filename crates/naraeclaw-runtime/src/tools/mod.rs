@@ -363,8 +363,8 @@ pub fn all_tools_with_runtime(
         Arc::new(CanvasTool::new(canvas_store.unwrap_or_default())),
     ];
 
-    // Register discord_search if discord_history channel is configured
-    if root_config.channels_config.discord_history.is_some() {
+    // discord_search tool is disabled (discord_history channel removed)
+    if false {
         match naraeclaw_memory::SqliteMemory::new_named(workspace_dir, "discord") {
             Ok(discord_mem) => {
                 tool_arcs.push(Arc::new(DiscordSearchTool::new(Arc::new(discord_mem))));

@@ -890,72 +890,23 @@ fn load_jsonl_messages(path: &std::path::Path) -> Vec<naraeclaw_providers::trait
     window.into_iter().collect()
 }
 
-/// Auto-detect the best channel for heartbeat delivery by checking which
-/// channels are configured. Returns the first match in priority order.
-fn auto_detect_heartbeat_channel(config: &Config) -> Option<(String, String)> {
-    // Priority order: telegram > discord > slack > mattermost
-    if let Some(tg) = &config.channels_config.telegram {
-        // Use the first allowed_user as target, or fall back to empty (broadcast)
-        let target = tg.allowed_users.first().cloned().unwrap_or_default();
-        if !target.is_empty() {
-            return Some(("telegram".to_string(), target));
-        }
-    }
-    if config.channels_config.discord.is_some() {
-        // Discord requires explicit target — can't auto-detect
-        return None;
-    }
-    if config.channels_config.slack.is_some() {
-        // Slack requires explicit target
-        return None;
-    }
-    if config.channels_config.mattermost.is_some() {
-        // Mattermost requires explicit target
-        return None;
-    }
+/// Auto-detect the best channel for heartbeat delivery.
+/// Currently only webhook is supported; explicit target configuration is required.
+fn auto_detect_heartbeat_channel(_config: &Config) -> Option<(String, String)> {
     None
 }
 
-fn validate_heartbeat_channel_config(config: &Config, channel: &str) -> Result<()> {
+fn validate_heartbeat_channel_config(_config: &Config, channel: &str) -> Result<()> {
     match channel.to_ascii_lowercase().as_str() {
-        "telegram" => {
-            if config.channels_config.telegram.is_none() {
-                anyhow::bail!(
-                    "heartbeat.target is set to telegram but channels_config.telegram is not configured"
-                );
-            }
-        }
-        "discord" => {
-            if config.channels_config.discord.is_none() {
-                anyhow::bail!(
-                    "heartbeat.target is set to discord but channels_config.discord is not configured"
-                );
-            }
-        }
-        "slack" => {
-            if config.channels_config.slack.is_none() {
-                anyhow::bail!(
-                    "heartbeat.target is set to slack but channels_config.slack is not configured"
-                );
-            }
-        }
-        "mattermost" => {
-            if config.channels_config.mattermost.is_none() {
-                anyhow::bail!(
-                    "heartbeat.target is set to mattermost but channels_config.mattermost is not configured"
-                );
-            }
-        }
+        "webhook" => Ok(()),
         other => anyhow::bail!("unsupported heartbeat.target channel: {other}"),
     }
-
-    Ok(())
 }
 
 fn has_supervised_channels(config: &Config) -> bool {
     config
         .channels_config
-        .channels_except_webhook()
+        .channels()
         .iter()
         .any(|(_, ok)| *ok)
 }
@@ -1036,54 +987,17 @@ mod tests {
     #[test]
     fn detects_supervised_channels_present() {
         let mut config = Config::default();
-        config.channels_config.telegram = Some(naraeclaw_config::schema::TelegramConfig {
+        config.channels_config.mqtt = Some(naraeclaw_config::schema::MqttConfig {
             enabled: true,
-            bot_token: "token".into(),
-            allowed_users: vec![],
-            stream_mode: naraeclaw_config::schema::StreamMode::default(),
-            draft_update_interval_ms: 1000,
-            interrupt_on_new_message: false,
-            mention_only: false,
-            ack_reactions: None,
-            proxy_url: None,
-            webhook_url: None,
-            webhook_listen_addr: "0.0.0.0:8443".to_string(),
-            webhook_path: "/telegram/webhook".to_string(),
-            webhook_secret_token: None,
+            broker_url: "mqtt://localhost:1883".into(),
+            client_id: "test-client".into(),
+            topics: vec!["test/#".into()],
+            qos: 1,
+            username: None,
+            password: None,
+            use_tls: false,
+            keep_alive_secs: 30,
         });
-        assert!(has_supervised_channels(&config));
-    }
-
-    #[test]
-    fn detects_mattermost_as_supervised_channel() {
-        let mut config = Config::default();
-        config.channels_config.mattermost = Some(naraeclaw_config::schema::MattermostConfig {
-            enabled: true,
-            url: "https://mattermost.example.com".into(),
-            bot_token: "token".into(),
-            channel_id: Some("channel-id".into()),
-            allowed_users: vec!["*".into()],
-            thread_replies: Some(true),
-            mention_only: Some(false),
-            interrupt_on_new_message: false,
-            proxy_url: None,
-        });
-        assert!(has_supervised_channels(&config));
-    }
-
-    #[test]
-    fn detects_nextcloud_talk_as_supervised_channel() {
-        let mut config = Config::default();
-        config.channels_config.nextcloud_talk =
-            Some(naraeclaw_config::schema::NextcloudTalkConfig {
-                enabled: true,
-                base_url: "https://cloud.example.com".into(),
-                app_token: "app-token".into(),
-                webhook_secret: None,
-                allowed_users: vec!["*".into()],
-                proxy_url: None,
-                bot_name: None,
-            });
         assert!(has_supervised_channels(&config));
     }
 
@@ -1097,7 +1011,7 @@ mod tests {
     #[test]
     fn resolve_delivery_requires_to_field() {
         let mut config = Config::default();
-        config.heartbeat.target = Some("telegram".into());
+        config.heartbeat.target = Some("webhook".into());
         let err = resolve_heartbeat_delivery(&config).unwrap_err();
         assert!(
             err.to_string()
@@ -1129,66 +1043,13 @@ mod tests {
     }
 
     #[test]
-    fn resolve_delivery_requires_channel_configuration() {
+    fn resolve_delivery_accepts_webhook_configuration() {
         let mut config = Config::default();
-        config.heartbeat.target = Some("telegram".into());
-        config.heartbeat.to = Some("123456".into());
-        let err = resolve_heartbeat_delivery(&config).unwrap_err();
-        assert!(
-            err.to_string()
-                .contains("channels_config.telegram is not configured")
-        );
-    }
-
-    #[test]
-    fn resolve_delivery_accepts_telegram_configuration() {
-        let mut config = Config::default();
-        config.heartbeat.target = Some("telegram".into());
-        config.heartbeat.to = Some("123456".into());
-        config.channels_config.telegram = Some(naraeclaw_config::schema::TelegramConfig {
-            enabled: true,
-            bot_token: "bot-token".into(),
-            allowed_users: vec![],
-            stream_mode: naraeclaw_config::schema::StreamMode::default(),
-            draft_update_interval_ms: 1000,
-            interrupt_on_new_message: false,
-            mention_only: false,
-            ack_reactions: None,
-            proxy_url: None,
-            webhook_url: None,
-            webhook_listen_addr: "0.0.0.0:8443".to_string(),
-            webhook_path: "/telegram/webhook".to_string(),
-            webhook_secret_token: None,
-        });
+        config.heartbeat.target = Some("webhook".into());
+        config.heartbeat.to = Some("https://example.com/hb".into());
 
         let target = resolve_heartbeat_delivery(&config).unwrap();
-        assert_eq!(target, Some(("telegram".to_string(), "123456".to_string())));
-    }
-
-    #[test]
-    fn auto_detect_telegram_when_configured() {
-        let mut config = Config::default();
-        config.channels_config.telegram = Some(naraeclaw_config::schema::TelegramConfig {
-            enabled: true,
-            bot_token: "bot-token".into(),
-            allowed_users: vec!["user123".into()],
-            stream_mode: naraeclaw_config::schema::StreamMode::default(),
-            draft_update_interval_ms: 1000,
-            interrupt_on_new_message: false,
-            mention_only: false,
-            ack_reactions: None,
-            proxy_url: None,
-            webhook_url: None,
-            webhook_listen_addr: "0.0.0.0:8443".to_string(),
-            webhook_path: "/telegram/webhook".to_string(),
-            webhook_secret_token: None,
-        });
-
-        let target = resolve_heartbeat_delivery(&config).unwrap();
-        assert_eq!(
-            target,
-            Some(("telegram".to_string(), "user123".to_string()))
-        );
+        assert_eq!(target, Some(("webhook".to_string(), "https://example.com/hb".to_string())));
     }
 
     #[test]

@@ -1002,47 +1002,11 @@ fn mask_sensitive_fields(
         mask_optional_secret(&mut route.api_key);
     }
 
-    if let Some(telegram) = masked.channels_config.telegram.as_mut() {
-        mask_required_secret(&mut telegram.bot_token);
-    }
-    if let Some(discord) = masked.channels_config.discord.as_mut() {
-        mask_required_secret(&mut discord.bot_token);
-    }
-    if let Some(slack) = masked.channels_config.slack.as_mut() {
-        mask_required_secret(&mut slack.bot_token);
-        mask_optional_secret(&mut slack.app_token);
-    }
-    if let Some(mattermost) = masked.channels_config.mattermost.as_mut() {
-        mask_required_secret(&mut mattermost.bot_token);
-    }
     if let Some(webhook) = masked.channels_config.webhook.as_mut() {
         mask_optional_secret(&mut webhook.secret);
     }
-    if let Some(matrix) = masked.channels_config.matrix.as_mut() {
-        mask_required_secret(&mut matrix.access_token);
-    }
-    if let Some(whatsapp) = masked.channels_config.whatsapp.as_mut() {
-        mask_optional_secret(&mut whatsapp.access_token);
-        mask_optional_secret(&mut whatsapp.app_secret);
-        mask_optional_secret(&mut whatsapp.verify_token);
-    }
-    if let Some(nextcloud) = masked.channels_config.nextcloud_talk.as_mut() {
-        mask_required_secret(&mut nextcloud.app_token);
-        mask_optional_secret(&mut nextcloud.webhook_secret);
-    }
-    if let Some(wati) = masked.channels_config.wati.as_mut() {
-        mask_required_secret(&mut wati.api_token);
-    }
-    #[cfg(feature = "channel-nostr")]
-    if let Some(nostr) = masked.channels_config.nostr.as_mut() {
-        mask_required_secret(&mut nostr.private_key);
-    }
-    if let Some(clawdtalk) = masked.channels_config.clawdtalk.as_mut() {
-        mask_required_secret(&mut clawdtalk.api_key);
-        mask_optional_secret(&mut clawdtalk.webhook_secret);
-    }
-    if let Some(email) = masked.channels_config.email.as_mut() {
-        mask_required_secret(&mut email.password);
+    if let Some(mqtt) = masked.channels_config.mqtt.as_mut() {
+        mask_optional_secret(&mut mqtt.password);
     }
     mask_optional_secret(&mut masked.transcription.api_key);
     masked
@@ -1099,82 +1063,16 @@ fn restore_masked_sensitive_fields(
     restore_embedding_route_api_keys(&mut incoming.embedding_routes, &current.embedding_routes);
 
     if let (Some(incoming_ch), Some(current_ch)) = (
-        incoming.channels_config.telegram.as_mut(),
-        current.channels_config.telegram.as_ref(),
-    ) {
-        restore_required_secret(&mut incoming_ch.bot_token, &current_ch.bot_token);
-    }
-    if let (Some(incoming_ch), Some(current_ch)) = (
-        incoming.channels_config.discord.as_mut(),
-        current.channels_config.discord.as_ref(),
-    ) {
-        restore_required_secret(&mut incoming_ch.bot_token, &current_ch.bot_token);
-    }
-    if let (Some(incoming_ch), Some(current_ch)) = (
-        incoming.channels_config.slack.as_mut(),
-        current.channels_config.slack.as_ref(),
-    ) {
-        restore_required_secret(&mut incoming_ch.bot_token, &current_ch.bot_token);
-        restore_optional_secret(&mut incoming_ch.app_token, &current_ch.app_token);
-    }
-    if let (Some(incoming_ch), Some(current_ch)) = (
-        incoming.channels_config.mattermost.as_mut(),
-        current.channels_config.mattermost.as_ref(),
-    ) {
-        restore_required_secret(&mut incoming_ch.bot_token, &current_ch.bot_token);
-    }
-    if let (Some(incoming_ch), Some(current_ch)) = (
         incoming.channels_config.webhook.as_mut(),
         current.channels_config.webhook.as_ref(),
     ) {
         restore_optional_secret(&mut incoming_ch.secret, &current_ch.secret);
     }
     if let (Some(incoming_ch), Some(current_ch)) = (
-        incoming.channels_config.matrix.as_mut(),
-        current.channels_config.matrix.as_ref(),
+        incoming.channels_config.mqtt.as_mut(),
+        current.channels_config.mqtt.as_ref(),
     ) {
-        restore_required_secret(&mut incoming_ch.access_token, &current_ch.access_token);
-    }
-    if let (Some(incoming_ch), Some(current_ch)) = (
-        incoming.channels_config.whatsapp.as_mut(),
-        current.channels_config.whatsapp.as_ref(),
-    ) {
-        restore_optional_secret(&mut incoming_ch.access_token, &current_ch.access_token);
-        restore_optional_secret(&mut incoming_ch.app_secret, &current_ch.app_secret);
-        restore_optional_secret(&mut incoming_ch.verify_token, &current_ch.verify_token);
-    }
-    if let (Some(incoming_ch), Some(current_ch)) = (
-        incoming.channels_config.nextcloud_talk.as_mut(),
-        current.channels_config.nextcloud_talk.as_ref(),
-    ) {
-        restore_required_secret(&mut incoming_ch.app_token, &current_ch.app_token);
-        restore_optional_secret(&mut incoming_ch.webhook_secret, &current_ch.webhook_secret);
-    }
-    if let (Some(incoming_ch), Some(current_ch)) = (
-        incoming.channels_config.wati.as_mut(),
-        current.channels_config.wati.as_ref(),
-    ) {
-        restore_required_secret(&mut incoming_ch.api_token, &current_ch.api_token);
-    }
-    #[cfg(feature = "channel-nostr")]
-    if let (Some(incoming_ch), Some(current_ch)) = (
-        incoming.channels_config.nostr.as_mut(),
-        current.channels_config.nostr.as_ref(),
-    ) {
-        restore_required_secret(&mut incoming_ch.private_key, &current_ch.private_key);
-    }
-    if let (Some(incoming_ch), Some(current_ch)) = (
-        incoming.channels_config.clawdtalk.as_mut(),
-        current.channels_config.clawdtalk.as_ref(),
-    ) {
-        restore_required_secret(&mut incoming_ch.api_key, &current_ch.api_key);
-        restore_optional_secret(&mut incoming_ch.webhook_secret, &current_ch.webhook_secret);
-    }
-    if let (Some(incoming_ch), Some(current_ch)) = (
-        incoming.channels_config.email.as_mut(),
-        current.channels_config.email.as_ref(),
-    ) {
-        restore_required_secret(&mut incoming_ch.password, &current_ch.password);
+        restore_optional_secret(&mut incoming_ch.password, &current_ch.password);
     }
     restore_optional_secret(
         &mut incoming.transcription.api_key,

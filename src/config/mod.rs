@@ -7,26 +7,26 @@ pub use schema::{
     BrowserComputerUseConfig, BrowserConfig, BuiltinHooksConfig, ChannelsConfig,
     ClassificationRule, ClaudeCodeConfig, ClaudeCodeRunnerConfig, CloudOpsConfig, CodexCliConfig,
     Config, CostConfig, CronConfig, CronJobDecl, CronScheduleDecl, DEFAULT_GWS_SERVICES,
-    DataRetentionConfig, DeepgramSttConfig, DelegateAgentConfig, DelegateToolConfig, DiscordConfig,
+    DataRetentionConfig, DeepgramSttConfig, DelegateAgentConfig, DelegateToolConfig,
     DockerRuntimeConfig, EdgeTtsConfig, ElevenLabsTtsConfig, EmbeddingRouteConfig, EstopConfig,
     GatewayConfig, GeminiCliConfig, GoogleSttConfig, GoogleTtsConfig,
     GoogleWorkspaceAllowedOperation, GoogleWorkspaceConfig, HeartbeatConfig, HooksConfig,
     HttpRequestConfig, IdentityConfig, ImageGenConfig, ImageProviderDalleConfig,
     ImageProviderFluxConfig, ImageProviderImagenConfig, ImageProviderStabilityConfig, JiraConfig,
     KnowledgeConfig, LinkEnricherConfig, LinkedInConfig, LinkedInContentConfig,
-    LinkedInImageConfig, LocalWhisperConfig, MatrixConfig, McpConfig, McpServerConfig,
+    LinkedInImageConfig, LocalWhisperConfig, McpConfig, McpServerConfig,
     McpTransport, MediaPipelineConfig, MemoryConfig, MemoryPolicyConfig, ModelRouteConfig,
-    MqttConfig, MultimodalConfig, NextcloudTalkConfig, NodeTransportConfig, NodesConfig,
+    MqttConfig, MultimodalConfig, NodeTransportConfig, NodesConfig,
     ObservabilityConfig, OpenAiSttConfig, OpenAiTtsConfig, OpenCodeCliConfig, OpenVpnTunnelConfig,
     OtpConfig, OtpMethod, PacingConfig, PipelineConfig, PiperTtsConfig, PluginsConfig, ProxyConfig,
     ProxyScope, QdrantConfig, QueryClassificationConfig, ReliabilityConfig, ResourceLimitsConfig,
     RuntimeConfig, SandboxBackend, SandboxConfig, SchedulerConfig, SearchMode, SecretsConfig,
     SecurityConfig, SecurityOpsConfig, ShellToolConfig, SkillCreationConfig,
-    SkillImprovementConfig, SkillsConfig, SkillsPromptInjectionMode, SlackConfig, SopConfig,
-    StorageConfig, StorageProviderConfig, StorageProviderSection, StreamMode, SwarmConfig,
-    SwarmStrategy, TelegramConfig, TextBrowserConfig, ToolFilterGroup, ToolFilterGroupMode,
+    SkillImprovementConfig, SkillsConfig, SkillsPromptInjectionMode, SopConfig,
+    StorageConfig, StorageProviderConfig, StorageProviderSection, SwarmConfig,
+    SwarmStrategy, TextBrowserConfig, ToolFilterGroup, ToolFilterGroupMode,
     TranscriptionConfig, TtsConfig, TunnelConfig, VerifiableIntentConfig, WebFetchConfig,
-    WebSearchConfig, WebhookConfig, WhatsAppChatPolicy, WhatsAppWebMode, WorkspaceConfig,
+    WebSearchConfig, WebhookConfig, WorkspaceConfig,
     apply_channel_proxy_to_builder, apply_runtime_proxy_to_builder, build_channel_proxy_client,
     build_channel_proxy_client_with_timeouts, build_runtime_proxy_client,
     build_runtime_proxy_client_with_timeouts, runtime_proxy_config, set_runtime_proxy_config,
@@ -205,49 +205,13 @@ mod tests {
 
     #[test]
     fn reexported_channel_configs_are_constructible() {
-        let telegram = TelegramConfig {
+        let mqtt = MqttConfig {
             enabled: true,
-            bot_token: "token".into(),
-            allowed_users: vec!["alice".into()],
-            stream_mode: StreamMode::default(),
-            draft_update_interval_ms: 1000,
-            interrupt_on_new_message: false,
-            mention_only: false,
-            ack_reactions: None,
-            proxy_url: None,
-            webhook_url: None,
-            webhook_listen_addr: "0.0.0.0:8443".to_string(),
-            webhook_path: "/telegram/webhook".to_string(),
-            webhook_secret_token: None,
+            broker_url: "mqtt://localhost:1883".into(),
+            ..Default::default()
         };
 
-        let discord = DiscordConfig {
-            enabled: true,
-            bot_token: "token".into(),
-            guild_id: Some("123".into()),
-            allowed_users: vec![],
-            listen_to_bots: false,
-            interrupt_on_new_message: false,
-            mention_only: false,
-            proxy_url: None,
-            stream_mode: StreamMode::default(),
-            draft_update_interval_ms: 1000,
-            multi_message_delay_ms: 800,
-            stall_timeout_secs: 0,
-        };
-
-        let nextcloud_talk = NextcloudTalkConfig {
-            enabled: true,
-            base_url: "https://cloud.example.com".into(),
-            app_token: "app-token".into(),
-            webhook_secret: None,
-            allowed_users: vec!["*".into()],
-            proxy_url: None,
-            bot_name: None,
-        };
-
-        assert_eq!(telegram.allowed_users.len(), 1);
-        assert_eq!(discord.guild_id.as_deref(), Some("123"));
-        assert_eq!(nextcloud_talk.base_url, "https://cloud.example.com");
+        assert!(mqtt.enabled);
+        assert_eq!(mqtt.broker_url, "mqtt://localhost:1883");
     }
 }
