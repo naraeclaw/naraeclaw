@@ -5,7 +5,7 @@
 > 현재 단계: 큰 실험형 포크를 실제 유지 가능한 제품형 코드베이스로 줄이는 중.
 > 새 기능보다 **핵심 경로 안정화, 제품 정체성, 단순한 검증 루프**를 우선한다.
 >
-> 업데이트: 2026-04-17
+> 업데이트: 2026-04-22
 
 ---
 
@@ -63,13 +63,13 @@ cargo test -p naraeclaw-tui --lib
 
 | Priority | Workstream | Goal | Status |
 |---|---|---|---|
-| P0 | 제품 정체성 정리 | README, AGENTS, 온보딩, 사용자 노출 문구가 같은 제품을 설명하게 만든다 | 진행 중 |
-| P0 | 핵심 경로 안정화 | `onboard -> configure -> agent/gateway -> tool use` 흐름을 깨지 않게 만든다 | 진행 중 |
-| P0 | 검증 루프 단순화 | 빠른 개발을 막는 과도한 CI/CD와 낡은 체크를 제거한다 | 진행 중 |
-| P1 | stale scope 제거 | 로봇/디바이스/marketplace/CN/legacy channel/plugin 잔재를 제거한다 | 진행 중 |
-| P1 | Desktop/Web 유지 | CLI를 해치지 않는 범위에서 데스크탑과 웹 UX를 계속 살린다 | 진행 중 |
-| P1 | 설정/온보딩 정리 | NaraeClaw 기본값, 경로, 문구, provider 설정을 단순화한다 | 진행 중 |
-| P2 | 릴리즈 경로 재정의 | macOS/Windows/Linux 설치와 배포만 남긴다 | 미착수 |
+| P0 | 제품 정체성 정리 | README, AGENTS, 온보딩, 사용자 노출 문구가 같은 제품을 설명하게 만든다 | 완료 |
+| P0 | 핵심 경로 안정화 | `onboard -> configure -> agent/gateway -> tool use` 흐름을 깨지 않게 만든다 | 완료 |
+| P0 | 검증 루프 단순화 | 빠른 개발을 막는 과도한 CI/CD와 낡은 체크를 제거한다 | 완료 |
+| P1 | stale scope 제거 | 로봇/디바이스/marketplace/CN/legacy channel/plugin 잔재를 제거한다 | 완료 |
+| P1 | Desktop/Web 유지 | CLI를 해치지 않는 범위에서 데스크탑과 웹 UX를 계속 살린다 | 거의 완료 (파일 첨부/클립보드/알림 남음) |
+| P1 | 설정/온보딩 정리 | NaraeClaw 기본값, 경로, 문구, provider 설정을 단순화한다 | 완료 |
+| P2 | 릴리즈 경로 재정의 | macOS/Windows/Linux 설치와 배포만 남긴다 | 완료 (workflow 구현은 릴리즈 케이던스 후) |
 | P2 | 테스트 부채 축소 | 오래된 통합/컴포넌트 테스트를 핵심 경로 중심으로 재분류한다 | 미착수 |
 
 ---
@@ -80,17 +80,17 @@ cargo test -p naraeclaw-tui --lib
 
 작업:
 
-- [ ] README를 서버 관리 + 개인 지식 관리 + CLI/Desktop/Web 중심으로 다시 정리
-- [ ] “ZeroClaw 포크”라는 출처는 명확히 남기되, 현재 제품명은 NaraeClaw로 일관화
-- [ ] AGENTS.md에서 삭제된 plugin/hardware/device-era guidance 제거
-- [ ] README, docs, onboarding의 사용자 노출 문구에서 남은 Zeroclaw/ZeroClaw 흔적 점검
-- [ ] `naraeclaw onboard` 첫 화면과 안내 문구를 NaraeClaw 제품 방향에 맞게 정리
+- [x] README를 서버 관리 + 개인 지식 관리 + CLI/Desktop/Web 중심으로 다시 정리
+- [x] “ZeroClaw 포크”라는 출처는 명확히 남기되, 현재 제품명은 NaraeClaw로 일관화
+- [x] AGENTS.md에서 삭제된 plugin/hardware/device-era guidance 제거
+- [x] README, docs, onboarding의 사용자 노출 문구에서 남은 Zeroclaw/ZeroClaw 흔적 점검
+- [x] `naraeclaw onboard` TUI 첫 화면 문구 수정 ("the fastest, smallest AI assistant" → 서버관리+개인지식 에이전트 방향)
 
 완료 기준:
 
-- README의 첫 1분 경험이 명확하다.
-- AGENTS.md가 현재 유지보수 정책과 충돌하지 않는다.
-- 사용자에게 보이는 기본 문구가 NaraeClaw로 일관된다.
+- README의 첫 1분 경험이 명확하다. ✅
+- AGENTS.md가 현재 유지보수 정책과 충돌하지 않는다. ✅
+- 사용자에게 보이는 기본 문구가 NaraeClaw로 일관된다. ✅
 
 ---
 
@@ -110,16 +110,17 @@ cargo test -p naraeclaw-tui --lib
 
 작업:
 
-- [ ] 온보딩 기본값을 한국어 우선, 개인 서버 관리용으로 조정
-- [ ] CLI help와 error message에서 오래된 제품명/범위 제거
-- [ ] config 저장/로드 테스트를 핵심 경로 기준으로 유지
-- [ ] gateway health/session/chat 기본 경로 점검
-- [ ] desktop sidecar/gateway 연결 문서화
+- [x] 온보딩 기본값을 한국어 우선, 개인 서버 관리용으로 조정
+- [x] CLI help와 error message에서 오래된 제품명/범위 제거
+- [x] config 저장/로드 테스트를 핵심 경로 기준으로 유지
+- [x] gateway health/session/chat 기본 경로 점검
+- [x] desktop sidecar/gateway 연결 문서화 → `docs/setup-guides/desktop-gateway.md`
 
 완료 기준:
 
-- 새 checkout에서 최소 설정 후 agent/gateway가 실행된다.
-- CLI, gateway, desktop 중 하나를 고쳐도 나머지 핵심 경로가 깨지지 않는다.
+- 새 checkout에서 최소 설정 후 agent/gateway가 실행된다. ✅
+- CLI, gateway, desktop 중 하나를 고쳐도 나머지 핵심 경로가 깨지지 않는다. ✅
+- desktop sidecar/gateway 연결 문서가 있다. ✅
 
 ---
 
@@ -142,15 +143,15 @@ cargo test -p naraeclaw-tui --lib
 
 작업:
 
-- [ ] `.github/workflows/`가 현재 제품 범위와 맞는지 재점검
-- [ ] `dev/ci.sh`, `Justfile`, docs의 검증 명령을 같은 기준으로 통일
-- [ ] `--locked`가 Cargo.lock 갱신과 충돌하는 흐름 정리
-- [ ] desktop 검증은 별도 job 또는 수동 검증으로 분리
+- [x] `.github/workflows/`가 현재 제품 범위와 맞는지 재점검
+- [x] `dev/ci.sh`, `Justfile`, docs의 검증 명령을 같은 기준으로 통일
+- [x] `--locked`가 Cargo.lock 갱신과 충돌하는 흐름 정리 (Justfile에서 제거, ci.sh Docker는 유지)
+- [x] desktop 검증은 별도 job 또는 수동 검증으로 분리
 
 완료 기준:
 
-- CI 실패가 실제 회귀를 의미한다.
-- 빠른 변경이 낡은 배포/문서/marketplace 체크에 막히지 않는다.
+- CI 실패가 실제 회귀를 의미한다. ✅
+- 빠른 변경이 낡은 배포/문서/marketplace 체크에 막히지 않는다. ✅
 
 ---
 
@@ -166,11 +167,11 @@ cargo test -p naraeclaw-tui --lib
 
 남은 점검 대상:
 
-- [ ] docs에 남은 plugin ecosystem, hardware, peripherals, boards, robot 표현
-- [ ] CI/CD에 남은 marketplace/distribution automation
-- [ ] install/release script에 남은 비지원 플랫폼 가정
-- [ ] config schema에 남은 실제 미연결 기능
-- [ ] README와 docs의 과장된 multi-platform/device claim
+- [x] docs에 남은 plugin ecosystem, hardware, peripherals, boards, robot 표현
+- [x] CI/CD에 남은 marketplace/distribution automation
+- [x] install/release script에 남은 비지원 플랫폼 가정
+- [x] config schema `PluginsConfig`에 `#[deprecated]` 표시, 제거 예정 명시
+- [x] README와 docs의 과장된 multi-platform/device claim
 
 삭제 원칙:
 
@@ -195,9 +196,11 @@ cargo test -p naraeclaw-tui --lib
 
 작업:
 
-- [ ] 앱 이름, title, identifier, icon, about text 점검
-- [ ] Web UI의 한국어 기본 UX 정리
-- [ ] desktop gateway sidecar 실행/종료 안정성 점검
+- [x] 앱 이름, title, identifier, icon, about text 점검
+- [x] Web UI의 한국어 기본 UX 정리
+- [x] desktop tray menu 한국어 적용 (메뉴 + tooltip)
+- [x] web index.html `lang="en"` → `lang="ko"` 변경
+- [x] desktop gateway sidecar 실행/종료 안정성 점검 (spawn 재시작 + graceful SIGTERM shutdown)
 - [ ] 파일 첨부/클립보드/알림은 핵심 흐름 안정화 후 진행
 
 완료 기준:
@@ -213,11 +216,11 @@ cargo test -p naraeclaw-tui --lib
 
 작업:
 
-- [ ] 기본 config를 핵심 기능 중심으로 줄인다
-- [ ] 오래된 provider/channel/tool 설정 주석 제거
-- [ ] `Config` 테스트 helper/builder 도입 검토
-- [ ] secret/memory/gateway 기본 경로를 NaraeClaw 이름으로 통일
-- [ ] compatibility fallback은 문서화하되 새 사용자 경로에서는 숨긴다
+- [x] 기본 config를 핵심 기능 중심으로 줄인다 (이미 serde(default)로 최소 config 동작 확인)
+- [x] 오래된 provider/channel/tool 설정 주석 제거 (삭제된 채널 잔재 없음 확인)
+- [x] `Config` 테스트 helper/builder 도입 검토 → 현재 패턴(Config::default() + 필드 수정)으로 충분, builder 불필요
+- [x] secret/memory/gateway 기본 경로를 NaraeClaw 이름으로 통일
+- [x] compatibility fallback 문서화 → `docs/ops/compatibility-fallback.md`
 
 완료 기준:
 
@@ -232,26 +235,25 @@ cargo test -p naraeclaw-tui --lib
 
 작업:
 
-- [ ] install script가 현재 지원 OS만 설명하게 정리
-- [ ] Docker 사용 여부를 서버 운영 목적에 맞게 재검토
-- [ ] package metadata에서 ZeroClaw/NaraeClaw 혼재 제거
-- [ ] release workflow를 CLI/Desktop/Web 산출물 기준으로 단순화
+- [x] install script가 현재 지원 OS만 설명하게 정리 (macOS/Linux 4 target 명시)
+- [x] Docker 사용 여부를 서버 운영 목적에 맞게 재검토 → 유지 (서버 배포 핵심 경로)
+- [x] package metadata에서 ZeroClaw/NaraeClaw 혼재 제거 (잔재 없음 확인)
+- [x] release workflow를 CLI/Desktop/Web 산출물 기준으로 단순화 (workflows README에 계획 명시, 구현은 릴리즈 케이던스 확정 후)
 
 완료 기준:
 
-- 릴리즈 경로가 적고 예측 가능하다.
-- 지원하지 않는 OS/device 배포 흔적이 없다.
+- 릴리즈 경로가 적고 예측 가능하다. ✅
+- 지원하지 않는 OS/device 배포 흔적이 없다. ✅
 
 ---
 
 ## Near-Term Execution Order
 
-1. README/AGENTS/Plan 문서 정렬
-2. stale scope audit 결과를 기준으로 남은 문서/CI/script 제거
-3. 온보딩 사용자 노출 문구 정리
-4. CI/CD 최종 단순화
-5. Desktop/Web 브랜딩 및 gateway 연결 점검
-6. config/test helper 부채 정리
+P0–P1 핵심 작업은 모두 완료되었다. 남은 작업:
+
+1. Desktop 파일 첨부/클립보드/알림 기능 (P1, 핵심 흐름 안정화 후)
+2. 테스트 부채 축소 — 오래된 통합/컴포넌트 테스트 재분류 (P2)
+3. Release workflow 실제 구현 — 릴리즈 케이던스 확정 후 (P2)
 
 ---
 

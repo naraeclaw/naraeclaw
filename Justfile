@@ -19,7 +19,7 @@ lint:
 
 # Run all tests
 test:
-    cargo test --locked
+    cargo test
 
 # Run only unit tests (faster)
 test-lib:
@@ -31,7 +31,7 @@ ci: fmt-check lint test
 
 # Build in release mode
 build:
-    cargo build --release --locked
+    cargo build --release
 
 # Build in debug mode
 build-debug:

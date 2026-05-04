@@ -131,6 +131,15 @@ export function useConfigState() {
       } else {
         try { setParsedConfig(parse(toml) as Record<string, unknown>); } catch { /* ignore */ }
       }
+      // Restart gateway to pick up new config (Tauri only)
+      try {
+        const { isTauri } = await import('@/lib/tauri');
+        if (isTauri()) {
+          const { invoke } = await import('@tauri-apps/api/core');
+          await invoke('restart_gateway');
+          setSuccess('설정 저장 완료 — Gateway 재시작 중');
+        }
+      } catch { /* not in Tauri */ }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to save configuration');
     } finally {

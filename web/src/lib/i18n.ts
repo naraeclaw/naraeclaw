@@ -456,6 +456,10 @@ const translations: Record<Locale, Record<string, string>> = {
     'nav.logs': 'Logs',
     'nav.doctor': 'Doctor',
     'nav.canvas': 'Canvas',
+    'nav.channels': 'Channels',
+    'nav.cli_tools': 'AI Tools',
+    'nav.remote': 'Remote',
+    'nav.wiki': 'Wiki',
 
     // Dashboard
     'dashboard.title': 'Dashboard',
@@ -6642,6 +6646,10 @@ const translations: Record<Locale, Record<string, string>> = {
     'nav.logs': '로그',
     'nav.doctor': '진단',
     'nav.canvas': '캔버스',
+    'nav.channels': '채널',
+    'nav.cli_tools': 'AI 도구',
+    'nav.remote': '원격 서버',
+    'nav.wiki': '지식 관리',
 
     // Dashboard
     'dashboard.title': '대시보드',

@@ -1,5 +1,6 @@
 #!/usr/bin/env sh
 # NaraeClaw installer
+# Supported platforms: macOS (x86_64, arm64), Linux (x86_64, aarch64)
 # POSIX preamble: ensure bash is available, then re-exec under bash.
 set -eu
 
@@ -96,6 +97,8 @@ Usage:
 
 The installer builds NaraeClaw, configures your provider and API key,
 starts the gateway service, and opens the dashboard — all in one step.
+
+Supported platforms: macOS (x86_64, arm64), Linux (x86_64, aarch64)
 
 Options:
   --docker                   Run install in Docker-compatible mode

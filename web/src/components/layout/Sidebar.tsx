@@ -12,19 +12,28 @@ import {
   Activity,
   Stethoscope,
   Monitor,
+  Radio,
+  Terminal,
+  Server,
+  BookOpen,
 } from 'lucide-react';
 import { t } from '@/lib/i18n';
 
 const navItems = [
   { to: '/', icon: LayoutDashboard, labelKey: 'nav.dashboard' },
   { to: '/agent', icon: MessageSquare, labelKey: 'nav.agent' },
-  { to: '/tools', icon: Wrench, labelKey: 'nav.tools' },
+  { to: '/wiki', icon: BookOpen, labelKey: 'nav.wiki' },
   { to: '/cron', icon: Clock, labelKey: 'nav.cron' },
-  { to: '/integrations', icon: Puzzle, labelKey: 'nav.integrations' },
+  { to: '/channels', icon: Radio, labelKey: 'nav.channels' },
   { to: '/memory', icon: Brain, labelKey: 'nav.memory' },
+  { to: '/cli-tools', icon: Terminal, labelKey: 'nav.cli_tools' },
+  { to: '/remote', icon: Server, labelKey: 'nav.remote' },
   { to: '/config', icon: Settings, labelKey: 'nav.config' },
+  // ── 아래는 고급/관리 메뉴 ──
+  { to: '/integrations', icon: Puzzle, labelKey: 'nav.integrations' },
   { to: '/cost', icon: DollarSign, labelKey: 'nav.cost' },
   { to: '/logs', icon: Activity, labelKey: 'nav.logs' },
+  { to: '/tools', icon: Wrench, labelKey: 'nav.tools' },
   { to: '/doctor', icon: Stethoscope, labelKey: 'nav.doctor' },
   { to: '/canvas', icon: Monitor, labelKey: 'nav.canvas' },
 ];

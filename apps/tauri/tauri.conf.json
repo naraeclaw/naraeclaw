@@ -4,8 +4,8 @@
   "version": "0.6.9",
   "identifier": "ai.naraeclaw.desktop",
   "build": {
-    "devUrl": "http://127.0.0.1:42617/_app/",
-    "frontendDist": "http://127.0.0.1:42617/_app/"
+    "devUrl": "http://localhost:5173/",
+    "frontendDist": "../../web/dist"
   },
   "app": {
     "windows": [
@@ -15,11 +15,11 @@
         "height": 800,
         "resizable": true,
         "fullscreen": false,
-        "visible": true
+        "visible": false
       }
     ],
     "security": {
-      "csp": "default-src 'self' http://127.0.0.1:* ws://127.0.0.1:*; connect-src 'self' http://127.0.0.1:* ws://127.0.0.1:*; script-src 'self' 'unsafe-inline' http://127.0.0.1:*; style-src 'self' 'unsafe-inline' http://127.0.0.1:*; img-src 'self' http://127.0.0.1:* data:"
+      "csp": "default-src 'self' http://127.0.0.1:* http://localhost:* ws://127.0.0.1:* ws://localhost:*; connect-src 'self' http://127.0.0.1:* http://localhost:* ws://127.0.0.1:* ws://localhost:*; script-src 'self' 'unsafe-inline' http://127.0.0.1:* http://localhost:*; style-src 'self' 'unsafe-inline'; img-src 'self' http://127.0.0.1:* data:"
     }
   },
   "bundle": {
@@ -32,7 +32,7 @@
       "icons/icon.ico"
     ],
     "externalBin": [
-      "../../target/release/naraeclaw"
+      "bin/naraeclaw"
     ]
   }
 }

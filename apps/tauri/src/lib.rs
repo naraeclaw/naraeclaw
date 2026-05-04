@@ -24,6 +24,11 @@ pub static INTENTIONAL_QUIT: AtomicBool = AtomicBool::new(false);
 /// Attempt to auto-pair with the gateway so the WebView has a valid token
 /// before the React frontend mounts. Runs on localhost so the admin endpoints
 /// are accessible without auth.
+///
+/// Token resolution order:
+/// 1. Tauri store (persisted from previous session)
+/// 2. In-memory state (current session)
+/// 3. Fresh auto-pair via admin endpoint
 async fn auto_pair(state: &state::SharedState) -> Option<String> {
     let url = {
         let s = state.read().await;
@@ -32,40 +37,65 @@ async fn auto_pair(state: &state::SharedState) -> Option<String> {
 
     let client = GatewayClient::new(&url, None);
 
-    // Check if gateway is reachable and requires pairing.
+    // Check if gateway requires pairing at all.
     if !client.requires_pairing().await.unwrap_or(false) {
-        return None; // Pairing disabled — no token needed.
+        return None;
     }
 
-    // Check if we already have a valid token in state.
+    // Check existing token in state.
     {
         let s = state.read().await;
         if let Some(ref token) = s.token {
             let authed = GatewayClient::new(&url, Some(token));
             if authed.validate_token().await.unwrap_or(false) {
-                return Some(token.clone()); // Existing token is valid.
+                return Some(token.clone());
             }
         }
     }
 
-    // No valid token — auto-pair by requesting a new code and exchanging it.
-    let client = GatewayClient::new(&url, None);
-    match client.auto_pair().await {
-        Ok(token) => {
-            let mut s = state.write().await;
-            s.token = Some(token.clone());
-            Some(token)
+    // Auto-pair with retries (gateway may still be initializing).
+    for attempt in 0..3 {
+        if attempt > 0 {
+            tokio::time::sleep(Duration::from_secs(1)).await;
         }
-        Err(_) => None, // Gateway may not be ready yet; health poller will retry.
+        let client = GatewayClient::new(&url, None);
+        match client.auto_pair().await {
+            Ok(token) => {
+                let mut s = state.write().await;
+                s.token = Some(token.clone());
+                return Some(token);
+            }
+            Err(e) => {
+                tracing::debug!("auto-pair attempt {}: {e}", attempt + 1);
+            }
+        }
+    }
+    None
+}
+
+/// Load a previously saved token from the Tauri store.
+fn load_token_from_store<R: tauri::Runtime>(app: &tauri::App<R>) -> Option<String> {
+    let store = app.store("naraeclaw.json").ok()?;
+    store
+        .get("gateway_token")
+        .and_then(|v| v.as_str().map(String::from))
+}
+
+/// Persist the token to the Tauri store for next launch.
+fn save_token_to_store<R: tauri::Runtime>(app: &tauri::AppHandle<R>, token: &str) {
+    if let Ok(store) = app.store("naraeclaw.json") {
+        store.set("gateway_token", token);
+        let _ = store.save();
     }
 }
 
-/// Inject a bearer token into the WebView's localStorage so the React app
-/// skips the pairing dialog. Uses Tauri's WebviewWindow scripting API.
+/// Inject a bearer token into the WebView's localStorage and reload so the
+/// React app picks it up immediately (skipping the pairing dialog).
 fn inject_token_into_webview<R: tauri::Runtime>(window: &tauri::WebviewWindow<R>, token: &str) {
     let escaped = token.replace('\\', "\\\\").replace('\'', "\\'");
-    let script = format!("localStorage.setItem('naraeclaw_token', '{escaped}')");
-    // WebviewWindow scripting is the standard Tauri API for running JS in the WebView.
+    let script = format!(
+        "if(!localStorage.getItem('naraeclaw_token')){{localStorage.setItem('naraeclaw_token','{escaped}');location.reload();}}"
+    );
     let _ = window.eval(&script);
 }
 
@@ -86,6 +116,71 @@ fn set_dock_icon() {
         let app = NSApplication::sharedApplication(mtm);
         unsafe { app.setApplicationIconImage(Some(&image)) };
     }
+}
+
+/// Check whether NaraeClaw has been configured (config.toml exists).
+fn config_exists() -> bool {
+    if let Ok(home) = std::env::var("HOME") {
+        std::path::Path::new(&home)
+            .join(".naraeclaw")
+            .join("config.toml")
+            .exists()
+    } else {
+        false
+    }
+}
+
+/// Start the gateway sidecar, wait for health, auto-pair, and show the window.
+///
+/// Called from setup when config exists, and from `complete_onboarding` after
+/// the user finishes in-app onboarding.
+pub fn start_gateway_and_show(app_handle: tauri::AppHandle, state: state::SharedState) {
+    tauri::async_runtime::spawn(async move {
+        if let Err(e) = sidecar::spawn_agent().await {
+            tracing::error!("Failed to start naraeclaw agent: {e}");
+            if let Some(window) = app_handle.get_webview_window("main") {
+                let _ = window.show();
+                let _ = window.eval(r#"document.body.innerHTML='<div style=\"padding:40px;text-align:center;color:#e94560\">에이전트 시작 실패</div>'"#);
+            }
+            return;
+        }
+
+        const MAX_WAIT: u64 = 30;
+        const POLL_MS: u64 = 500;
+        let steps = (MAX_WAIT * 1000) / POLL_MS;
+
+        let gateway_url = {
+            let s = state.read().await;
+            s.gateway_url.clone()
+        };
+
+        for _ in 0..steps {
+            tokio::time::sleep(std::time::Duration::from_millis(POLL_MS)).await;
+            if gateway_client::GatewayClient::new(&gateway_url, None)
+                .get_health()
+                .await
+                .unwrap_or(false)
+            {
+                if let Some(window) = app_handle.get_webview_window("main") {
+                    let _ = window.show();
+                    let _ = window.set_focus();
+                }
+                if let Some(token) = auto_pair(&state).await
+                    && let Some(window) = app_handle.get_webview_window("main")
+                {
+                    save_token_to_store(&app_handle, &token);
+                    inject_token_into_webview(&window, &token);
+                }
+                return;
+            }
+        }
+
+        tracing::warn!("naraeclaw agent did not become healthy within {MAX_WAIT}s");
+        if let Some(window) = app_handle.get_webview_window("main") {
+            let _ = window.show();
+            let _ = window.set_focus();
+        }
+    });
 }
 
 /// Minimum and maximum allowed window dimensions.
@@ -160,6 +255,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_store::Builder::default().build())
+        .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             // When a second instance launches, focus the existing window.
             if let Some(window) = app.get_webview_window("main") {
@@ -175,6 +271,41 @@ pub fn run() {
             commands::pairing::initiate_pairing,
             commands::pairing::get_devices,
             commands::agent::send_message,
+            commands::config::config_exists,
+            commands::config::check_ollama,
+            commands::config::ollama_pull,
+            commands::config::ollama_start,
+            commands::config::complete_onboarding,
+            commands::config::ollama_health,
+            commands::config::ollama_repair_model,
+            commands::config::restart_gateway,
+            commands::config::get_config,
+            commands::config::update_config,
+            commands::channel_config::get_channels,
+            commands::channel_config::save_channel,
+            commands::file_ops::handle_file_drop,
+            commands::file_ops::send_clipboard,
+            commands::cli_tools::list_cli_tools,
+            commands::cli_tools::run_cli_tool,
+            commands::scheduler::list_tasks,
+            commands::scheduler::create_task_natural,
+            commands::scheduler::delete_task,
+            commands::computer_use::take_screenshot,
+            commands::computer_use::mouse_action,
+            commands::computer_use::keyboard_type,
+            commands::computer_use::keyboard_shortcut,
+            commands::computer_use::list_windows,
+            commands::resources::get_system_info,
+            commands::resources::open_browser,
+            commands::resources::open_app,
+            commands::resources::list_files,
+            commands::resources::list_processes,
+            commands::remote::list_servers,
+            commands::remote::add_server,
+            commands::remote::remove_server,
+            commands::remote::switch_server,
+            commands::knowledge::memory_to_wiki,
+            commands::knowledge::list_memories,
         ])
         .setup(move |app| {
             // Set macOS dock icon (needed for dev builds without .app bundle).
@@ -187,60 +318,33 @@ pub fn run() {
             // Restore saved window size and position from previous session.
             restore_window_state(app);
 
+            // Restore token from previous session.
+            if let Some(token) = load_token_from_store(app) {
+                let state_clone = shared.clone();
+                tauri::async_runtime::block_on(async {
+                    let mut s = state_clone.write().await;
+                    s.token = Some(token);
+                });
+            }
+
             // Spawn the naraeclaw agent sidecar. The gateway HTTP server it starts
             // is what the WebView connects to. We show the window only after the
             // gateway is healthy to avoid a blank-page flash.
-            tauri::async_runtime::spawn(async move {
-                if let Err(e) = sidecar::spawn_agent().await {
-                    tracing::error!("Failed to start naraeclaw agent: {e}");
-                }
-            });
-
-            // Wait for the gateway to become healthy, then show the window and
-            // attempt auto-pairing. Times out after 30 seconds.
-            let app_handle = app.handle().clone();
-            let ready_state = shared.clone();
-            tauri::async_runtime::spawn(async move {
-                const MAX_WAIT: u64 = 30;
-                const POLL_MS: u64 = 500;
-                let steps = (MAX_WAIT * 1000) / POLL_MS;
-
-                let gateway_url = {
-                    let s = ready_state.read().await;
-                    s.gateway_url.clone()
-                };
-
-                for _ in 0..steps {
-                    tokio::time::sleep(Duration::from_millis(POLL_MS)).await;
-                    if GatewayClient::new(&gateway_url, None)
-                        .get_health()
-                        .await
-                        .unwrap_or(false)
-                    {
-                        // Gateway is ready — show the window.
-                        if let Some(window) = app_handle.get_webview_window("main") {
-                            let _ = window.show();
-                            let _ = window.set_focus();
-                        }
-                        // Attempt auto-pairing and inject token.
-                        if let Some(token) = auto_pair(&ready_state).await
-                            && let Some(window) = app_handle.get_webview_window("main")
-                        {
-                            inject_token_into_webview(&window, &token);
-                        }
-                        return;
-                    }
-                }
-
-                tracing::warn!(
-                    "naraeclaw agent did not become healthy within {MAX_WAIT}s — \
-                     showing window anyway"
-                );
-                if let Some(window) = app_handle.get_webview_window("main") {
+            let needs_onboarding = !config_exists();
+            if needs_onboarding {
+                // No config — show onboarding UI immediately.
+                // Sidecar is NOT started yet; it will be started after onboarding
+                // completes via the `complete_onboarding` Tauri command.
+                if let Some(window) = app.get_webview_window("main") {
                     let _ = window.show();
                     let _ = window.set_focus();
+                    // Navigate to onboarding route.
+                    let _ = window.eval("window.location.pathname = '/onboarding'");
                 }
-            });
+            } else {
+                // Config exists — start gateway sidecar and wait for it.
+                start_gateway_and_show(app.handle().clone(), shared.clone());
+            }
 
             // Start background health polling (tray icon / status updates).
             health::spawn_health_poller(app.handle().clone(), shared.clone());

@@ -26,12 +26,12 @@ pub fn icon_for_state(connected: bool, status: AgentStatus) -> Image<'static> {
 /// Tooltip text for the current state.
 pub fn tooltip_for_state(connected: bool, status: AgentStatus) -> &'static str {
     if !connected {
-        return "NaraeClaw — Disconnected";
+        return "NaraeClaw — 연결 끊김";
     }
     match status {
-        AgentStatus::Idle => "NaraeClaw — Idle",
-        AgentStatus::Working => "NaraeClaw — Working",
-        AgentStatus::Error => "NaraeClaw — Error",
+        AgentStatus::Idle => "NaraeClaw — 대기 중",
+        AgentStatus::Working => "NaraeClaw — 작업 중",
+        AgentStatus::Error => "NaraeClaw — 오류",
     }
 }
 
@@ -58,16 +58,16 @@ mod tests {
     fn tooltip_disconnected() {
         assert_eq!(
             tooltip_for_state(false, AgentStatus::Idle),
-            "NaraeClaw — Disconnected"
+            "NaraeClaw — 연결 끊김"
         );
         // Agent status is irrelevant when disconnected.
         assert_eq!(
             tooltip_for_state(false, AgentStatus::Working),
-            "NaraeClaw — Disconnected"
+            "NaraeClaw — 연결 끊김"
         );
         assert_eq!(
             tooltip_for_state(false, AgentStatus::Error),
-            "NaraeClaw — Disconnected"
+            "NaraeClaw — 연결 끊김"
         );
     }
 
@@ -75,15 +75,15 @@ mod tests {
     fn tooltip_connected_variants() {
         assert_eq!(
             tooltip_for_state(true, AgentStatus::Idle),
-            "NaraeClaw — Idle"
+            "NaraeClaw — 대기 중"
         );
         assert_eq!(
             tooltip_for_state(true, AgentStatus::Working),
-            "NaraeClaw — Working"
+            "NaraeClaw — 작업 중"
         );
         assert_eq!(
             tooltip_for_state(true, AgentStatus::Error),
-            "NaraeClaw — Error"
+            "NaraeClaw — 오류"
         );
     }
 
