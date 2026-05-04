@@ -1,0 +1,70 @@
+# cargo-deny configuration
+# https://embarkstudios.github.io/cargo-deny/
+#
+# NOTE: cargo-deny >= 0.18.6 required — 0.18.5 fails to parse CVSS 4.0 advisories
+# (upstream issue: https://github.com/EmbarkStudios/cargo-deny/issues/xxx).
+# Upgrade: cargo install cargo-deny --version ">=0.18.6"
+
+[advisories]
+version = 2
+# RustSec advisory database
+db-path = "~/.cargo/advisory-db"
+db-urls = ["https://github.com/rustsec/advisory-db"]
+
+vulnerability = "deny"
+unmaintained = "warn"
+yanked = "warn"
+notice = "warn"
+
+ignore = [
+    # ── rumqttc: rustls-webpki 0.102.x upstream issue ─────────────────────
+    # rumqttc 0.25.1 directly depends on rustls-webpki = "^0.102.8".
+    # The 0.102.x line will never receive these fixes — the solution requires
+    # upgrading to rustls 0.23 (webpki 0.103.x), which rumqttc hasn't done yet.
+    #
+    # Practical risk: these advisories only trigger during TLS certificate
+    # validation against a malicious/malformed cert or CRL. The MQTT channel
+    # is typically used with a local broker (no TLS). Once rumqttc publishes a
+    # release using rustls 0.23, remove these ignores.
+    #
+    # Track: https://github.com/bytebeamio/rumqtt
+    { id = "RUSTSEC-2026-0098", reason = "rumqttc upstream has not migrated to rustls 0.23 yet; local MQTT usage does not reach the vulnerable code path" },
+    { id = "RUSTSEC-2026-0099", reason = "rumqttc upstream has not migrated to rustls 0.23 yet; local MQTT usage does not reach the vulnerable code path" },
+    { id = "RUSTSEC-2026-0104", reason = "rumqttc upstream has not migrated to rustls 0.23 yet; CRL parsing reachable only with crafted input via TLS MQTT" },
+]
+
+[licenses]
+version = 2
+# Allowed license identifiers (SPDX format)
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Unicode-3.0",
+    "Unicode-DFS-2016",
+    "CC0-1.0",
+    "Zlib",
+    "OpenSSL",
+    "BSL-1.0",          # Boost Software License (used by some crypto libs)
+]
+
+# Crates whose license we explicitly accept even if non-standard.
+exceptions = [
+    # ring uses a custom license (ISC-style + OpenSSL).
+    { allow = ["MIT", "ISC", "OpenSSL"], crate = "ring" },
+]
+
+[bans]
+version = 2
+multiple-versions = "warn"
+wildcards = "warn"
+deny = []
+
+[sources]
+version = 2
+unknown-registry = "warn"
+unknown-git = "warn"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
