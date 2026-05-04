@@ -67,7 +67,7 @@ cargo test -p naraeclaw-tui --lib
 | P0 | 핵심 경로 안정화 | `onboard -> configure -> agent/gateway -> tool use` 흐름을 깨지 않게 만든다 | 완료 |
 | P0 | 검증 루프 단순화 | 빠른 개발을 막는 과도한 CI/CD와 낡은 체크를 제거한다 | 완료 |
 | P1 | stale scope 제거 | 로봇/디바이스/marketplace/CN/legacy channel/plugin 잔재를 제거한다 | 완료 |
-| P1 | Desktop/Web 유지 | CLI를 해치지 않는 범위에서 데스크탑과 웹 UX를 계속 살린다 | 거의 완료 (파일 첨부/클립보드/알림 남음) |
+| P1 | Desktop/Web 유지 | CLI를 해치지 않는 범위에서 데스크탑과 웹 UX를 계속 살린다 | 완료 (Onboarding/ChannelSetup/CliTools/RemoteServers/Wiki/OllamaSettings 페이지 완성) |
 | P1 | 설정/온보딩 정리 | NaraeClaw 기본값, 경로, 문구, provider 설정을 단순화한다 | 완료 |
 | P2 | 릴리즈 경로 재정의 | macOS/Windows/Linux 설치와 배포만 남긴다 | 완료 (workflow 구현은 릴리즈 케이던스 후) |
 | P2 | 테스트 부채 축소 | 오래된 통합/컴포넌트 테스트를 핵심 경로 중심으로 재분류한다 | 미착수 |
