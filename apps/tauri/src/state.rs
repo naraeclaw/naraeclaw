@@ -1,7 +1,11 @@
 //! Shared application state for Tauri.
 
-use std::sync::Arc;
-use tokio::sync::RwLock;
+use std::{
+    collections::HashMap,
+    sync::Arc,
+    time::{Duration, Instant},
+};
+use tokio::sync::{Mutex, RwLock};
 
 /// Agent status as reported by the gateway.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
@@ -19,6 +23,10 @@ pub struct AppState {
     pub token: Option<String>,
     pub connected: bool,
     pub agent_status: AgentStatus,
+    /// One-shot nonces for computer-use action approvals.
+    /// Uses its own inner `Arc<Mutex<>>` so it can be mutated under a
+    /// read lock on `AppState`.
+    pub approvals: ApprovalStore,
 }
 
 impl Default for AppState {
@@ -28,12 +36,54 @@ impl Default for AppState {
             token: None,
             connected: false,
             agent_status: AgentStatus::Idle,
+            approvals: ApprovalStore::default(),
         }
     }
 }
 
 /// Thread-safe wrapper around `AppState`.
 pub type SharedState = Arc<RwLock<AppState>>;
+
+/// One-shot approval nonces for destructive computer-use actions.
+///
+/// Each nonce is valid for `APPROVAL_TTL` and consumed on first use.
+/// The renderer must call `request_computer_use_approval` (which shows a
+/// native confirmation dialog) to obtain a nonce before calling any
+/// computer-use action. Storing the nonce in Rust state means a renderer-
+/// side XSS payload must chain two separate calls (request + act) within
+/// the TTL window, and the request call itself triggers a visible OS dialog
+/// that the real user can dismiss.
+pub const APPROVAL_TTL: Duration = Duration::from_secs(30);
+
+#[derive(Debug, Default, Clone)]
+pub struct ApprovalStore {
+    inner: Arc<Mutex<HashMap<String, Instant>>>,
+}
+
+impl ApprovalStore {
+    /// Insert a new nonce with the current timestamp.
+    pub async fn insert(&self, nonce: String) {
+        let mut map = self.inner.lock().await;
+        // Evict expired entries to avoid unbounded growth.
+        map.retain(|_, issued| issued.elapsed() < APPROVAL_TTL);
+        map.insert(nonce, Instant::now());
+    }
+
+    /// Consume a nonce — returns `true` if valid and removes it.
+    pub async fn consume(&self, nonce: &str) -> bool {
+        let mut map = self.inner.lock().await;
+        match map.get(nonce) {
+            Some(issued) if issued.elapsed() < APPROVAL_TTL => {
+                map.remove(nonce);
+                true
+            }
+            _ => {
+                map.remove(nonce); // clean up expired
+                false
+            }
+        }
+    }
+}
 
 /// Create the default shared state.
 pub fn shared_state() -> SharedState {

@@ -19,7 +19,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self' http://127.0.0.1:* http://localhost:* ws://127.0.0.1:* ws://localhost:*; connect-src 'self' http://127.0.0.1:* http://localhost:* ws://127.0.0.1:* ws://localhost:*; script-src 'self' 'unsafe-inline' http://127.0.0.1:* http://localhost:*; style-src 'self' 'unsafe-inline'; img-src 'self' http://127.0.0.1:* data:"
+      "csp": "default-src 'self'; connect-src 'self' http://127.0.0.1:42617 ws://127.0.0.1:42617; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' http://127.0.0.1:42617 data: blob:"
     }
   },
   "bundle": {
