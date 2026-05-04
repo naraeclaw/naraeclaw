@@ -16,7 +16,7 @@ naraeclaw-runtime.workspace = true
 naraeclaw-tools.workspace = true
 anyhow = "1.0"
 lru = "0.17"
-rumqttc = "0.24"
+rumqttc = "0.25"
 axum = { version = "0.8", default-features = false, features = ["http1", "json", "tokio", "query", "ws", "macros"] }
 async-trait = "0.1"
 base64 = "0.22"
