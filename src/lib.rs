@@ -204,19 +204,8 @@ pub enum ChannelCommands {
     /// Run health checks for configured channels (handled in main.rs for async)
     Doctor,
     /// Add a new channel configuration
-    #[command(long_about = "\
-Add a new channel configuration.
-
-Provide the channel type and a JSON object with the required \
-configuration keys for that channel type.
-
-Supported types: telegram, discord, slack, whatsapp, matrix, email.
-
-Examples:
-  naraeclaw channel add telegram '{\"bot_token\":\"...\",\"name\":\"my-bot\"}'
-  naraeclaw channel add discord '{\"bot_token\":\"...\",\"name\":\"my-discord\"}'")]
     Add {
-        /// Channel type (telegram, discord, slack, whatsapp, matrix, email)
+        /// Channel type (webhook)
         channel_type: String,
         /// Optional configuration as JSON
         config: String,
@@ -226,43 +215,14 @@ Examples:
         /// Channel name to remove
         name: String,
     },
-    /// Bind a Telegram identity (username or numeric user ID) into allowlist
-    #[command(long_about = "\
-Bind a Telegram identity into the allowlist.
-
-Adds a Telegram username (without the '@' prefix) or numeric user \
-ID to the channel allowlist so the agent will respond to messages \
-from that identity.
-
-Examples:
-  naraeclaw channel bind-telegram naraeclaw_user
-  naraeclaw channel bind-telegram 123456789")]
-    BindTelegram {
-        /// Telegram identity to allow (username without '@' or numeric user ID)
-        identity: String,
-    },
     /// Send a message to a configured channel
-    #[command(long_about = "\
-Send a one-off message to a configured channel.
-
-Sends a text message through the specified channel without starting \
-the full agent loop. Useful for scripted notifications, service \
-alerts, and automation pipelines.
-
-The --channel-id selects the channel by its config section name \
-(e.g. 'telegram', 'discord', 'slack'). The --recipient is the \
-platform-specific destination (e.g. a Telegram chat ID).
-
-Examples:
-  naraeclaw channel send 'Deployment finished.' --channel-id telegram --recipient 123456789
-  naraeclaw channel send 'Build succeeded!' --channel-id discord --recipient 987654321")]
     Send {
         /// Message text to send
         message: String,
-        /// Channel config name (e.g. telegram, discord, slack)
+        /// Channel config name (e.g. webhook)
         #[arg(long)]
         channel_id: String,
-        /// Recipient identifier (platform-specific, e.g. Telegram chat ID)
+        /// Recipient identifier (destination URL or channel-specific ID)
         #[arg(long)]
         recipient: String,
     },

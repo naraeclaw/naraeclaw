@@ -1894,14 +1894,8 @@ async fn main() -> Result<()> {
 #[cfg(feature = "agent-runtime")]
 fn build_wizard_callbacks() -> onboard::WizardCallbacks {
     onboard::WizardCallbacks {
-        #[cfg(feature = "channel-nostr")]
-        nostr_validate_key: Some(Box::new(|key: &str| {
-            let keys = nostr_sdk::Keys::parse(key)
-                .map_err(|e| anyhow::anyhow!("invalid nostr key: {e}"))?;
-            Ok(keys.public_key().to_hex())
-        })),
-
-        whatsapp_web_available: cfg!(feature = "whatsapp-web"),
+        whatsapp_web_available: false,
+        ..Default::default()
     }
 }
 

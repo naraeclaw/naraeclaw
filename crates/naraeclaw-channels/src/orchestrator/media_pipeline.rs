@@ -91,36 +91,8 @@ impl<'a> MediaPipeline<'a> {
         enriched.trim().to_string()
     }
 
-    /// Transcribe an audio attachment using the existing transcription infra.
-    async fn process_audio(&self, attachment: &MediaAttachment) -> String {
-        if !self.transcription_config.enabled {
-            return "[Audio: attached]".to_string();
-        }
-
-        match super::transcription::transcribe_audio(
-            attachment.data.clone(),
-            &attachment.file_name,
-            self.transcription_config,
-        )
-        .await
-        {
-            Ok(text) => {
-                let trimmed = text.trim();
-                if trimmed.is_empty() {
-                    "[Audio transcription: (empty)]".to_string()
-                } else {
-                    format!("[Audio transcription: {trimmed}]")
-                }
-            }
-            Err(err) => {
-                tracing::warn!(
-                    file = %attachment.file_name,
-                    error = %err,
-                    "Media pipeline: audio transcription failed"
-                );
-                "[Audio: transcription failed]".to_string()
-            }
-        }
+    async fn process_audio(&self, _attachment: &MediaAttachment) -> String {
+        "[Audio: transcription not available]".to_string()
     }
 
     /// Describe an image attachment.

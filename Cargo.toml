@@ -173,13 +173,10 @@ ratatui = { version = "0.30", default-features = true, optional = true }
 crossterm = { version = "0.29", features = ["event-stream"], optional = true }
 
 
-# Nostr key validation for wizard (behind channel-nostr feature)
-nostr-sdk = { version = "0.44", default-features = false, optional = true }
-
 # Binary discovery (init system detection)
 which = { version = "8.0", optional = true }
 
-# WebSocket client channels (Discord/Nostr)
+# WebSocket client (gateway)
 tokio-tungstenite = { version = "0.29", features = ["rustls-tls-webpki-roots"], optional = true }
 tokio-socks = { version = "0.5", optional = true }
 futures-util = { version = "0.3", default-features = false, features = ["sink"] }
@@ -190,11 +187,6 @@ rustls-pemfile = { version = "2", optional = true }
 rustls-pki-types = { version = "1.14.0", optional = true }
 tokio-rustls = { version = "0.26.4", optional = true }
 webpki-roots = { version = "1.0.6", optional = true }
-
-# email
-lettre = { version = "0.11.19", default-features = false, features = ["builder", "smtp-transport", "rustls-tls"], optional = true }
-mail-parser = { version = "0.11.2", optional = true }
-async-imap = { version = "0.11", features = ["runtime-tokio"], default-features = false, optional = true }
 
 # HTTP server (gateway) — replaces raw TCP for proper HTTP/1.1 compliance
 axum = { version = "0.8", default-features = false, features = ["http1", "json", "tokio", "query", "ws", "macros"], optional = true }
@@ -233,14 +225,10 @@ agent-runtime = [
     "dep:ratatui", "dep:crossterm",
     "dep:tokio-tungstenite", "dep:tokio-socks", "dep:hostname",
     "dep:rustls", "dep:rustls-pemfile", "dep:rustls-pki-types", "dep:tokio-rustls", "dep:webpki-roots",
-    "dep:lettre", "dep:mail-parser", "dep:async-imap",
     "dep:axum", "dep:hyper", "dep:hyper-util", "dep:tower", "dep:tower-http", "dep:http-body-util",
     "dep:mime_guess",
     "gateway", "tui-onboarding",
-    "channel-email", "channel-telegram", "channel-discord",
-    "channel-slack", "channel-signal", "channel-mattermost",
-    "channel-notion", "channel-nextcloud", "channel-webhook",
-    "channel-acp-server", "channel-whatsapp-cloud",
+    "channel-webhook", "channel-acp-server",
 ]
 
 # Major subsystems — each forwards to exactly ONE crate
@@ -249,35 +237,11 @@ tui-onboarding = ["dep:naraeclaw-tui"]
 schema-export = ["naraeclaw-config/schema-export"]
 
 # Channels — each forwards directly to naraeclaw-channels (1 hop)
-channel-email = ["naraeclaw-channels/channel-email"]
-channel-telegram = ["naraeclaw-channels/channel-telegram"]
-channel-nostr = ["naraeclaw-channels/channel-nostr", "naraeclaw-runtime/channel-nostr", "dep:nostr-sdk"]
-channel-matrix = ["naraeclaw-channels/channel-matrix"]
-channel-discord = ["naraeclaw-channels/channel-discord"]
-channel-slack = ["naraeclaw-channels/channel-slack"]
-channel-signal = ["naraeclaw-channels/channel-signal"]
-channel-mattermost = ["naraeclaw-channels/channel-mattermost"]
-channel-bluesky = ["naraeclaw-channels/channel-bluesky"]
-channel-twitter = ["naraeclaw-channels/channel-twitter"]
-channel-reddit = ["naraeclaw-channels/channel-reddit"]
-channel-notion = ["naraeclaw-channels/channel-notion"]
-channel-wati = ["naraeclaw-channels/channel-wati", "naraeclaw-gateway/channel-wati"]
-channel-nextcloud = ["naraeclaw-channels/channel-nextcloud"]
-channel-clawdtalk = ["naraeclaw-channels/channel-clawdtalk"]
 channel-webhook = ["naraeclaw-channels/channel-webhook"]
 channel-acp-server = ["naraeclaw-channels/channel-acp-server"]
-channel-whatsapp-cloud = ["naraeclaw-channels/channel-whatsapp-cloud"]
-channel-voice-call = ["naraeclaw-channels/channel-voice-call"]
 
-# Optional channel bundles for non-default integrations.
-channels-social = ["channel-bluesky", "channel-twitter", "channel-reddit"]
-channels-full = [
-    "agent-runtime", "channels-social",
-    "channel-clawdtalk", "channel-voice-call",
-]
-
-whatsapp-web = ["naraeclaw-channels/whatsapp-web"]
-voice-wake = ["naraeclaw-channels/voice-wake"]
+# Bundle alias for future expansion
+channels-full = ["agent-runtime"]
 
 # Backends and platform flags — each forwards to ONE crate
 observability-prometheus = ["naraeclaw-runtime/observability-prometheus"]
@@ -296,7 +260,6 @@ metrics = ["observability-prometheus"]
 # CI meta-feature
 ci-all = [
     "channels-full",
-    "channel-nostr", "channel-matrix", "whatsapp-web",
     "observability-prometheus", "observability-otel",
     "sandbox-landlock", "sandbox-bubblewrap",
     "browser-native", "rag-pdf",
