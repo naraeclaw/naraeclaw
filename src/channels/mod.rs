@@ -1,8 +1,4 @@
 pub use naraeclaw_channels::orchestrator::*;
-#[cfg(feature = "channel-matrix")]
-pub mod matrix;
-#[cfg(feature = "channel-telegram")]
-pub mod telegram;
 pub mod session_backend {
     pub use naraeclaw_infra::session_backend::*;
 }
@@ -24,17 +20,9 @@ pub async fn handle_command(command: crate::ChannelCommands, config: &Config) ->
         crate::ChannelCommands::List => {
             println!("Channels:");
             println!("  ✅ CLI (always available)");
-            for (channel, configured) in config.channels_config.channels() {
-                println!(
-                    "  {} {}",
-                    if configured { "✅" } else { "❌" },
-                    channel.name()
-                );
-            }
-            if !cfg!(feature = "channel-matrix") {
-                println!(
-                    "  ℹ️ Matrix channel support is disabled in this build (enable `channel-matrix`)."
-                );
+            #[cfg(feature = "channel-webhook")]
+            if config.channels_config.webhook.as_ref().is_some_and(|w| w.enabled) {
+                println!("  ✅ Webhook");
             }
             println!("\nTo start channels: naraeclaw channel start");
             println!("To check health:    naraeclaw channel doctor");
@@ -51,9 +39,6 @@ pub async fn handle_command(command: crate::ChannelCommands, config: &Config) ->
         }
         crate::ChannelCommands::Remove { name } => {
             anyhow::bail!("Remove channel '{name}' — edit ~/.naraeclaw/config.toml directly");
-        }
-        crate::ChannelCommands::BindTelegram { identity } => {
-            Box::pin(bind_telegram_identity(config, &identity)).await
         }
         crate::ChannelCommands::Send {
             message,

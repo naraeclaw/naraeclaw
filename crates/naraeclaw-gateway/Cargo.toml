@@ -13,7 +13,7 @@ naraeclaw-config.workspace = true
 naraeclaw-infra.workspace = true
 naraeclaw-memory.workspace = true
 naraeclaw-providers.workspace = true
-naraeclaw-channels = { workspace = true, default-features = true, features = ["channel-email", "channel-telegram"] }
+naraeclaw-channels = { workspace = true, default-features = true }
 naraeclaw-runtime.workspace = true
 naraeclaw-tools.workspace = true
 
@@ -72,5 +72,3 @@ tokio = { version = "1.52", features = ["rt-multi-thread", "macros"] }
 default = []
 webauthn = ["naraeclaw-runtime/webauthn"]
 observability-prometheus = ["naraeclaw-runtime/observability-prometheus"]
-channel-nostr = ["naraeclaw-channels/channel-nostr"]
-channel-wati = ["naraeclaw-channels/channel-wati"]
