@@ -12,37 +12,19 @@ pub fn all_integrations() -> Vec<IntegrationEntry> {
             name: "Telegram",
             description: "Bot API — long-polling",
             category: IntegrationCategory::Chat,
-            status_fn: |c| {
-                if c.channels_config.telegram.is_some() {
-                    IntegrationStatus::Active
-                } else {
-                    IntegrationStatus::Available
-                }
-            },
+            status_fn: |_| IntegrationStatus::ComingSoon,
         },
         IntegrationEntry {
             name: "Discord",
             description: "Servers, channels & DMs",
             category: IntegrationCategory::Chat,
-            status_fn: |c| {
-                if c.channels_config.discord.is_some() {
-                    IntegrationStatus::Active
-                } else {
-                    IntegrationStatus::Available
-                }
-            },
+            status_fn: |_| IntegrationStatus::ComingSoon,
         },
         IntegrationEntry {
             name: "Slack",
             description: "Workspace apps via Web API",
             category: IntegrationCategory::Chat,
-            status_fn: |c| {
-                if c.channels_config.slack.is_some() {
-                    IntegrationStatus::Active
-                } else {
-                    IntegrationStatus::Available
-                }
-            },
+            status_fn: |_| IntegrationStatus::ComingSoon,
         },
         IntegrationEntry {
             name: "Webhooks",
@@ -60,25 +42,13 @@ pub fn all_integrations() -> Vec<IntegrationEntry> {
             name: "WhatsApp",
             description: "Meta Cloud API via webhook",
             category: IntegrationCategory::Chat,
-            status_fn: |c| {
-                if c.channels_config.whatsapp.is_some() {
-                    IntegrationStatus::Active
-                } else {
-                    IntegrationStatus::Available
-                }
-            },
+            status_fn: |_| IntegrationStatus::ComingSoon,
         },
         IntegrationEntry {
             name: "Signal",
             description: "Privacy-focused via signal-cli",
             category: IntegrationCategory::Chat,
-            status_fn: |c| {
-                if c.channels_config.signal.is_some() {
-                    IntegrationStatus::Active
-                } else {
-                    IntegrationStatus::Available
-                }
-            },
+            status_fn: |_| IntegrationStatus::ComingSoon,
         },
         IntegrationEntry {
             name: "Microsoft Teams",
@@ -90,13 +60,7 @@ pub fn all_integrations() -> Vec<IntegrationEntry> {
             name: "Matrix",
             description: "Matrix protocol (Element)",
             category: IntegrationCategory::Chat,
-            status_fn: |c| {
-                if c.channels_config.matrix.is_some() {
-                    IntegrationStatus::Active
-                } else {
-                    IntegrationStatus::Available
-                }
-            },
+            status_fn: |_| IntegrationStatus::ComingSoon,
         },
         IntegrationEntry {
             name: "Nostr",
@@ -667,13 +631,7 @@ pub fn all_integrations() -> Vec<IntegrationEntry> {
             name: "Email",
             description: "IMAP/SMTP email channel",
             category: IntegrationCategory::Social,
-            status_fn: |c| {
-                if c.channels_config.email.is_some() {
-                    IntegrationStatus::Active
-                } else {
-                    IntegrationStatus::Available
-                }
-            },
+            status_fn: |_| IntegrationStatus::ComingSoon,
         },
         // ── Platforms ───────────────────────────────────────────
         IntegrationEntry {
@@ -713,7 +671,6 @@ pub fn all_integrations() -> Vec<IntegrationEntry> {
 mod tests {
     use super::*;
     use naraeclaw_config::schema::Config;
-    use naraeclaw_config::schema::{MatrixConfig, StreamMode, TelegramConfig};
 
     #[test]
     fn registry_has_entries() {
@@ -770,106 +727,16 @@ mod tests {
     }
 
     #[test]
-    fn telegram_active_when_configured() {
-        let mut config = Config::default();
-        config.channels_config.telegram = Some(TelegramConfig {
-            enabled: true,
-            bot_token: "123:ABC".into(),
-            allowed_users: vec!["user".into()],
-            stream_mode: StreamMode::default(),
-            draft_update_interval_ms: 1000,
-            interrupt_on_new_message: false,
-            mention_only: false,
-            ack_reactions: None,
-            proxy_url: None,
-            webhook_url: None,
-            webhook_listen_addr: "0.0.0.0:8443".to_string(),
-            webhook_path: "/telegram/webhook".to_string(),
-            webhook_secret_token: None,
-        });
-        let entries = all_integrations();
-        let tg = entries.iter().find(|e| e.name == "Telegram").unwrap();
-        assert!(matches!((tg.status_fn)(&config), IntegrationStatus::Active));
-    }
-
-    #[test]
-    fn telegram_available_when_not_configured() {
-        let config = Config::default();
-        let entries = all_integrations();
-        let tg = entries.iter().find(|e| e.name == "Telegram").unwrap();
-        assert!(matches!(
-            (tg.status_fn)(&config),
-            IntegrationStatus::Available
-        ));
-    }
-
-    #[test]
-    fn matrix_active_when_configured() {
-        let mut config = Config::default();
-        config.channels_config.matrix = Some(MatrixConfig {
-            enabled: true,
-            homeserver: "https://m.org".into(),
-            access_token: "tok".into(),
-            user_id: None,
-            device_id: None,
-            room_id: "!r:m".into(),
-            allowed_users: vec![],
-            allowed_rooms: vec![],
-            interrupt_on_new_message: false,
-            stream_mode: naraeclaw_config::schema::StreamMode::default(),
-            draft_update_interval_ms: 1500,
-            multi_message_delay_ms: 800,
-            recovery_key: None,
-        });
-        let entries = all_integrations();
-        let mx = entries.iter().find(|e| e.name == "Matrix").unwrap();
-        assert!(matches!((mx.status_fn)(&config), IntegrationStatus::Active));
-    }
-
-    #[test]
-    fn matrix_available_when_not_configured() {
-        let config = Config::default();
-        let entries = all_integrations();
-        let mx = entries.iter().find(|e| e.name == "Matrix").unwrap();
-        assert!(matches!(
-            (mx.status_fn)(&config),
-            IntegrationStatus::Available
-        ));
-    }
-
-    #[test]
     fn coming_soon_integrations_stay_coming_soon() {
         let config = Config::default();
         let entries = all_integrations();
-        for name in ["Nostr", "Spotify", "Home Assistant"] {
+        for name in ["Telegram", "Discord", "Slack", "WhatsApp", "Signal", "Matrix", "Nostr", "Spotify", "Home Assistant"] {
             let entry = entries.iter().find(|e| e.name == name).unwrap();
             assert!(
                 matches!((entry.status_fn)(&config), IntegrationStatus::ComingSoon),
                 "{name} should be ComingSoon"
             );
         }
-    }
-
-    #[test]
-    fn whatsapp_available_when_not_configured() {
-        let config = Config::default();
-        let entries = all_integrations();
-        let wa = entries.iter().find(|e| e.name == "WhatsApp").unwrap();
-        assert!(matches!(
-            (wa.status_fn)(&config),
-            IntegrationStatus::Available
-        ));
-    }
-
-    #[test]
-    fn email_available_when_not_configured() {
-        let config = Config::default();
-        let entries = all_integrations();
-        let email = entries.iter().find(|e| e.name == "Email").unwrap();
-        assert!(matches!(
-            (email.status_fn)(&config),
-            IntegrationStatus::Available
-        ));
     }
 
     #[test]

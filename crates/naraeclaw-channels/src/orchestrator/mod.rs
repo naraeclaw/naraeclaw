@@ -3657,60 +3657,8 @@ async fn run_message_dispatch_loop(
     }
 }
 
-fn normalize_telegram_identity(value: &str) -> String {
-    value.trim().trim_start_matches('@').to_string()
-}
-
-pub async fn bind_telegram_identity(config: &Config, identity: &str) -> Result<()> {
-    let normalized = normalize_telegram_identity(identity);
-    if normalized.is_empty() {
-        anyhow::bail!("Telegram identity cannot be empty");
-    }
-
-    let mut updated = config.clone();
-    let Some(telegram) = updated.channels_config.telegram.as_mut() else {
-        anyhow::bail!(
-            "Telegram channel is not configured. Run `naraeclaw onboard --channels-only` first"
-        );
-    };
-
-    if telegram.allowed_users.iter().any(|u| u == "*") {
-        println!(
-            "⚠️ Telegram allowlist is currently wildcard (`*`) — binding is unnecessary until you remove '*'."
-        );
-    }
-
-    if telegram
-        .allowed_users
-        .iter()
-        .map(|entry| normalize_telegram_identity(entry))
-        .any(|entry| entry == normalized)
-    {
-        println!("✅ Telegram identity already bound: {normalized}");
-        return Ok(());
-    }
-
-    telegram.allowed_users.push(normalized.clone());
-    updated.save().await?;
-    println!("✅ Bound Telegram identity: {normalized}");
-    println!("   Saved to {}", updated.config_path.display());
-    match maybe_restart_managed_daemon_service() {
-        Ok(true) => {
-            println!("🔄 Detected running managed daemon service; reloaded automatically.");
-        }
-        Ok(false) => {
-            println!(
-                "ℹ️ No managed daemon service detected. If `naraeclaw daemon`/`channel start` is already running, restart it to load the updated allowlist."
-            );
-        }
-        Err(e) => {
-            eprintln!(
-                "⚠️ Allowlist saved, but failed to reload daemon service automatically: {e}\n\
-                 Restart service manually with `naraeclaw service stop && naraeclaw service start`."
-            );
-        }
-    }
-    Ok(())
+pub async fn bind_telegram_identity(_config: &Config, _identity: &str) -> Result<()> {
+    anyhow::bail!("Telegram channel is not available in this build")
 }
 
 fn maybe_restart_managed_daemon_service() -> Result<bool> {
@@ -4305,31 +4253,11 @@ pub async fn start_channels(config: Config) -> Result<()> {
     provider_cache_seed.insert(provider_name.clone(), Arc::clone(&provider));
     let message_timeout_secs =
         effective_channel_message_timeout_secs(config.channels_config.message_timeout_secs);
-    let interrupt_on_new_message = config
-        .channels_config
-        .telegram
-        .as_ref()
-        .is_some_and(|tg| tg.interrupt_on_new_message);
-    let interrupt_on_new_message_slack = config
-        .channels_config
-        .slack
-        .as_ref()
-        .is_some_and(|sl| sl.interrupt_on_new_message);
-    let interrupt_on_new_message_discord = config
-        .channels_config
-        .discord
-        .as_ref()
-        .is_some_and(|dc| dc.interrupt_on_new_message);
-    let interrupt_on_new_message_mattermost = config
-        .channels_config
-        .mattermost
-        .as_ref()
-        .is_some_and(|mm| mm.interrupt_on_new_message);
-    let interrupt_on_new_message_matrix = config
-        .channels_config
-        .matrix
-        .as_ref()
-        .is_some_and(|mx| mx.interrupt_on_new_message);
+    let interrupt_on_new_message = false;
+    let interrupt_on_new_message_slack = false;
+    let interrupt_on_new_message_discord = false;
+    let interrupt_on_new_message_mattermost = false;
+    let interrupt_on_new_message_matrix = false;
 
     let runtime_ctx = Arc::new(ChannelRuntimeContext {
         channels_by_name,
