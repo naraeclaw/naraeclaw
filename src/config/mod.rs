@@ -15,18 +15,18 @@ pub use schema::{
     ImageProviderFluxConfig, ImageProviderImagenConfig, ImageProviderStabilityConfig, JiraConfig,
     KnowledgeConfig, LinkEnricherConfig, LinkedInConfig, LinkedInContentConfig,
     LinkedInImageConfig, LocalWhisperConfig, McpConfig, McpServerConfig, McpTransport,
-    MediaPipelineConfig, MemoryConfig, MemoryPolicyConfig, ModelRouteConfig, MqttConfig,
-    MultimodalConfig, NodeTransportConfig, NodesConfig, ObservabilityConfig, OpenAiSttConfig,
-    OpenAiTtsConfig, OpenCodeCliConfig, OpenVpnTunnelConfig, OtpConfig, OtpMethod, PacingConfig,
-    PipelineConfig, PiperTtsConfig, PluginsConfig, ProxyConfig, ProxyScope, QdrantConfig,
+    MediaPipelineConfig, MemoryConfig, MemoryPolicyConfig, ModelRouteConfig, MultimodalConfig,
+    NodeTransportConfig, NodesConfig, ObservabilityConfig, OpenAiSttConfig, OpenAiTtsConfig,
+    OpenCodeCliConfig, OpenVpnTunnelConfig, OtpConfig, OtpMethod, PacingConfig, PipelineConfig,
+    PiperTtsConfig, PluginsConfig, ProxyConfig, ProxyScope, QdrantConfig,
     QueryClassificationConfig, ReliabilityConfig, ResourceLimitsConfig, RuntimeConfig,
     SandboxBackend, SandboxConfig, SchedulerConfig, SearchMode, SecretsConfig, SecurityConfig,
     SecurityOpsConfig, ShellToolConfig, SkillCreationConfig, SkillImprovementConfig, SkillsConfig,
-    SkillsPromptInjectionMode, SopConfig, StorageConfig, StorageProviderConfig,
+    SkillsPromptInjectionMode, SlackConfig, SopConfig, StorageConfig, StorageProviderConfig,
     StorageProviderSection, SwarmConfig, SwarmStrategy, TextBrowserConfig, ToolFilterGroup,
     ToolFilterGroupMode, TranscriptionConfig, TtsConfig, TunnelConfig, VerifiableIntentConfig,
-    WebFetchConfig, WebSearchConfig, WebhookConfig, WorkspaceConfig,
-    apply_channel_proxy_to_builder, apply_runtime_proxy_to_builder, build_channel_proxy_client,
+    WebFetchConfig, WebSearchConfig, WorkspaceConfig, apply_channel_proxy_to_builder,
+    apply_runtime_proxy_to_builder, build_channel_proxy_client,
     build_channel_proxy_client_with_timeouts, build_runtime_proxy_client,
     build_runtime_proxy_client_with_timeouts, runtime_proxy_config, set_runtime_proxy_config,
     ws_connect_with_proxy,
@@ -203,12 +203,13 @@ mod tests {
     }
 
     #[test]
-    fn reexported_channel_configs_are_constructible() {
-        let mut mqtt = MqttConfig::default();
-        mqtt.enabled = true;
-        mqtt.broker_url = "mqtt://localhost:1883".into();
+    fn reexported_slack_config_is_constructible() {
+        let mut slack = SlackConfig::default();
+        slack.enabled = true;
+        slack.app_token = "xapp-test".into();
+        slack.bot_token = "xoxb-test".into();
 
-        assert!(mqtt.enabled);
-        assert_eq!(mqtt.broker_url, "mqtt://localhost:1883");
+        assert!(slack.enabled);
+        assert_eq!(slack.app_token, "xapp-test");
     }
 }

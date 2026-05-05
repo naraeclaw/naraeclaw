@@ -70,16 +70,6 @@ pub struct DaemonSubsystems {
                 + Sync,
         >,
     >,
-    /// Start the MQTT SOP listener. Injected by the binary when channels crate is available.
-    pub mqtt_start: Option<
-        Box<
-            dyn Fn(
-                    naraeclaw_config::schema::MqttConfig,
-                ) -> std::pin::Pin<Box<dyn Future<Output = Result<()>> + Send>>
-                + Send
-                + Sync,
-        >,
-    >,
 }
 
 pub async fn run(
@@ -148,33 +138,6 @@ pub async fn run(
     } else {
         crate::health::mark_component_ok("channels");
         tracing::info!("Channels subsystem not wired; channel supervisor disabled");
-    }
-
-    // Wire up MQTT SOP listener if configured and enabled
-    if let Some(mqtt_start) = subsystems.mqtt_start {
-        if let Some(ref mqtt_config) = config.channels_config.mqtt {
-            if mqtt_config.enabled {
-                let mqtt_cfg = mqtt_config.clone();
-                let mqtt_start = std::sync::Arc::new(mqtt_start);
-                handles.push(spawn_component_supervisor(
-                    "mqtt",
-                    initial_backoff,
-                    max_backoff,
-                    move || {
-                        let cfg = mqtt_cfg.clone();
-                        let start = mqtt_start.clone();
-                        async move { start(cfg).await }
-                    },
-                ));
-            } else {
-                tracing::info!("MQTT channel configured but disabled (enabled = false)");
-                crate::health::mark_component_ok("mqtt");
-            }
-        } else {
-            crate::health::mark_component_ok("mqtt");
-        }
-    } else {
-        crate::health::mark_component_ok("mqtt");
     }
 
     if config.heartbeat.enabled {
@@ -891,14 +854,13 @@ fn load_jsonl_messages(path: &std::path::Path) -> Vec<naraeclaw_providers::trait
 }
 
 /// Auto-detect the best channel for heartbeat delivery.
-/// Currently only webhook is supported; explicit target configuration is required.
 fn auto_detect_heartbeat_channel(_config: &Config) -> Option<(String, String)> {
     None
 }
 
 fn validate_heartbeat_channel_config(_config: &Config, channel: &str) -> Result<()> {
     match channel.to_ascii_lowercase().as_str() {
-        "webhook" => Ok(()),
+        "slack" => Ok(()),
         other => anyhow::bail!("unsupported heartbeat.target channel: {other}"),
     }
 }
@@ -906,9 +868,6 @@ fn validate_heartbeat_channel_config(_config: &Config, channel: &str) -> Result<
 fn has_supervised_channels(config: &Config) -> bool {
     config.channels_config.channels().iter().any(|(_, ok)| *ok)
 }
-
-// run_mqtt_sop_listener has been moved to naraeclaw-channels::orchestrator::mqtt.
-// The daemon now receives it as a callback via DaemonSubsystems::mqtt_start.
 
 #[cfg(test)]
 mod tests {
@@ -983,16 +942,12 @@ mod tests {
     #[test]
     fn detects_supervised_channels_present() {
         let mut config = Config::default();
-        config.channels_config.mqtt = Some(naraeclaw_config::schema::MqttConfig {
+        config.channels_config.slack = Some(naraeclaw_config::schema::SlackConfig {
             enabled: true,
-            broker_url: "mqtt://localhost:1883".into(),
-            client_id: "test-client".into(),
-            topics: vec!["test/#".into()],
-            qos: 1,
-            username: None,
-            password: None,
-            use_tls: false,
-            keep_alive_secs: 30,
+            app_token: "xapp-test".into(),
+            bot_token: "xoxb-test".into(),
+            signing_secret: None,
+            default_channel: None,
         });
         assert!(has_supervised_channels(&config));
     }
@@ -1007,7 +962,7 @@ mod tests {
     #[test]
     fn resolve_delivery_requires_to_field() {
         let mut config = Config::default();
-        config.heartbeat.target = Some("webhook".into());
+        config.heartbeat.target = Some("slack".into());
         let err = resolve_heartbeat_delivery(&config).unwrap_err();
         assert!(
             err.to_string()
@@ -1039,15 +994,15 @@ mod tests {
     }
 
     #[test]
-    fn resolve_delivery_accepts_webhook_configuration() {
+    fn resolve_delivery_accepts_slack_configuration() {
         let mut config = Config::default();
-        config.heartbeat.target = Some("webhook".into());
-        config.heartbeat.to = Some("https://example.com/hb".into());
+        config.heartbeat.target = Some("slack".into());
+        config.heartbeat.to = Some("C123456789".into());
 
         let target = resolve_heartbeat_delivery(&config).unwrap();
         assert_eq!(
             target,
-            Some(("webhook".to_string(), "https://example.com/hb".to_string()))
+            Some(("slack".to_string(), "C123456789".to_string()))
         );
     }
 

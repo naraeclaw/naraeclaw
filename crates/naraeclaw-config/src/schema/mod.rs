@@ -2340,8 +2340,7 @@ auto_save = true
             cron: CronConfig::default(),
             channels_config: ChannelsConfig {
                 cli: true,
-                webhook: None,
-                mqtt: None,
+                slack: None,
                 message_timeout_secs: 300,
                 ack_reactions: true,
                 show_tool_calls: true,
@@ -2416,7 +2415,7 @@ auto_save = true
         );
         assert_eq!(parsed.heartbeat.target.as_deref(), Some("telegram"));
         assert_eq!(parsed.heartbeat.to.as_deref(), Some("123456"));
-        assert!(parsed.channels_config.mqtt.is_none());
+        assert!(parsed.channels_config.slack.is_none());
     }
 
     #[test]
@@ -2985,18 +2984,20 @@ default_temperature = 0.7
     }
 
     #[test]
-    async fn webhook_config_with_secret() {
-        let json = r#"{"port":8080,"secret":"my-secret-key"}"#;
-        let parsed: WebhookConfig = serde_json::from_str(json).unwrap();
-        assert_eq!(parsed.secret.as_deref(), Some("my-secret-key"));
+    async fn slack_config_with_tokens() {
+        let json = r#"{"app_token":"xapp-1-test","bot_token":"xoxb-test"}"#;
+        let parsed: SlackConfig = serde_json::from_str(json).unwrap();
+        assert_eq!(parsed.app_token, "xapp-1-test");
+        assert_eq!(parsed.bot_token, "xoxb-test");
+        assert!(parsed.signing_secret.is_none());
     }
 
     #[test]
-    async fn webhook_config_without_secret() {
-        let json = r#"{"port":8080}"#;
-        let parsed: WebhookConfig = serde_json::from_str(json).unwrap();
-        assert!(parsed.secret.is_none());
-        assert_eq!(parsed.port, 8080);
+    async fn slack_config_with_signing_secret() {
+        let json =
+            r#"{"app_token":"xapp-1-test","bot_token":"xoxb-test","signing_secret":"abc123"}"#;
+        let parsed: SlackConfig = serde_json::from_str(json).unwrap();
+        assert_eq!(parsed.signing_secret.as_deref(), Some("abc123"));
     }
 
     // ══════════════════════════════════════════════════════════
@@ -5604,31 +5605,29 @@ auto_approve = ["file_read", "file_write", "file_edit", "memory_recall", "memory
     #[test]
     async fn backfill_enabled_activates_channel_without_explicit_enabled() {
         let toml = r#"
-[channels_config.mqtt]
-broker_url = "mqtt://localhost:1883"
-client_id = "naraeclaw-test"
-topics = ["naraeclaw/test"]
+[channels_config.slack]
+app_token = "xapp-test"
+bot_token = "xoxb-test"
 "#;
         let mut config: Config = toml::from_str(toml).unwrap();
-        assert!(!config.channels_config.mqtt.as_ref().unwrap().enabled);
+        assert!(!config.channels_config.slack.as_ref().unwrap().enabled);
 
         config.channels_config.backfill_enabled(toml);
-        assert!(config.channels_config.mqtt.as_ref().unwrap().enabled);
+        assert!(config.channels_config.slack.as_ref().unwrap().enabled);
     }
 
     #[test]
     async fn backfill_enabled_respects_explicit_false() {
         let toml = r#"
-[channels_config.mqtt]
-broker_url = "mqtt://localhost:1883"
-client_id = "naraeclaw-test"
-topics = ["naraeclaw/test"]
+[channels_config.slack]
+app_token = "xapp-test"
+bot_token = "xoxb-test"
 enabled = false
 "#;
         let mut config: Config = toml::from_str(toml).unwrap();
         config.channels_config.backfill_enabled(toml);
         assert!(
-            !config.channels_config.mqtt.as_ref().unwrap().enabled,
+            !config.channels_config.slack.as_ref().unwrap().enabled,
             "explicit enabled=false must not be overwritten"
         );
     }
@@ -5640,25 +5639,24 @@ api_key = "sk-test"
 "#;
         let mut config: Config = toml::from_str(toml).unwrap();
         config.channels_config.backfill_enabled(toml);
-        assert!(config.channels_config.mqtt.is_none());
+        assert!(config.channels_config.slack.is_none());
     }
 
     #[test]
     async fn backfill_enabled_works_with_toml_comments() {
         let toml = r#"
-# My MQTT setup
-[channels_config.mqtt]
-broker_url = "mqtt://localhost:1883"  # production broker
-client_id = "naraeclaw-test"
-topics = ["naraeclaw/test"]
+# Slack Socket Mode 설정
+[channels_config.slack]
+app_token = "xapp-test"  # App-Level Token
+bot_token = "xoxb-test"
 # enabled intentionally omitted
 "#;
         let mut config: Config = toml::from_str(toml).unwrap();
-        assert!(!config.channels_config.mqtt.as_ref().unwrap().enabled);
+        assert!(!config.channels_config.slack.as_ref().unwrap().enabled);
 
         config.channels_config.backfill_enabled(toml);
         assert!(
-            config.channels_config.mqtt.as_ref().unwrap().enabled,
+            config.channels_config.slack.as_ref().unwrap().enabled,
             "backfill should activate channel even when config has comments"
         );
     }

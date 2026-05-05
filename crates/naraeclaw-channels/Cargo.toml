@@ -3,7 +3,7 @@ name = "naraeclaw-channels"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Channel implementations for NaraeClaw (CLI + webhook)."
+description = "Channel implementations for NaraeClaw (CLI + Slack Socket Mode)."
 publish = false
 
 [dependencies]
@@ -16,7 +16,6 @@ naraeclaw-runtime.workspace = true
 naraeclaw-tools.workspace = true
 anyhow = "1.0"
 lru = "0.17"
-rumqttc = "0.25"
 axum = { version = "0.8", default-features = false, features = ["http1", "json", "tokio", "query", "ws", "macros"] }
 async-trait = "0.1"
 base64 = "0.22"
@@ -50,8 +49,8 @@ tokio-socks = "0.5"
 shellexpand = "3.1"
 
 [features]
-default = ["channel-webhook", "channel-acp-server"]
-channel-webhook = []
+default = ["channel-slack", "channel-acp-server"]
+channel-slack = []
 channel-acp-server = []
 
 [dev-dependencies]

@@ -22,16 +22,10 @@ pub fn all_integrations() -> Vec<IntegrationEntry> {
         },
         IntegrationEntry {
             name: "Slack",
-            description: "Workspace apps via Web API",
-            category: IntegrationCategory::Chat,
-            status_fn: |_| IntegrationStatus::ComingSoon,
-        },
-        IntegrationEntry {
-            name: "Webhooks",
-            description: "HTTP endpoint for triggers",
+            description: "Workspace apps via Socket Mode",
             category: IntegrationCategory::Chat,
             status_fn: |c| {
-                if c.channels_config.webhook.is_some() {
+                if c.channels_config.slack.is_some() {
                     IntegrationStatus::Active
                 } else {
                     IntegrationStatus::Available
@@ -733,7 +727,6 @@ mod tests {
         for name in [
             "Telegram",
             "Discord",
-            "Slack",
             "WhatsApp",
             "Signal",
             "Matrix",
@@ -747,6 +740,12 @@ mod tests {
                 "{name} should be ComingSoon"
             );
         }
+        // Slack is Available (not yet configured) or Active (when configured)
+        let slack = entries.iter().find(|e| e.name == "Slack").unwrap();
+        assert!(
+            matches!((slack.status_fn)(&config), IntegrationStatus::Available),
+            "Slack should be Available when not configured"
+        );
     }
 
     #[test]

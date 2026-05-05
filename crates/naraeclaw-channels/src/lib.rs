@@ -1,12 +1,15 @@
 //! Channel implementations for NaraeClaw.
 //!
 //! Supported surfaces:
-//! - `cli`     — interactive terminal session
-//! - `webhook` — thin HTTP receiver for external integrations (Slack, Telegram, etc.)
+//! - `cli`   — interactive terminal session
+//! - `slack` — Slack Socket Mode bot (no public URL required)
 
 pub mod cli;
 pub mod orchestrator;
 pub mod util;
 
-#[cfg(feature = "channel-webhook")]
-pub mod webhook;
+#[cfg(feature = "channel-slack")]
+pub mod slack;
+
+#[cfg(feature = "channel-slack")]
+pub use crate::slack::SlackChannel;

@@ -1002,11 +1002,10 @@ fn mask_sensitive_fields(
         mask_optional_secret(&mut route.api_key);
     }
 
-    if let Some(webhook) = masked.channels_config.webhook.as_mut() {
-        mask_optional_secret(&mut webhook.secret);
-    }
-    if let Some(mqtt) = masked.channels_config.mqtt.as_mut() {
-        mask_optional_secret(&mut mqtt.password);
+    if let Some(slack) = masked.channels_config.slack.as_mut() {
+        mask_required_secret(&mut slack.app_token);
+        mask_required_secret(&mut slack.bot_token);
+        mask_optional_secret(&mut slack.signing_secret);
     }
     mask_optional_secret(&mut masked.transcription.api_key);
     masked
@@ -1063,16 +1062,12 @@ fn restore_masked_sensitive_fields(
     restore_embedding_route_api_keys(&mut incoming.embedding_routes, &current.embedding_routes);
 
     if let (Some(incoming_ch), Some(current_ch)) = (
-        incoming.channels_config.webhook.as_mut(),
-        current.channels_config.webhook.as_ref(),
+        incoming.channels_config.slack.as_mut(),
+        current.channels_config.slack.as_ref(),
     ) {
-        restore_optional_secret(&mut incoming_ch.secret, &current_ch.secret);
-    }
-    if let (Some(incoming_ch), Some(current_ch)) = (
-        incoming.channels_config.mqtt.as_mut(),
-        current.channels_config.mqtt.as_ref(),
-    ) {
-        restore_optional_secret(&mut incoming_ch.password, &current_ch.password);
+        restore_required_secret(&mut incoming_ch.app_token, &current_ch.app_token);
+        restore_required_secret(&mut incoming_ch.bot_token, &current_ch.bot_token);
+        restore_optional_secret(&mut incoming_ch.signing_secret, &current_ch.signing_secret);
     }
     restore_optional_secret(
         &mut incoming.transcription.api_key,

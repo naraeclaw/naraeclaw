@@ -3212,8 +3212,7 @@ mod tests {
         assert_eq!(config.default_provider.as_deref(), Some("ollama"));
         assert!(config.api_key.is_none());
         assert!(config.default_model.is_none());
-        assert!(config.channels_config.webhook.is_none());
-        assert!(config.channels_config.mqtt.is_none());
+        assert!(config.channels_config.slack.is_none());
         assert!(!config.skills.open_skills_enabled);
         assert!(!config.hooks.enabled);
         assert!(!config.gateway.require_pairing);
