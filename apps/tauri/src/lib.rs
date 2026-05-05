@@ -286,6 +286,7 @@ pub fn run() {
             commands::file_ops::handle_file_drop,
             commands::file_ops::send_clipboard,
             commands::cli_tools::list_cli_tools,
+            commands::cli_tools::install_cli_tool,
             commands::cli_tools::run_cli_tool,
             commands::scheduler::list_tasks,
             commands::scheduler::create_task_natural,
