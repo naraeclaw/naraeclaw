@@ -3,7 +3,7 @@
 > 나래 — 날개의 고어. 가볍게, 빠르게.
 
 NaraeClaw는 한국어 우선의 경량 자율 에이전트입니다.
-서버/인프라 관리, 반복 운영 작업, 개인 지식 워크플로우를 CLI, Desktop, Web에서 다룹니다.
+서버/인프라 관리, 반복 운영 작업, 개인 지식 워크플로우를 CLI와 게이트웨이 API로 다룹니다.
 
 이 저장소는 ZeroClaw에서 갈라져 나온 포크이며, 현재는 한국어 환경과 실사용 범위에 맞춰 단순하게 유지하는 쪽에 맞춰져 있습니다.
 
@@ -11,7 +11,7 @@ NaraeClaw는 한국어 우선의 경량 자율 에이전트입니다.
 
 - 한국어 우선의 에이전트 런타임
 - 서버 상태 확인, 운영 작업 자동화, 장기 메모리 기반 개인 지식 관리
-- CLI, Desktop, Web을 같은 런타임 위에서 연결
+- CLI와 게이트웨이 API로 접근
 
 ## Who it is for
 
@@ -22,8 +22,7 @@ NaraeClaw는 한국어 우선의 경량 자율 에이전트입니다.
 ## Core surfaces
 
 - `CLI` - 온보딩, 에이전트 실행, 상태 확인, 설정 관리
-- `Desktop` - 경량 컴패니언 앱
-- `Web` - 게이트웨이 기반 브라우저 연결
+- `Gateway` - HTTP/WebSocket API (포트 42617)
 
 ## Quick start
 
@@ -34,14 +33,11 @@ cargo build --release
 # 초기 설정
 ./target/release/naraeclaw onboard
 
-# 에이전트 실행
+# 에이전트 실행 (대화형 CLI)
 ./target/release/naraeclaw agent
 
-# 웹 게이트웨이
-./target/release/naraeclaw gateway start
-
-# 데스크톱 컴패니언 앱 연결
-./target/release/naraeclaw desktop
+# 게이트웨이 서비스 시작 (HTTP/WebSocket API)
+./target/release/naraeclaw gateway
 ```
 
 ## Current scope
@@ -50,7 +46,7 @@ cargo build --release
 - 서버/인프라 관리용 에이전트 실행
 - 개인 지식 워크플로우와 장기 메모리
 - 파일, 셸, HTTP, 브라우저, 메모리 같은 핵심 도구
-- Desktop 및 Web 연결
+- 게이트웨이 API를 통한 외부 연동
 
 ## Validation basics
 
@@ -58,8 +54,8 @@ cargo build --release
 
 ```bash
 cargo fmt --all -- --check
-cargo check --workspace --exclude naraeclaw-desktop
-cargo clippy --workspace --exclude naraeclaw-desktop --all-targets -- -D warnings
+cargo check --workspace
+cargo clippy --workspace --all-targets -- -D warnings
 # 변경 범위에 맞는 targeted test를 추가로 실행
 ```
 

@@ -44,6 +44,5 @@ The project is a modular Rust workspace, recently refactored for maximum maintai
 - `crates/naraeclaw-runtime/src/security/leak_detector.rs`: The **CredentialFilter** engine.
 - `crates/naraeclaw-runtime/src/service/mod.rs`: Cross-platform service management.
 - `crates/naraeclaw-config/src/schema/mod.rs`: Entry point for the modularized config system.
-- `apps/tauri/`: Desktop shell and window management.
-- `web/`: Web UI and shared frontend surface.
+- `crates/naraeclaw-gateway/src/`: HTTP/WebSocket gateway (port 42617).
 - `Plan.md`: Historical record of architectural evolution and future roadmap.

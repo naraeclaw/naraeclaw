@@ -23,6 +23,7 @@ pub use naraeclaw_api::media::{MediaAttachment, MediaKind};
 /// media annotations prepended.
 pub struct MediaPipeline<'a> {
     config: &'a MediaPipelineConfig,
+    #[allow(dead_code)]
     transcription_config: &'a TranscriptionConfig,
     vision_available: bool,
 }

@@ -189,27 +189,26 @@ async fn handle_socket(
     let mut resumed = false;
     let mut message_count: usize = 0;
     let mut effective_name: Option<String> = None;
-    let persisted_messages: Vec<naraeclaw_providers::ChatMessage> = if let Some(ref backend) =
-        state.session_backend
-    {
-        let msgs = backend.load(&session_key);
-        if !msgs.is_empty() {
-            message_count = msgs.len();
-            resumed = true;
-        }
-        if let Some(ref name) = session_name
-            && !name.is_empty()
-        {
-            let _ = backend.set_session_name(&session_key, name);
-            effective_name = Some(name.clone());
-        }
-        if effective_name.is_none() {
-            effective_name = backend.get_session_name(&session_key).unwrap_or(None);
-        }
-        msgs
-    } else {
-        vec![]
-    };
+    let persisted_messages: Vec<naraeclaw_providers::ChatMessage> =
+        if let Some(ref backend) = state.session_backend {
+            let msgs = backend.load(&session_key);
+            if !msgs.is_empty() {
+                message_count = msgs.len();
+                resumed = true;
+            }
+            if let Some(ref name) = session_name
+                && !name.is_empty()
+            {
+                let _ = backend.set_session_name(&session_key, name);
+                effective_name = Some(name.clone());
+            }
+            if effective_name.is_none() {
+                effective_name = backend.get_session_name(&session_key).unwrap_or(None);
+            }
+            msgs
+        } else {
+            vec![]
+        };
 
     // Send session_start message to client (agent 초기화 전 — 빠른 응답)
     let mut session_start = serde_json::json!({
@@ -267,27 +266,27 @@ async fn handle_socket(
     // state.config는 Mutex로 보호되므로 클론 후 독립적으로 변경 가능.
     let mut config = state.config.lock().clone();
 
-    if let Some(ref wd) = connect_params.working_dir {
-        if !wd.is_empty() {
-            let expanded = if wd.starts_with('~') {
-                if let Ok(home) = std::env::var("HOME") {
-                    wd.replacen('~', &home, 1)
-                } else {
-                    wd.clone()
-                }
+    if let Some(ref wd) = connect_params.working_dir
+        && !wd.is_empty()
+    {
+        let expanded = if wd.starts_with('~') {
+            if let Ok(home) = std::env::var("HOME") {
+                wd.replacen('~', &home, 1)
             } else {
                 wd.clone()
-            };
-            config.workspace_dir = std::path::PathBuf::from(expanded);
-        }
+            }
+        } else {
+            wd.clone()
+        };
+        config.workspace_dir = std::path::PathBuf::from(expanded);
     }
     if let Some(workspace_only) = connect_params.workspace_only {
         config.autonomy.workspace_only = workspace_only;
     }
-    if let Some(ref cmds) = connect_params.allowed_commands {
-        if !cmds.is_empty() {
-            config.autonomy.allowed_commands = cmds.clone();
-        }
+    if let Some(ref cmds) = connect_params.allowed_commands
+        && !cmds.is_empty()
+    {
+        config.autonomy.allowed_commands = cmds.clone();
     }
     if let Some(ref roots) = connect_params.allowed_roots {
         // 기존 allowed_roots에 추가 (전역 설정 유지 + 에이전트별 추가)
@@ -300,10 +299,10 @@ async fn handle_socket(
     if let Some(timeout) = connect_params.shell_timeout_secs {
         config.autonomy.shell_timeout_secs = timeout;
     }
-    if let Some(ref tools) = connect_params.auto_approve_tools {
-        if !tools.is_empty() {
-            config.autonomy.auto_approve = tools.clone();
-        }
+    if let Some(ref tools) = connect_params.auto_approve_tools
+        && !tools.is_empty()
+    {
+        config.autonomy.auto_approve = tools.clone();
     }
     if let Some(ref tools) = connect_params.always_ask_tools {
         config.autonomy.always_ask = tools.clone();
@@ -333,7 +332,8 @@ async fn handle_socket(
     };
 
     // session_id override from connect params
-    let effective_sid = connect_params.session_id
+    let effective_sid = connect_params
+        .session_id
         .unwrap_or_else(|| session_id.clone());
     agent.set_memory_session_id(Some(effective_sid));
 

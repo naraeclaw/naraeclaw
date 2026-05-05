@@ -422,6 +422,7 @@ mod tests {
         );
     }
 
+    #[cfg(target_os = "linux")]
     fn make_release(assets: &[&str]) -> serde_json::Value {
         let assets: Vec<serde_json::Value> = assets
             .iter()
