@@ -367,6 +367,15 @@ export default function AgentChat() {
           </div>
         </div>
         <div style={{ display: 'flex', gap: 6 }}>
+          {agentId && (
+            <button
+              onClick={() => navigate(`/agent/${agentId}/settings`)}
+              title="에이전트 설정"
+              style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid var(--pc-border)', background: 'transparent', color: 'var(--pc-text-muted)', cursor: 'pointer', fontSize: 13 }}
+            >
+              ⚙
+            </button>
+          )}
           <button
             onClick={() => handleCopy('all', messages.map(m => `[${m.role}] ${m.content}`).join('\n\n'))}
             title="대화 복사"

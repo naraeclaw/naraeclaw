@@ -20,6 +20,7 @@ import CliTools from './pages/CliTools';
 import RemoteServers from './pages/RemoteServers';
 import Wiki from './pages/Wiki';
 import AgentProfiles from './pages/AgentProfiles';
+import AgentSettings from './pages/AgentSettings';
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import { DraftContext, useDraftStore } from './hooks/useDraft';
 import { setLocale, t, type Locale } from './lib/i18n';
@@ -237,6 +238,7 @@ function AppContent() {
             <Route path="/" element={<Dashboard />} />
             <Route path="/agent" element={<AgentChat />} />
             <Route path="/chat/:agentId" element={<AgentChat />} />
+            <Route path="/agent/:agentId/settings" element={<AgentSettings />} />
             <Route path="/tools" element={<Tools />} />
             <Route path="/cron" element={<Cron />} />
             <Route path="/integrations" element={<Integrations />} />
