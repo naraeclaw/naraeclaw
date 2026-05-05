@@ -40,9 +40,7 @@ pub fn spawn_health_poller<R: Runtime>(app: AppHandle<R>, state: SharedState) {
                         .unwrap_or(false);
                     if !ollama_ok {
                         tracing::warn!("Ollama not responding, attempting to start");
-                        let _ = tokio::process::Command::new("ollama")
-                            .arg("serve")
-                            .spawn();
+                        let _ = tokio::process::Command::new("ollama").arg("serve").spawn();
                     }
                 }
             } else {

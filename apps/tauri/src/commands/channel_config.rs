@@ -36,7 +36,9 @@ pub async fn get_channels(
             enabled: false,
             connected: false,
             needs: vec!["secret".into()],
-            description: "HTTP Webhook으로 에이전트에 메시지를 보냅니다. 비밀 키(선택)로 요청을 검증합니다.".into(),
+            description:
+                "HTTP Webhook으로 에이전트에 메시지를 보냅니다. 비밀 키(선택)로 요청을 검증합니다."
+                    .into(),
         },
         ChannelInfo {
             id: "mqtt".into(),
@@ -142,7 +144,10 @@ pub async fn save_channel(settings: ChannelSettings) -> Result<String, String> {
                 .as_table_mut()
                 .ok_or("mqtt section is not a table")?;
             section.insert("enabled".into(), toml::Value::Boolean(true));
-            section.insert("broker_url".into(), toml::Value::String(broker_url.to_string()));
+            section.insert(
+                "broker_url".into(),
+                toml::Value::String(broker_url.to_string()),
+            );
             section.insert("client_id".into(), toml::Value::String(client_id));
             section.insert(
                 "topics".into(),
@@ -173,7 +178,10 @@ pub async fn save_channel(settings: ChannelSettings) -> Result<String, String> {
         .await
         .map_err(|e| format!("Gateway 재시작 실패: {e}"))?;
 
-    Ok(format!("{} 저장 완료 — Gateway 재시작 중", settings.channel))
+    Ok(format!(
+        "{} 저장 완료 — Gateway 재시작 중",
+        settings.channel
+    ))
 }
 
 fn generate_client_id() -> String {

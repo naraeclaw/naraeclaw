@@ -17,16 +17,8 @@ const TOOLS: &[(&str, &str, &str)] = &[
         "npm install -g @anthropic-ai/claude-code",
     ),
     ("codex", "Codex CLI", "npm install -g @openai/codex"),
-    (
-        "gemini",
-        "Gemini CLI",
-        "npm install -g @google/gemini-cli",
-    ),
-    (
-        "kiro",
-        "Kiro CLI",
-        "npm install -g @aws/kiro-cli",
-    ),
+    ("gemini", "Gemini CLI", "npm install -g @google/gemini-cli"),
+    ("kiro", "Kiro CLI", "npm install -g @aws/kiro-cli"),
 ];
 
 /// List external CLI tools with install status.

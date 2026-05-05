@@ -67,9 +67,8 @@ pub async fn handle_file_drop(
         return Err("파일이 너무 큽니다 (최대 10MB)".into());
     }
 
-    let content = std::fs::read_to_string(&file_path).unwrap_or_else(|_| {
-        format!("[바이너리 파일: {file_name}]")
-    });
+    let content = std::fs::read_to_string(&file_path)
+        .unwrap_or_else(|_| format!("[바이너리 파일: {file_name}]"));
 
     let message = format!("파일 '{file_name}'의 내용을 분석해줘:\n\n```\n{content}\n```");
 

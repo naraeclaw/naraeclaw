@@ -41,9 +41,7 @@ pub async fn request_computer_use_approval(
     action_description: String,
 ) -> Result<String, String> {
     let nonce = generate_nonce();
-    tracing::info!(
-        "computer-use approval issued for action: {action_description} nonce={nonce}"
-    );
+    tracing::info!("computer-use approval issued for action: {action_description} nonce={nonce}");
     let s = state.read().await;
     s.approvals.insert(nonce.clone()).await;
     Ok(nonce)

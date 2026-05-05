@@ -904,11 +904,7 @@ fn validate_heartbeat_channel_config(_config: &Config, channel: &str) -> Result<
 }
 
 fn has_supervised_channels(config: &Config) -> bool {
-    config
-        .channels_config
-        .channels()
-        .iter()
-        .any(|(_, ok)| *ok)
+    config.channels_config.channels().iter().any(|(_, ok)| *ok)
 }
 
 // run_mqtt_sop_listener has been moved to naraeclaw-channels::orchestrator::mqtt.
@@ -1049,7 +1045,10 @@ mod tests {
         config.heartbeat.to = Some("https://example.com/hb".into());
 
         let target = resolve_heartbeat_delivery(&config).unwrap();
-        assert_eq!(target, Some(("webhook".to_string(), "https://example.com/hb".to_string())));
+        assert_eq!(
+            target,
+            Some(("webhook".to_string(), "https://example.com/hb".to_string()))
+        );
     }
 
     #[test]

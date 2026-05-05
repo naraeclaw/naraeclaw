@@ -21,7 +21,12 @@ pub async fn handle_command(command: crate::ChannelCommands, config: &Config) ->
             println!("Channels:");
             println!("  ✅ CLI (always available)");
             #[cfg(feature = "channel-webhook")]
-            if config.channels_config.webhook.as_ref().is_some_and(|w| w.enabled) {
+            if config
+                .channels_config
+                .webhook
+                .as_ref()
+                .is_some_and(|w| w.enabled)
+            {
                 println!("  ✅ Webhook");
             }
             println!("\nTo start channels: naraeclaw channel start");
