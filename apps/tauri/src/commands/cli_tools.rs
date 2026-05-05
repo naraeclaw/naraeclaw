@@ -42,6 +42,31 @@ pub async fn list_cli_tools() -> Vec<CliToolInfo> {
     result
 }
 
+/// Install an external CLI tool via npm.
+#[tauri::command]
+pub async fn install_cli_tool(tool: String) -> Result<String, String> {
+    let pkg = match tool.as_str() {
+        "claude" => "@anthropic-ai/claude-code",
+        "codex"  => "@openai/codex",
+        "gemini" => "@google/gemini-cli",
+        "kiro"   => "@aws/kiro-cli",
+        _        => return Err(format!("지원하지 않는 도구: {tool}")),
+    };
+
+    let output = tokio::process::Command::new("npm")
+        .args(["install", "-g", pkg])
+        .output()
+        .await
+        .map_err(|e| format!("npm 실행 실패: {e}"))?;
+
+    if output.status.success() {
+        Ok(format!("{pkg} 설치 완료"))
+    } else {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        Err(format!("설치 실패: {stderr}"))
+    }
+}
+
 /// Run an external CLI tool with a prompt and return the output.
 #[tauri::command]
 pub async fn run_cli_tool(tool: String, prompt: String) -> Result<String, String> {
