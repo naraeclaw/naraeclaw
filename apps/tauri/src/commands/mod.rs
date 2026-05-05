@@ -8,6 +8,7 @@ pub mod file_ops;
 pub mod gateway;
 pub mod knowledge;
 pub mod pairing;
+pub mod profiles;
 pub mod remote;
 pub mod resources;
 pub mod scheduler;

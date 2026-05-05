@@ -307,6 +307,11 @@ pub fn run() {
             commands::remote::switch_server,
             commands::knowledge::memory_to_wiki,
             commands::knowledge::list_memories,
+            commands::profiles::list_profiles,
+            commands::profiles::create_profile,
+            commands::profiles::switch_profile,
+            commands::profiles::delete_profile,
+            commands::profiles::update_profile_meta,
         ])
         .setup(move |app| {
             // Set macOS dock icon (needed for dev builds without .app bundle).
