@@ -4,8 +4,8 @@
   "version": "0.6.9",
   "identifier": "ai.naraeclaw.desktop",
   "build": {
-    "beforeDevCommand": "cd web && npm run dev",
-    "beforeBuildCommand": "cd web && npm run build",
+    "beforeDevCommand": "bash -c 'cd \"$(git rev-parse --show-toplevel)/web\" && npm run dev'",
+    "beforeBuildCommand": "bash -c 'cd \"$(git rev-parse --show-toplevel)/web\" && npm run build'",
     "devUrl": "http://localhost:5173/",
     "frontendDist": "../../web/dist"
   },
