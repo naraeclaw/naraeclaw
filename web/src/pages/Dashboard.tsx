@@ -182,7 +182,7 @@ function CreateModal({ onClose, onCreate }: CreateModalProps) {
 
 // ─── 에이전트 카드 ─────────────────────────────────────────────────────────────
 
-function AgentCard({ agent, onClick, onDelete }: { agent: Agent; onClick: () => void; onDelete: () => void }) {
+function AgentCard({ agent, onClick, onSettings, onDelete }: { agent: Agent; onClick: () => void; onSettings: () => void; onDelete: () => void }) {
   const col = COLOR_VARS[agent.color];
   const [hover, setHover] = useState(false);
 
@@ -216,12 +216,23 @@ function AgentCard({ agent, onClick, onDelete }: { agent: Agent; onClick: () => 
           <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--pc-text-primary)', marginBottom: 2 }}>{agent.name}</div>
           {agent.description && <div className="tiny" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{agent.description}</div>}
         </div>
-        <button
-          onClick={e => { e.stopPropagation(); if (confirm(`'${agent.name}'을 삭제할까요?\n대화 기록도 모두 사라집니다.`)) onDelete(); }}
-          style={{ opacity: hover ? 0.6 : 0, padding: '4px 7px', borderRadius: 7, border: '1px solid var(--pc-border)', background: 'var(--pc-bg-input)', color: 'var(--pc-text-muted)', cursor: 'pointer', fontSize: 12, transition: 'opacity 0.15s' }}
-        >
-          삭제
-        </button>
+        {/* 호버 시 액션 버튼들 */}
+        <div style={{ display: 'flex', gap: 4, opacity: hover ? 1 : 0, transition: 'opacity 0.15s' }}>
+          <button
+            onClick={e => { e.stopPropagation(); onSettings(); }}
+            title="설정"
+            style={{ padding: '4px 8px', borderRadius: 7, border: '1px solid var(--pc-border)', background: 'var(--pc-bg-input)', color: 'var(--pc-text-muted)', cursor: 'pointer', fontSize: 13 }}
+          >
+            ⚙
+          </button>
+          <button
+            onClick={e => { e.stopPropagation(); if (confirm(`'${agent.name}'을 삭제할까요?\n대화 기록도 모두 사라집니다.`)) onDelete(); }}
+            title="삭제"
+            style={{ padding: '4px 8px', borderRadius: 7, border: '1px solid var(--pc-border)', background: 'var(--pc-bg-input)', color: 'var(--pc-text-muted)', cursor: 'pointer', fontSize: 12 }}
+          >
+            ✕
+          </button>
+        </div>
       </div>
 
       {/* Stats */}
@@ -340,6 +351,7 @@ export default function Dashboard() {
                 key={a.id}
                 agent={a}
                 onClick={() => navigate(`/chat/${a.id}`)}
+                onSettings={() => navigate(`/agent/${a.id}/settings`)}
                 onDelete={() => handleDelete(a.id)}
               />
             ))}
