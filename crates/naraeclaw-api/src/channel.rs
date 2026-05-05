@@ -24,6 +24,10 @@ pub struct ChannelMessage {
     /// Channels populate this when they receive media alongside a text message.
     /// Defaults to empty — existing channels are unaffected.
     pub attachments: Vec<MediaAttachment>,
+    /// Whether the bot was explicitly mentioned/addressed in this message.
+    /// - `true`: direct @mention in a channel, DM, or CLI — agent should respond.
+    /// - `false`: passive channel monitoring (e.g. `message.channels` without @mention) — agent skips.
+    pub is_mention: bool,
 }
 
 /// Message to send through a channel

@@ -3574,6 +3574,18 @@ async fn run_message_dispatch_loop(
             continue;
         }
 
+        // Skip passive channel monitoring messages — only respond when explicitly mentioned.
+        // Channels set is_mention=false for messages like Slack's message.channels events
+        // where the bot was not @mentioned. The agent only reacts to direct requests.
+        if !msg.is_mention {
+            tracing::debug!(
+                channel = %msg.channel,
+                sender = %msg.sender,
+                "Skipping non-mention channel message"
+            );
+            continue;
+        }
+
         // ── Debounce: accumulate rapid messages per sender ──────────
         // CLI messages bypass debouncing so the interactive loop stays responsive.
         let msg = if msg.channel != "cli" && ctx.debouncer.enabled() {
@@ -5631,6 +5643,7 @@ BTC is currently around $65,000 based on latest tool output."#
                 thread_ts: None,
                 interruption_scope_id: None,
                 attachments: vec![],
+                is_mention: true,
             },
             CancellationToken::new(),
         )
@@ -5723,6 +5736,7 @@ BTC is currently around $65,000 based on latest tool output."#
                 thread_ts: None,
                 interruption_scope_id: None,
                 attachments: vec![],
+                is_mention: true,
             },
             CancellationToken::new(),
         )
@@ -5829,6 +5843,7 @@ BTC is currently around $65,000 based on latest tool output."#
                 thread_ts: None,
                 interruption_scope_id: None,
                 attachments: vec![],
+                is_mention: true,
             },
             CancellationToken::new(),
         )
@@ -5920,6 +5935,7 @@ BTC is currently around $65,000 based on latest tool output."#
                 thread_ts: None,
                 interruption_scope_id: None,
                 attachments: vec![],
+                is_mention: true,
             },
             CancellationToken::new(),
         )
@@ -6021,6 +6037,7 @@ BTC is currently around $65,000 based on latest tool output."#
                 thread_ts: None,
                 interruption_scope_id: None,
                 attachments: vec![],
+                is_mention: true,
             },
             CancellationToken::new(),
         )
@@ -6143,6 +6160,7 @@ BTC is currently around $65,000 based on latest tool output."#
                 thread_ts: None,
                 interruption_scope_id: None,
                 attachments: vec![],
+                is_mention: true,
             },
             CancellationToken::new(),
         )
@@ -6246,6 +6264,7 @@ BTC is currently around $65,000 based on latest tool output."#
                 thread_ts: None,
                 interruption_scope_id: None,
                 attachments: vec![],
+                is_mention: true,
             },
             CancellationToken::new(),
         )
@@ -6364,6 +6383,7 @@ BTC is currently around $65,000 based on latest tool output."#
                 thread_ts: None,
                 interruption_scope_id: None,
                 attachments: vec![],
+                is_mention: true,
             },
             CancellationToken::new(),
         )
@@ -6470,6 +6490,7 @@ BTC is currently around $65,000 based on latest tool output."#
                 thread_ts: None,
                 interruption_scope_id: None,
                 attachments: vec![],
+                is_mention: true,
             },
             CancellationToken::new(),
         )
@@ -6566,6 +6587,7 @@ BTC is currently around $65,000 based on latest tool output."#
                 thread_ts: None,
                 interruption_scope_id: None,
                 attachments: vec![],
+                is_mention: true,
             },
             CancellationToken::new(),
         )
@@ -6784,6 +6806,7 @@ BTC is currently around $65,000 based on latest tool output."#
             thread_ts: None,
             interruption_scope_id: None,
             attachments: vec![],
+            is_mention: true,
         })
         .await
         .unwrap();
@@ -6797,6 +6820,7 @@ BTC is currently around $65,000 based on latest tool output."#
             thread_ts: None,
             interruption_scope_id: None,
             attachments: vec![],
+            is_mention: true,
         })
         .await
         .unwrap();
@@ -6899,6 +6923,7 @@ BTC is currently around $65,000 based on latest tool output."#
                 thread_ts: None,
                 interruption_scope_id: None,
                 attachments: vec![],
+                is_mention: true,
             })
             .await
             .unwrap();
@@ -6913,6 +6938,7 @@ BTC is currently around $65,000 based on latest tool output."#
                 thread_ts: None,
                 interruption_scope_id: None,
                 attachments: vec![],
+                is_mention: true,
             })
             .await
             .unwrap();
@@ -7032,6 +7058,7 @@ BTC is currently around $65,000 based on latest tool output."#
                 thread_ts: Some("1741234567.100001".to_string()),
                 interruption_scope_id: Some("1741234567.100001".to_string()),
                 attachments: vec![],
+                is_mention: true,
             })
             .await
             .unwrap();
@@ -7046,6 +7073,7 @@ BTC is currently around $65,000 based on latest tool output."#
                 thread_ts: Some("1741234567.100001".to_string()),
                 interruption_scope_id: Some("1741234567.100001".to_string()),
                 attachments: vec![],
+                is_mention: true,
             })
             .await
             .unwrap();
@@ -7162,6 +7190,7 @@ BTC is currently around $65,000 based on latest tool output."#
                 thread_ts: None,
                 interruption_scope_id: None,
                 attachments: vec![],
+                is_mention: true,
             })
             .await
             .unwrap();
@@ -7176,6 +7205,7 @@ BTC is currently around $65,000 based on latest tool output."#
                 thread_ts: None,
                 interruption_scope_id: None,
                 attachments: vec![],
+                is_mention: true,
             })
             .await
             .unwrap();
@@ -7270,6 +7300,7 @@ BTC is currently around $65,000 based on latest tool output."#
                 thread_ts: None,
                 interruption_scope_id: None,
                 attachments: vec![],
+                is_mention: true,
             },
             CancellationToken::new(),
         )
@@ -7359,6 +7390,7 @@ BTC is currently around $65,000 based on latest tool output."#
                 thread_ts: None,
                 interruption_scope_id: None,
                 attachments: vec![],
+                is_mention: true,
             },
             CancellationToken::new(),
         )
@@ -7448,6 +7480,7 @@ BTC is currently around $65,000 based on latest tool output."#
                 thread_ts: None,
                 interruption_scope_id: None,
                 attachments: vec![],
+                is_mention: true,
             },
             CancellationToken::new(),
         )
@@ -7984,6 +8017,7 @@ BTC is currently around $65,000 based on latest tool output."#
             thread_ts: None,
             interruption_scope_id: None,
             attachments: vec![],
+            is_mention: true,
         };
 
         assert_eq!(conversation_memory_key(&msg), "slack_U123_msg_abc123");
@@ -8001,6 +8035,7 @@ BTC is currently around $65,000 based on latest tool output."#
             thread_ts: Some("1741234567.123456".into()),
             interruption_scope_id: None,
             attachments: vec![],
+            is_mention: true,
         };
 
         assert_eq!(
@@ -8021,6 +8056,7 @@ BTC is currently around $65,000 based on latest tool output."#
             thread_ts: None,
             interruption_scope_id: None,
             attachments: vec![],
+            is_mention: true,
         };
 
         assert_eq!(followup_thread_id(&msg).as_deref(), Some("msg_abc123"));
@@ -8038,6 +8074,7 @@ BTC is currently around $65,000 based on latest tool output."#
             thread_ts: None,
             interruption_scope_id: None,
             attachments: vec![],
+            is_mention: true,
         };
         let msg2 = naraeclaw_api::channel::ChannelMessage {
             id: "msg_2".into(),
@@ -8049,6 +8086,7 @@ BTC is currently around $65,000 based on latest tool output."#
             thread_ts: None,
             interruption_scope_id: None,
             attachments: vec![],
+            is_mention: true,
         };
 
         assert_ne!(
@@ -8072,6 +8110,7 @@ BTC is currently around $65,000 based on latest tool output."#
             thread_ts: None,
             interruption_scope_id: None,
             attachments: vec![],
+            is_mention: true,
         };
         let msg2 = naraeclaw_api::channel::ChannelMessage {
             id: "msg_2".into(),
@@ -8083,6 +8122,7 @@ BTC is currently around $65,000 based on latest tool output."#
             thread_ts: None,
             interruption_scope_id: None,
             attachments: vec![],
+            is_mention: true,
         };
 
         mem.store(
@@ -8242,6 +8282,7 @@ BTC is currently around $65,000 based on latest tool output."#
                 thread_ts: None,
                 interruption_scope_id: None,
                 attachments: vec![],
+                is_mention: true,
             },
             CancellationToken::new(),
         )
@@ -8259,6 +8300,7 @@ BTC is currently around $65,000 based on latest tool output."#
                 thread_ts: None,
                 interruption_scope_id: None,
                 attachments: vec![],
+                is_mention: true,
             },
             CancellationToken::new(),
         )
@@ -8386,6 +8428,7 @@ BTC is currently around $65,000 based on latest tool output."#
                 thread_ts: None,
                 interruption_scope_id: None,
                 attachments: vec![],
+                is_mention: true,
             },
             CancellationToken::new(),
         )
@@ -8420,6 +8463,7 @@ BTC is currently around $65,000 based on latest tool output."#
                 thread_ts: None,
                 interruption_scope_id: None,
                 attachments: vec![],
+                is_mention: true,
             },
             CancellationToken::new(),
         )
@@ -8459,6 +8503,7 @@ BTC is currently around $65,000 based on latest tool output."#
                 thread_ts: None,
                 interruption_scope_id: None,
                 attachments: vec![],
+                is_mention: true,
             },
             CancellationToken::new(),
         )
@@ -8573,6 +8618,7 @@ BTC is currently around $65,000 based on latest tool output."#
                 thread_ts: None,
                 interruption_scope_id: None,
                 attachments: vec![],
+                is_mention: true,
             },
             CancellationToken::new(),
         )
@@ -8691,6 +8737,7 @@ BTC is currently around $65,000 based on latest tool output."#
                 thread_ts: None,
                 interruption_scope_id: None,
                 attachments: vec![],
+                is_mention: true,
             },
             CancellationToken::new(),
         )
@@ -9235,6 +9282,7 @@ This is an example JSON object for profile settings."#;
                 thread_ts: None,
                 interruption_scope_id: None,
                 attachments: vec![],
+                is_mention: true,
             },
             CancellationToken::new(),
         )
@@ -9332,6 +9380,7 @@ This is an example JSON object for profile settings."#;
                 thread_ts: None,
                 interruption_scope_id: None,
                 attachments: vec![],
+                is_mention: true,
             },
             CancellationToken::new(),
         )
@@ -9349,6 +9398,7 @@ This is an example JSON object for profile settings."#;
                 thread_ts: None,
                 interruption_scope_id: None,
                 attachments: vec![],
+                is_mention: true,
             },
             CancellationToken::new(),
         )
@@ -9464,6 +9514,7 @@ This is an example JSON object for profile settings."#;
                 thread_ts: None,
                 interruption_scope_id: None,
                 attachments: vec![],
+                is_mention: true,
             },
             CancellationToken::new(),
         )
@@ -9481,6 +9532,7 @@ This is an example JSON object for profile settings."#;
                 thread_ts: None,
                 interruption_scope_id: None,
                 attachments: vec![],
+                is_mention: true,
             },
             CancellationToken::new(),
         )
@@ -9640,6 +9692,7 @@ This is an example JSON object for profile settings."#;
                 thread_ts: None,
                 interruption_scope_id: None,
                 attachments: vec![],
+                is_mention: true,
             },
             CancellationToken::new(),
         )
@@ -9762,6 +9815,7 @@ This is an example JSON object for profile settings."#;
                 thread_ts: None,
                 interruption_scope_id: None,
                 attachments: vec![],
+                is_mention: true,
             },
             CancellationToken::new(),
         )
@@ -9876,6 +9930,7 @@ This is an example JSON object for profile settings."#;
                 thread_ts: None,
                 interruption_scope_id: None,
                 attachments: vec![],
+                is_mention: true,
             },
             CancellationToken::new(),
         )
@@ -10010,6 +10065,7 @@ This is an example JSON object for profile settings."#;
                 thread_ts: None,
                 interruption_scope_id: None,
                 attachments: vec![],
+                is_mention: true,
             },
             CancellationToken::new(),
         )
@@ -10134,6 +10190,7 @@ This is an example JSON object for profile settings."#;
             thread_ts: None,
             interruption_scope_id: None,
             attachments: vec![],
+            is_mention: true,
         };
         assert_eq!(interruption_scope_key(&msg), "matrix_room_alice");
     }
@@ -10150,6 +10207,7 @@ This is an example JSON object for profile settings."#;
             thread_ts: Some("$thread1".into()),
             interruption_scope_id: Some("$thread1".into()),
             attachments: vec![],
+            is_mention: true,
         };
         assert_eq!(interruption_scope_key(&msg), "matrix_room_alice_$thread1");
     }
@@ -10167,6 +10225,7 @@ This is an example JSON object for profile settings."#;
             thread_ts: Some("1234567890.000100".into()), // Slack top-level fallback
             interruption_scope_id: None,                 // but NOT a thread reply
             attachments: vec![],
+            is_mention: true,
         };
         assert_eq!(interruption_scope_key(&msg), "slack_C123_alice");
     }
@@ -10253,6 +10312,7 @@ This is an example JSON object for profile settings."#;
                 thread_ts: Some("1741234567.100001".to_string()),
                 interruption_scope_id: Some("1741234567.100001".to_string()),
                 attachments: vec![],
+                is_mention: true,
             })
             .await
             .unwrap();
@@ -10267,6 +10327,7 @@ This is an example JSON object for profile settings."#;
                 thread_ts: Some("1741234567.200002".to_string()),
                 interruption_scope_id: Some("1741234567.200002".to_string()),
                 attachments: vec![],
+                is_mention: true,
             })
             .await
             .unwrap();

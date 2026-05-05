@@ -56,6 +56,7 @@ impl Channel for CliChannel {
                 thread_ts: None,
                 interruption_scope_id: None,
                 attachments: vec![],
+                is_mention: true,
             };
 
             if tx.send(msg).await.is_err() {
@@ -125,6 +126,7 @@ mod tests {
             thread_ts: None,
             interruption_scope_id: None,
             attachments: vec![],
+            is_mention: true,
         };
         assert_eq!(msg.id, "test-id");
         assert_eq!(msg.sender, "user");
@@ -146,6 +148,7 @@ mod tests {
             thread_ts: None,
             interruption_scope_id: None,
             attachments: vec![],
+            is_mention: true,
         };
         let cloned = msg.clone();
         assert_eq!(cloned.id, msg.id);
