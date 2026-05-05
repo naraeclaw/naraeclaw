@@ -18,11 +18,10 @@
 
 pub mod acp_server;
 pub mod media_pipeline;
-pub mod mqtt;
 
 pub use crate::cli::CliChannel;
-#[cfg(feature = "channel-webhook")]
-pub use crate::webhook::WebhookChannel;
+#[cfg(feature = "channel-slack")]
+pub use crate::slack::SlackChannel;
 pub use naraeclaw_api::channel::{Channel, ChannelMessage, SendMessage};
 pub use naraeclaw_infra::debounce::MessageDebouncer;
 pub use naraeclaw_infra::session_backend::SessionBackend;
@@ -3656,26 +3655,23 @@ pub async fn bind_telegram_identity(_config: &Config, _identity: &str) -> Result
     anyhow::bail!("Telegram channel is not available in this build")
 }
 
-/// Build a single channel instance by config section name (e.g. "webhook").
+/// Build a single channel instance by config section name (e.g. "slack").
 fn build_channel_by_id(config: &Config, channel_id: &str) -> Result<Arc<dyn Channel>> {
     match channel_id {
-        #[cfg(feature = "channel-webhook")]
-        "webhook" => {
-            let wh = config
+        #[cfg(feature = "channel-slack")]
+        "slack" => {
+            let sl = config
                 .channels_config
-                .webhook
+                .slack
                 .as_ref()
-                .context("Webhook channel is not configured")?;
-            Ok(Arc::new(WebhookChannel::new(
-                wh.port,
-                wh.listen_path.clone(),
-                wh.send_url.clone(),
-                wh.send_method.clone(),
-                wh.auth_header.clone(),
-                wh.secret.clone(),
+                .context("Slack channel is not configured")?;
+            Ok(Arc::new(SlackChannel::new(
+                sl.app_token.clone(),
+                sl.bot_token.clone(),
+                sl.default_channel.clone(),
             )))
         }
-        other => anyhow::bail!("Unknown channel '{other}'. Supported: webhook"),
+        other => anyhow::bail!("Unknown channel '{other}'. Supported: slack"),
     }
 }
 
@@ -3724,22 +3720,19 @@ fn collect_configured_channels(
 ) -> Vec<ConfiguredChannel> {
     let mut channels = Vec::new();
 
-    #[cfg(feature = "channel-webhook")]
-    if let Some(ref wh) = config.channels_config.webhook {
-        if wh.enabled {
+    #[cfg(feature = "channel-slack")]
+    if let Some(ref sl) = config.channels_config.slack {
+        if sl.enabled {
             channels.push(ConfiguredChannel {
-                display_name: "Webhook",
-                channel: Arc::new(WebhookChannel::new(
-                    wh.port,
-                    wh.listen_path.clone(),
-                    wh.send_url.clone(),
-                    wh.send_method.clone(),
-                    wh.auth_header.clone(),
-                    wh.secret.clone(),
+                display_name: "Slack",
+                channel: Arc::new(SlackChannel::new(
+                    sl.app_token.clone(),
+                    sl.bot_token.clone(),
+                    sl.default_channel.clone(),
                 )),
             });
         } else {
-            tracing::info!("Webhook channel configured but disabled (enabled = false)");
+            tracing::info!("Slack channel configured but disabled (enabled = false)");
         }
     }
 
@@ -3785,10 +3778,6 @@ pub async fn doctor_channels(config: Config) -> Result<()> {
                 println!("  ⏱️  {:<9} timed out (>10s)", configured.display_name);
             }
         }
-    }
-
-    if config.channels_config.webhook.is_some() {
-        println!("  ℹ️  Webhook   check via `naraeclaw gateway` then GET /health");
     }
 
     println!();
@@ -4342,8 +4331,6 @@ pub async fn start_channels(config: Config) -> Result<()> {
 
 /// Deliver a cron job announcement to a configured channel.
 /// Scans for credential leaks before delivery.
-/// Currently only "webhook" delivery is supported. Pass `channel = "webhook"` and
-/// `target` as the destination URL, or leave blank to use the configured send_url.
 pub async fn deliver_announcement(
     _config: &naraeclaw_config::schema::Config,
     channel: &str,

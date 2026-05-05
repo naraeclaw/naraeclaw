@@ -4,7 +4,7 @@ use console::style;
 use dialoguer::{Confirm, Select};
 use naraeclaw_config::schema::{
     AutonomyConfig, BrowserConfig, ChannelsConfig, Config, HeartbeatConfig, MemoryConfig,
-    ObservabilityConfig, RuntimeConfig, SecretsConfig, StorageConfig, WebhookConfig,
+    ObservabilityConfig, RuntimeConfig, SecretsConfig, SlackConfig, StorageConfig,
 };
 use naraeclaw_memory::{
     default_memory_backend_key, memory_backend_profile, selectable_memory_backends,
@@ -3279,12 +3279,12 @@ fn setup_memory() -> Result<MemoryConfig> {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum ChannelMenuChoice {
-    Webhook,
+    Slack,
     Done,
 }
 
 const CHANNEL_MENU_CHOICES: &[ChannelMenuChoice] =
-    &[ChannelMenuChoice::Webhook, ChannelMenuChoice::Done];
+    &[ChannelMenuChoice::Slack, ChannelMenuChoice::Done];
 
 fn channel_menu_choices() -> &'static [ChannelMenuChoice] {
     CHANNEL_MENU_CHOICES
@@ -3306,12 +3306,12 @@ fn setup_channels(
         let options: Vec<String> = menu_choices
             .iter()
             .map(|choice| match choice {
-                ChannelMenuChoice::Webhook => format!(
-                    "Webhook    {}",
-                    if config.webhook.is_some() {
+                ChannelMenuChoice::Slack => format!(
+                    "Slack      {}",
+                    if config.slack.is_some() {
                         "✅ configured"
                     } else {
-                        "— HTTP endpoint"
+                        "— Socket Mode bot"
                     }
                 ),
                 ChannelMenuChoice::Done => "Done — finish setup".to_string(),
@@ -3330,44 +3330,43 @@ fn setup_channels(
             .unwrap_or(ChannelMenuChoice::Done);
 
         match choice {
-            ChannelMenuChoice::Webhook => {
-                // ── Webhook ──
+            ChannelMenuChoice::Slack => {
+                // ── Slack Socket Mode ──
                 println!();
                 println!(
                     "  {} {}",
-                    style("Webhook Setup").white().bold(),
-                    style("— HTTP endpoint for custom integrations").dim()
+                    style("Slack Socket Mode Setup").white().bold(),
+                    style("— 공개 URL 없이 동작하는 Slack 봇").dim()
                 );
+                println!("  api.slack.com/apps 에서 앱을 만들고 Socket Mode를 활성화하세요.");
+                println!();
 
-                let port: String = Input::new()
-                    .with_prompt("  Port")
-                    .default("8080")
+                let app_token: String = Input::new()
+                    .with_prompt("  App-Level Token (xapp-…)")
                     .interact_text()?;
 
-                let secret: String = Input::new()
-                    .with_prompt("  Secret (optional, Enter to skip)")
+                let bot_token: String = Input::new()
+                    .with_prompt("  Bot Token (xoxb-…)")
+                    .interact_text()?;
+
+                let default_channel: String = Input::new()
+                    .with_prompt("  기본 채널 ID (C…, 선택사항, Enter로 건너뜀)")
                     .allow_empty(true)
                     .interact_text()?;
 
-                let existing_wh = config.webhook.as_ref();
-                config.webhook = Some(WebhookConfig {
+                let existing_sl = config.slack.as_ref();
+                config.slack = Some(SlackConfig {
                     enabled: true,
-                    port: port.parse().unwrap_or(8080),
-                    listen_path: existing_wh.and_then(|w| w.listen_path.clone()),
-                    send_url: existing_wh.and_then(|w| w.send_url.clone()),
-                    send_method: existing_wh.and_then(|w| w.send_method.clone()),
-                    auth_header: existing_wh.and_then(|w| w.auth_header.clone()),
-                    secret: if secret.is_empty() {
-                        existing_wh.and_then(|w| w.secret.clone())
+                    app_token,
+                    bot_token,
+                    signing_secret: existing_sl.and_then(|s| s.signing_secret.clone()),
+                    default_channel: if default_channel.is_empty() {
+                        existing_sl.and_then(|s| s.default_channel.clone())
                     } else {
-                        Some(secret)
+                        Some(default_channel)
                     },
                 });
-                println!(
-                    "  {} Webhook on port {}",
-                    style("✅").green().bold(),
-                    style(&port).cyan()
-                );
+                println!("  {} Slack 채널 설정 완료", style("✅").green().bold());
             }
             ChannelMenuChoice::Done => break,
         }
@@ -5817,7 +5816,6 @@ Do not overwrite me.",
     #[test]
     fn channels_fresh_install_starts_empty() {
         let config = ChannelsConfig::default();
-        assert!(config.webhook.is_none());
-        assert!(config.mqtt.is_none());
+        assert!(config.slack.is_none());
     }
 }

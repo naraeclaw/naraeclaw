@@ -20,14 +20,14 @@ pub async fn handle_command(command: crate::ChannelCommands, config: &Config) ->
         crate::ChannelCommands::List => {
             println!("Channels:");
             println!("  ✅ CLI (always available)");
-            #[cfg(feature = "channel-webhook")]
+            #[cfg(feature = "channel-slack")]
             if config
                 .channels_config
-                .webhook
+                .slack
                 .as_ref()
-                .is_some_and(|w| w.enabled)
+                .is_some_and(|s| s.enabled)
             {
-                println!("  ✅ Webhook");
+                println!("  ✅ Slack (Socket Mode)");
             }
             println!("\nTo start channels: naraeclaw channel start");
             println!("To check health:    naraeclaw channel doctor");

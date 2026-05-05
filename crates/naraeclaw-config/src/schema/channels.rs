@@ -1,4 +1,4 @@
-//! 채널 설정 — CLI, Webhook, MQTT 채널 Config 타입.
+//! 채널 설정 — CLI, Slack 채널 Config 타입.
 #![allow(unused_imports)]
 use super::*;
 use crate::traits::ChannelConfig;
@@ -27,10 +27,9 @@ impl<T: ChannelConfig> crate::traits::ConfigHandle for ConfigWrapper<T> {
 
 /// Top-level channel configurations (`[channels_config]` section).
 ///
-/// NaraeClaw supports two active channel surfaces:
-/// - `cli`     — interactive terminal session (always available)
-/// - `webhook` — HTTP receiver for external integrations
-/// - `mqtt`    — MQTT SOP listener
+/// NaraeClaw supports the following channel surfaces:
+/// - `cli`   — interactive terminal session (always available)
+/// - `slack` — Slack Socket Mode bot (no public URL required)
 #[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Clone, Serialize, Deserialize, Configurable)]
 #[cfg_attr(feature = "schema-export", derive(schemars::JsonSchema))]
@@ -39,12 +38,9 @@ pub struct ChannelsConfig {
     /// Enable the CLI interactive channel. Default: `true`.
     #[serde(default = "default_true")]
     pub cli: bool,
-    /// Webhook channel configuration.
+    /// Slack Socket Mode channel configuration.
     #[nested]
-    pub webhook: Option<WebhookConfig>,
-    /// MQTT channel configuration (SOP listener).
-    #[nested]
-    pub mqtt: Option<MqttConfig>,
+    pub slack: Option<SlackConfig>,
     /// Base timeout in seconds for processing a single channel message (LLM + tools).
     /// Runtime uses this as a per-turn budget that scales with tool-loop depth
     /// (up to 4x, capped) so one slow/retried model call does not consume the
@@ -104,16 +100,10 @@ impl ChannelsConfig {
     }
 
     pub fn channels(&self) -> Vec<(Box<dyn crate::traits::ConfigHandle>, bool)> {
-        vec![
-            (
-                Box::new(ConfigWrapper::new(self.webhook.as_ref())),
-                self.webhook.is_some(),
-            ),
-            (
-                Box::new(ConfigWrapper::new(self.mqtt.as_ref())),
-                self.mqtt.is_some(),
-            ),
-        ]
+        vec![(
+            Box::new(ConfigWrapper::new(self.slack.as_ref())),
+            self.slack.is_some(),
+        )]
     }
 }
 
@@ -129,8 +119,7 @@ impl Default for ChannelsConfig {
     fn default() -> Self {
         Self {
             cli: true,
-            webhook: None,
-            mqtt: None,
+            slack: None,
             message_timeout_secs: default_channel_message_timeout_secs(),
             ack_reactions: true,
             show_tool_calls: false,
@@ -142,134 +131,42 @@ impl Default for ChannelsConfig {
     }
 }
 
-/// Webhook channel configuration.
+/// Slack Socket Mode channel configuration.
 ///
-/// Receives messages via HTTP POST and sends replies to a configurable outbound URL.
-/// This is the "universal adapter" for any system that supports webhooks.
+/// Uses Slack's Socket Mode API — no public URL required.
+/// Requires an App-Level Token (`xapp-`) and a Bot Token (`xoxb-`).
+///
+/// Setup:
+/// 1. Create a Slack app at <https://api.slack.com/apps>
+/// 2. Enable Socket Mode and create an App-Level Token with `connections:write` scope
+/// 3. Add Bot Token scopes: `chat:write`, `reactions:write`, `channels:history`, `im:history`
+/// 4. Install the app to your workspace
 #[derive(Debug, Clone, Default, Serialize, Deserialize, Configurable)]
 #[cfg_attr(feature = "schema-export", derive(schemars::JsonSchema))]
-#[prefix = "channels.webhook"]
-pub struct WebhookConfig {
-    /// Whether this channel is active (must be explicitly enabled). Default: false.
+#[prefix = "channels.slack"]
+pub struct SlackConfig {
+    /// Whether this channel is active. Default: false.
     #[serde(default)]
     pub enabled: bool,
-    /// Port to listen on for incoming webhooks.
-    pub port: u16,
-    /// URL path to listen on (default: `/webhook`).
-    #[serde(default)]
-    pub listen_path: Option<String>,
-    /// URL to POST/PUT outbound messages to.
-    #[serde(default)]
-    pub send_url: Option<String>,
-    /// HTTP method for outbound messages (`POST` or `PUT`). Default: `POST`.
-    #[serde(default)]
-    pub send_method: Option<String>,
-    /// Optional `Authorization` header value for outbound requests.
-    #[serde(default)]
-    pub auth_header: Option<String>,
-    /// Optional shared secret for webhook signature verification (HMAC-SHA256).
+    /// App-Level Token (`xapp-…`). Required for Socket Mode WebSocket connection.
     #[secret]
-    pub secret: Option<String>,
+    pub app_token: String,
+    /// Bot Token (`xoxb-…`). Required for sending messages via Web API.
+    #[secret]
+    pub bot_token: String,
+    /// Slack signing secret for request verification (optional).
+    #[secret]
+    pub signing_secret: Option<String>,
+    /// Default channel ID to post to when no thread context is available.
+    /// If unset, replies are sent to the channel where the message arrived.
+    pub default_channel: Option<String>,
 }
 
-impl ChannelConfig for WebhookConfig {
+impl ChannelConfig for SlackConfig {
     fn name() -> &'static str {
-        "Webhook"
+        "Slack"
     }
     fn desc() -> &'static str {
-        "HTTP endpoint"
+        "Slack Socket Mode"
     }
-}
-
-/// MQTT channel configuration (SOP listener).
-///
-/// Subscribes to MQTT topics and dispatches incoming messages
-/// to the SOP engine for processing.
-#[derive(Debug, Clone, Default, Serialize, Deserialize, Configurable)]
-#[cfg_attr(feature = "schema-export", derive(schemars::JsonSchema))]
-#[prefix = "channels.mqtt"]
-pub struct MqttConfig {
-    /// Whether this channel is active (must be explicitly enabled). Default: false.
-    #[serde(default)]
-    pub enabled: bool,
-    /// MQTT broker URL (e.g., `mqtt://localhost:1883` or `mqtts://broker.example.com:8883`).
-    /// Use `mqtt://` for plain connections or `mqtts://` for TLS.
-    pub broker_url: String,
-    /// MQTT client ID (must be unique per broker).
-    pub client_id: String,
-    /// Topics to subscribe to (e.g., `sensors/#`, `alerts/+/critical`).
-    /// At least one topic is required.
-    #[serde(default)]
-    pub topics: Vec<String>,
-    /// MQTT QoS level (0 = at-most-once, 1 = at-least-once, 2 = exactly-once). Default: 1.
-    #[serde(default = "default_mqtt_qos")]
-    pub qos: u8,
-    /// Username for authentication (optional).
-    pub username: Option<String>,
-    /// Password for authentication (optional).
-    #[secret]
-    pub password: Option<String>,
-    /// Enable TLS encryption. Must match the broker_url scheme:
-    /// - `mqtt://` → `use_tls: false`
-    /// - `mqtts://` → `use_tls: true`
-    #[serde(default)]
-    pub use_tls: bool,
-    /// Keep-alive interval in seconds (default: 30). Prevents broker disconnect on idle.
-    #[serde(default = "default_mqtt_keep_alive_secs")]
-    pub keep_alive_secs: u64,
-}
-
-impl MqttConfig {
-    pub fn validate(&self) -> anyhow::Result<()> {
-        if self.qos > 2 {
-            anyhow::bail!("qos must be 0, 1, or 2, got {}", self.qos);
-        }
-
-        let is_tls_scheme = self.broker_url.starts_with("mqtts://");
-        let is_mqtt_scheme = self.broker_url.starts_with("mqtt://");
-
-        if !is_tls_scheme && !is_mqtt_scheme {
-            anyhow::bail!(
-                "broker_url must start with 'mqtt://' or 'mqtts://', got: {}",
-                self.broker_url
-            );
-        }
-
-        if is_mqtt_scheme && self.use_tls {
-            anyhow::bail!("use_tls is true but broker_url uses 'mqtt://' (not 'mqtts://')");
-        }
-
-        if is_tls_scheme && !self.use_tls {
-            anyhow::bail!(
-                "use_tls is false but broker_url uses 'mqtts://' (requires use_tls: true)"
-            );
-        }
-
-        if self.topics.is_empty() {
-            anyhow::bail!("at least one topic must be configured");
-        }
-
-        if self.client_id.is_empty() {
-            anyhow::bail!("client_id must not be empty");
-        }
-
-        Ok(())
-    }
-}
-
-impl ChannelConfig for MqttConfig {
-    fn name() -> &'static str {
-        "MQTT"
-    }
-    fn desc() -> &'static str {
-        "MQTT SOP Listener"
-    }
-}
-
-pub fn default_mqtt_qos() -> u8 {
-    1
-}
-
-pub fn default_mqtt_keep_alive_secs() -> u64 {
-    30
 }

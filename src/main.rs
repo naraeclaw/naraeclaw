@@ -1312,23 +1312,6 @@ async fn main() -> Result<()> {
                         Box::pin(naraeclaw_channels::orchestrator::start_channels(config)).await
                     })
                 })),
-                mqtt_start: Some(Box::new(|mqtt_config| {
-                    Box::pin(async move {
-                        use naraeclaw_config::schema::SopConfig;
-                        use naraeclaw_memory::NoneMemory;
-                        use naraeclaw_runtime::sop::{SopAuditLogger, SopEngine};
-                        use std::sync::{Arc, Mutex};
-
-                        let engine = Arc::new(Mutex::new(SopEngine::new(SopConfig::default())));
-                        let audit = Arc::new(SopAuditLogger::new(Arc::new(NoneMemory)));
-                        naraeclaw_channels::orchestrator::mqtt::run_mqtt_sop_listener(
-                            &mqtt_config,
-                            engine,
-                            audit,
-                        )
-                        .await
-                    })
-                })),
             };
             Box::pin(daemon::run(config, host, port, subsystems)).await
         }

@@ -504,15 +504,8 @@ pub async fn run_gateway(
         tx
     });
     let event_buffer = Arc::new(sse::EventBuffer::new(500));
-    // Extract webhook secret for authentication
-    let webhook_secret_hash: Option<Arc<str>> =
-        config.channels_config.webhook.as_ref().and_then(|webhook| {
-            webhook.secret.as_ref().and_then(|raw_secret| {
-                let trimmed_secret = raw_secret.trim();
-                (!trimmed_secret.is_empty())
-                    .then(|| Arc::<str>::from(hash_webhook_secret(trimmed_secret)))
-            })
-        });
+    // No gateway-level webhook secret needed (Slack uses Socket Mode, not HTTP webhooks)
+    let webhook_secret_hash: Option<Arc<str>> = None;
 
     let _whatsapp_app_secret: Option<Arc<str>> = None;
     let _wati_channel: Option<()> = None;

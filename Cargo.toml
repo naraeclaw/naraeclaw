@@ -228,7 +228,7 @@ agent-runtime = [
     "dep:axum", "dep:hyper", "dep:hyper-util", "dep:tower", "dep:tower-http", "dep:http-body-util",
     "dep:mime_guess",
     "gateway", "tui-onboarding",
-    "channel-webhook", "channel-acp-server",
+    "channel-slack", "channel-acp-server",
 ]
 
 # Major subsystems — each forwards to exactly ONE crate
@@ -237,7 +237,7 @@ tui-onboarding = ["dep:naraeclaw-tui"]
 schema-export = ["naraeclaw-config/schema-export"]
 
 # Channels — each forwards directly to naraeclaw-channels (1 hop)
-channel-webhook = ["naraeclaw-channels/channel-webhook"]
+channel-slack = ["naraeclaw-channels/channel-slack"]
 channel-acp-server = ["naraeclaw-channels/channel-acp-server"]
 
 # Bundle alias for future expansion
