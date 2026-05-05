@@ -334,12 +334,17 @@ impl Channel for SlackChannel {
 }
 
 /// Parse a Slack `events_api` payload into a `ChannelMessage`.
-/// Only handles `message` events from real users (ignores bots and subtypes).
+///
+/// Routing rules:
+/// - `app_mention` — always handled (explicit @bot mention in any channel or thread)
+/// - `message` in DM (channel starts with `D`) — always handled
+/// - `message` in public/private channel — ignored (use @mention instead)
 fn parse_events_api(payload: &serde_json::Value) -> Option<ChannelMessage> {
     let event = payload.get("event")?;
     let event_type = event["type"].as_str()?;
 
-    if event_type != "message" {
+    // Accept explicit @mention events and plain message events (for DM routing below)
+    if event_type != "message" && event_type != "app_mention" {
         return None;
     }
 
@@ -351,8 +356,15 @@ fn parse_events_api(payload: &serde_json::Value) -> Option<ChannelMessage> {
         return None;
     }
 
-    let user = event["user"].as_str()?.to_string();
     let channel = event["channel"].as_str()?.to_string();
+
+    // For plain `message` events, only respond in DMs (channel ID starts with 'D').
+    // In channels, require an explicit @mention (`app_mention` event type).
+    if event_type == "message" && !channel.starts_with('D') {
+        return None;
+    }
+
+    let user = event["user"].as_str()?.to_string();
     let text = event["text"].as_str().unwrap_or("").to_string();
     let ts = event["ts"].as_str()?.to_string();
 
@@ -383,6 +395,8 @@ fn parse_events_api(payload: &serde_json::Value) -> Option<ChannelMessage> {
         thread_ts: Some(ts),
         interruption_scope_id,
         attachments: vec![],
+        // app_mention = explicit @bot call; message in DM = always direct
+        is_mention: event_type == "app_mention" || channel.starts_with('D'),
     })
 }
 
@@ -390,11 +404,24 @@ fn parse_events_api(payload: &serde_json::Value) -> Option<ChannelMessage> {
 mod tests {
     use super::*;
 
-    fn make_event_payload(user: &str, channel: &str, text: &str, ts: &str) -> serde_json::Value {
+    fn make_dm_payload(user: &str, text: &str, ts: &str) -> serde_json::Value {
         serde_json::json!({
             "type": "event_callback",
             "event": {
                 "type": "message",
+                "user": user,
+                "channel": "D456",  // DM channel (starts with 'D')
+                "text": text,
+                "ts": ts
+            }
+        })
+    }
+
+    fn make_mention_payload(user: &str, channel: &str, text: &str, ts: &str) -> serde_json::Value {
+        serde_json::json!({
+            "type": "event_callback",
+            "event": {
+                "type": "app_mention",
                 "user": user,
                 "channel": channel,
                 "text": text,
@@ -404,15 +431,39 @@ mod tests {
     }
 
     #[test]
-    fn parse_basic_message() {
-        let payload = make_event_payload("U123", "C456", "Hello!", "1234567890.123456");
+    fn dm_message_parsed() {
+        let payload = make_dm_payload("U123", "Hello!", "1234567890.123456");
+        let msg = parse_events_api(&payload).unwrap();
+        assert_eq!(msg.sender, "U123");
+        assert_eq!(msg.reply_target, "D456");
+        assert_eq!(msg.content, "Hello!");
+        assert_eq!(msg.channel, "slack");
+        assert_eq!(msg.id, "slack_D456_1234567890.123456");
+        assert_eq!(msg.thread_ts.as_deref(), Some("1234567890.123456"));
+    }
+
+    #[test]
+    fn app_mention_in_channel_parsed() {
+        let payload = make_mention_payload("U123", "C456", "@bot help me", "1234567890.123456");
         let msg = parse_events_api(&payload).unwrap();
         assert_eq!(msg.sender, "U123");
         assert_eq!(msg.reply_target, "C456");
-        assert_eq!(msg.content, "Hello!");
-        assert_eq!(msg.channel, "slack");
-        assert_eq!(msg.id, "slack_C456_1234567890.123456");
-        assert_eq!(msg.thread_ts.as_deref(), Some("1234567890.123456"));
+        assert_eq!(msg.content, "@bot help me");
+    }
+
+    #[test]
+    fn channel_message_without_mention_ignored() {
+        // Plain message in a public channel (C...) should be ignored
+        let payload = serde_json::json!({
+            "event": {
+                "type": "message",
+                "user": "U123",
+                "channel": "C456",
+                "text": "talking to another bot",
+                "ts": "1234567890.000001"
+            }
+        });
+        assert!(parse_events_api(&payload).is_none());
     }
 
     #[test]
@@ -422,7 +473,7 @@ mod tests {
                 "type": "message",
                 "user": "U123",
                 "bot_id": "B999",
-                "channel": "C456",
+                "channel": "D456",
                 "text": "I am a bot",
                 "ts": "1234567890.000001"
             }
@@ -437,7 +488,7 @@ mod tests {
                 "type": "message",
                 "subtype": "message_changed",
                 "user": "U123",
-                "channel": "C456",
+                "channel": "D456",
                 "text": "edited",
                 "ts": "1234567890.000002"
             }
@@ -447,17 +498,17 @@ mod tests {
 
     #[test]
     fn ignores_empty_text() {
-        let payload = make_event_payload("U123", "C456", "", "1234567890.000003");
+        let payload = make_dm_payload("U123", "", "1234567890.000003");
         assert!(parse_events_api(&payload).is_none());
     }
 
     #[test]
-    fn threaded_message_sets_interruption_scope() {
+    fn threaded_dm_sets_interruption_scope() {
         let payload = serde_json::json!({
             "event": {
                 "type": "message",
                 "user": "U123",
-                "channel": "C456",
+                "channel": "D456",
                 "text": "reply in thread",
                 "ts": "1234567891.000001",
                 "thread_ts": "1234567890.000000"
@@ -472,7 +523,7 @@ mod tests {
 
     #[test]
     fn timestamp_parsed_from_ts() {
-        let payload = make_event_payload("U123", "C456", "hi", "1700000000.123456");
+        let payload = make_dm_payload("U123", "hi", "1700000000.123456");
         let msg = parse_events_api(&payload).unwrap();
         assert_eq!(msg.timestamp, 1700000000);
     }
