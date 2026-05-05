@@ -236,6 +236,7 @@ function AppContent() {
           <Route element={<Layout />}>
             <Route path="/" element={<Dashboard />} />
             <Route path="/agent" element={<AgentChat />} />
+            <Route path="/chat/:agentId" element={<AgentChat />} />
             <Route path="/tools" element={<Tools />} />
             <Route path="/cron" element={<Cron />} />
             <Route path="/integrations" element={<Integrations />} />
