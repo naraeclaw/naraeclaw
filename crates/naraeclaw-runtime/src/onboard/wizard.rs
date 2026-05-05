@@ -3,9 +3,8 @@ use anyhow::{Context, Result, bail};
 use console::style;
 use dialoguer::{Confirm, Select};
 use naraeclaw_config::schema::{
-    AutonomyConfig, BrowserConfig, ChannelsConfig, Config, HeartbeatConfig,
-    MemoryConfig, ObservabilityConfig, RuntimeConfig, SecretsConfig,
-    StorageConfig, WebhookConfig,
+    AutonomyConfig, BrowserConfig, ChannelsConfig, Config, HeartbeatConfig, MemoryConfig,
+    ObservabilityConfig, RuntimeConfig, SecretsConfig, StorageConfig, WebhookConfig,
 };
 use naraeclaw_memory::{
     default_memory_backend_key, memory_backend_profile, selectable_memory_backends,
@@ -3284,10 +3283,8 @@ enum ChannelMenuChoice {
     Done,
 }
 
-const CHANNEL_MENU_CHOICES: &[ChannelMenuChoice] = &[
-    ChannelMenuChoice::Webhook,
-    ChannelMenuChoice::Done,
-];
+const CHANNEL_MENU_CHOICES: &[ChannelMenuChoice] =
+    &[ChannelMenuChoice::Webhook, ChannelMenuChoice::Done];
 
 fn channel_menu_choices() -> &'static [ChannelMenuChoice] {
     CHANNEL_MENU_CHOICES
@@ -5818,126 +5815,9 @@ Do not overwrite me.",
     }
 
     #[test]
-    fn channels_repair_preserves_unmodified_channels() {
-        use naraeclaw_config::schema::{DiscordConfig, MatrixConfig, StreamMode};
-
-        let existing = ChannelsConfig {
-            discord: Some(DiscordConfig {
-                enabled: true,
-                bot_token: "keep-me".into(),
-                guild_id: None,
-                allowed_users: vec![],
-                listen_to_bots: false,
-                interrupt_on_new_message: false,
-                mention_only: false,
-                proxy_url: None,
-                stream_mode: StreamMode::default(),
-                draft_update_interval_ms: 1500,
-                multi_message_delay_ms: 800,
-                stall_timeout_secs: 0,
-            }),
-            matrix: Some(MatrixConfig {
-                enabled: true,
-                homeserver: "https://m.org".into(),
-                access_token: "old-token".into(),
-                user_id: None,
-                device_id: None,
-                room_id: "!r:m".into(),
-                allowed_users: vec![],
-                allowed_rooms: vec![],
-                interrupt_on_new_message: false,
-                stream_mode: StreamMode::default(),
-                draft_update_interval_ms: 1500,
-                multi_message_delay_ms: 800,
-                recovery_key: None,
-            }),
-            ..ChannelsConfig::default()
-        };
-
-        // Simulate the wizard starting from existing config and only updating Matrix
-        let mut config = existing;
-        config.matrix.as_mut().unwrap().access_token = "new-token".into();
-
-        // Discord should be untouched
-        assert!(config.discord.is_some());
-        assert_eq!(config.discord.as_ref().unwrap().bot_token, "keep-me");
-
-        // Matrix should reflect the update
-        assert_eq!(config.matrix.as_ref().unwrap().access_token, "new-token");
-    }
-
-    #[test]
-    fn matrix_reconfigure_preserves_non_prompted_fields() {
-        use naraeclaw_config::schema::{MatrixConfig, StreamMode};
-
-        let existing = ChannelsConfig {
-            matrix: Some(MatrixConfig {
-                enabled: true,
-                homeserver: "https://m.org".into(),
-                access_token: "tok".into(),
-                user_id: None,
-                device_id: Some("NARAECLAW".into()),
-                room_id: "!r:m".into(),
-                allowed_users: vec!["@u:m".into()],
-                allowed_rooms: vec!["!keep:m.org".into()],
-                interrupt_on_new_message: true,
-                stream_mode: StreamMode::Partial,
-                draft_update_interval_ms: 2000,
-                multi_message_delay_ms: 1000,
-                recovery_key: Some("recovery-secret".into()),
-            }),
-            ..ChannelsConfig::default()
-        };
-
-        // Simulate re-configure: wizard preserves non-prompted fields
-        let existing_mx = existing.matrix.as_ref();
-        let preserved_rooms = existing_mx
-            .map(|m| m.allowed_rooms.clone())
-            .unwrap_or_default();
-        let preserved_interrupt = existing_mx
-            .map(|m| m.interrupt_on_new_message)
-            .unwrap_or(false);
-        let preserved_stream = existing_mx
-            .map(|m| m.stream_mode)
-            .unwrap_or(StreamMode::Partial);
-        let preserved_draft_ms = existing_mx
-            .map(|m| m.draft_update_interval_ms)
-            .unwrap_or(1500);
-        let preserved_multi_ms = existing_mx.map(|m| m.multi_message_delay_ms).unwrap_or(800);
-
-        assert_eq!(preserved_rooms, vec!["!keep:m.org".to_string()]);
-        assert!(preserved_interrupt);
-        assert!(matches!(preserved_stream, StreamMode::Partial));
-        assert_eq!(preserved_draft_ms, 2000);
-        assert_eq!(preserved_multi_ms, 1000);
-    }
-
-    #[test]
-    fn matrix_fresh_install_uses_defaults_for_non_prompted_fields() {
-        use naraeclaw_config::schema::StreamMode;
-
-        let existing_mx: Option<&naraeclaw_config::schema::MatrixConfig> = None;
-        let rooms = existing_mx
-            .map(|m| m.allowed_rooms.clone())
-            .unwrap_or_default();
-        let interrupt = existing_mx
-            .map(|m| m.interrupt_on_new_message)
-            .unwrap_or(false);
-        let stream = existing_mx
-            .map(|m| m.stream_mode)
-            .unwrap_or(StreamMode::Partial);
-
-        assert!(rooms.is_empty());
-        assert!(!interrupt);
-        assert!(matches!(stream, StreamMode::Partial));
-    }
-
-    #[test]
     fn channels_fresh_install_starts_empty() {
         let config = ChannelsConfig::default();
-        assert!(config.discord.is_none());
-        assert!(config.matrix.is_none());
-        assert!(config.telegram.is_none());
-        assert!(config.slack.is_none());
+        assert!(config.webhook.is_none());
+        assert!(config.mqtt.is_none());
     }
 }

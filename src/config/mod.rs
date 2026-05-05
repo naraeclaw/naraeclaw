@@ -14,19 +14,18 @@ pub use schema::{
     HttpRequestConfig, IdentityConfig, ImageGenConfig, ImageProviderDalleConfig,
     ImageProviderFluxConfig, ImageProviderImagenConfig, ImageProviderStabilityConfig, JiraConfig,
     KnowledgeConfig, LinkEnricherConfig, LinkedInConfig, LinkedInContentConfig,
-    LinkedInImageConfig, LocalWhisperConfig, McpConfig, McpServerConfig,
-    McpTransport, MediaPipelineConfig, MemoryConfig, MemoryPolicyConfig, ModelRouteConfig,
-    MqttConfig, MultimodalConfig, NodeTransportConfig, NodesConfig,
-    ObservabilityConfig, OpenAiSttConfig, OpenAiTtsConfig, OpenCodeCliConfig, OpenVpnTunnelConfig,
-    OtpConfig, OtpMethod, PacingConfig, PipelineConfig, PiperTtsConfig, PluginsConfig, ProxyConfig,
-    ProxyScope, QdrantConfig, QueryClassificationConfig, ReliabilityConfig, ResourceLimitsConfig,
-    RuntimeConfig, SandboxBackend, SandboxConfig, SchedulerConfig, SearchMode, SecretsConfig,
-    SecurityConfig, SecurityOpsConfig, ShellToolConfig, SkillCreationConfig,
-    SkillImprovementConfig, SkillsConfig, SkillsPromptInjectionMode, SopConfig,
-    StorageConfig, StorageProviderConfig, StorageProviderSection, SwarmConfig,
-    SwarmStrategy, TextBrowserConfig, ToolFilterGroup, ToolFilterGroupMode,
-    TranscriptionConfig, TtsConfig, TunnelConfig, VerifiableIntentConfig, WebFetchConfig,
-    WebSearchConfig, WebhookConfig, WorkspaceConfig,
+    LinkedInImageConfig, LocalWhisperConfig, McpConfig, McpServerConfig, McpTransport,
+    MediaPipelineConfig, MemoryConfig, MemoryPolicyConfig, ModelRouteConfig, MqttConfig,
+    MultimodalConfig, NodeTransportConfig, NodesConfig, ObservabilityConfig, OpenAiSttConfig,
+    OpenAiTtsConfig, OpenCodeCliConfig, OpenVpnTunnelConfig, OtpConfig, OtpMethod, PacingConfig,
+    PipelineConfig, PiperTtsConfig, PluginsConfig, ProxyConfig, ProxyScope, QdrantConfig,
+    QueryClassificationConfig, ReliabilityConfig, ResourceLimitsConfig, RuntimeConfig,
+    SandboxBackend, SandboxConfig, SchedulerConfig, SearchMode, SecretsConfig, SecurityConfig,
+    SecurityOpsConfig, ShellToolConfig, SkillCreationConfig, SkillImprovementConfig, SkillsConfig,
+    SkillsPromptInjectionMode, SopConfig, StorageConfig, StorageProviderConfig,
+    StorageProviderSection, SwarmConfig, SwarmStrategy, TextBrowserConfig, ToolFilterGroup,
+    ToolFilterGroupMode, TranscriptionConfig, TtsConfig, TunnelConfig, VerifiableIntentConfig,
+    WebFetchConfig, WebSearchConfig, WebhookConfig, WorkspaceConfig,
     apply_channel_proxy_to_builder, apply_runtime_proxy_to_builder, build_channel_proxy_client,
     build_channel_proxy_client_with_timeouts, build_runtime_proxy_client,
     build_runtime_proxy_client_with_timeouts, runtime_proxy_config, set_runtime_proxy_config,
@@ -205,11 +204,9 @@ mod tests {
 
     #[test]
     fn reexported_channel_configs_are_constructible() {
-        let mqtt = MqttConfig {
-            enabled: true,
-            broker_url: "mqtt://localhost:1883".into(),
-            ..Default::default()
-        };
+        let mut mqtt = MqttConfig::default();
+        mqtt.enabled = true;
+        mqtt.broker_url = "mqtt://localhost:1883".into();
 
         assert!(mqtt.enabled);
         assert_eq!(mqtt.broker_url, "mqtt://localhost:1883");

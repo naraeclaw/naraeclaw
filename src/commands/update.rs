@@ -436,6 +436,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(target_os = "linux")]
     fn find_asset_url_picks_correct_gnu_over_other_linux_assets() {
         let release = make_release(&[
             "naraeclaw-aarch64-unknown-linux-gnu.debug.tar.gz",
