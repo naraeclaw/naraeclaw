@@ -121,7 +121,23 @@ export default function AgentChat() {
   useEffect(() => {
     const ws = new WebSocketClient();
 
-    ws.onOpen = () => { setConnected(true); setError(null); };
+    ws.onOpen = () => {
+      setConnected(true);
+      setError(null);
+      // 에이전트 정책을 connect 메시지로 전송하여 세션에 적용
+      if (agent?.policy) {
+        const p = agent.policy;
+        ws.sendConnect({
+          working_dir:        p.workingDir || undefined,
+          workspace_only:     p.workspaceOnly,
+          allowed_commands:   p.allowedCommands.length > 0 ? p.allowedCommands : undefined,
+          allowed_roots:      p.allowedRoots.length > 0 ? p.allowedRoots : undefined,
+          shell_timeout_secs: p.shellTimeoutSecs !== 60 ? p.shellTimeoutSecs : undefined,
+          auto_approve_tools: p.autoApproveTools.length > 0 ? p.autoApproveTools : undefined,
+          always_ask_tools:   p.alwaysAskTools.length > 0 ? p.alwaysAskTools : undefined,
+        });
+      }
+    };
     ws.onClose = (ev: CloseEvent) => {
       setConnected(false);
       if (ev.code !== 1000 && ev.code !== 1001) setError(`연결이 종료되었습니다 (코드: ${ev.code})`);

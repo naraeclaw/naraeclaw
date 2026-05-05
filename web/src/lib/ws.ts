@@ -115,6 +115,20 @@ export class WebSocketClient {
     this.ws.send(JSON.stringify({ type: 'message', content }));
   }
 
+  /** Send connect handshake with optional per-agent policy overrides. */
+  sendConnect(params: {
+    working_dir?: string;
+    workspace_only?: boolean;
+    allowed_commands?: string[];
+    allowed_roots?: string[];
+    shell_timeout_secs?: number;
+    auto_approve_tools?: string[];
+    always_ask_tools?: string[];
+  }): void {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+    this.ws.send(JSON.stringify({ type: 'connect', ...params }));
+  }
+
   /** Close the connection without auto-reconnecting. */
   disconnect(): void {
     this.intentionallyClosed = true;
