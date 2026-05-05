@@ -11,27 +11,34 @@ pub struct CliToolInfo {
 }
 
 const TOOLS: &[(&str, &str, &str)] = &[
-    (
-        "claude",
-        "Claude Code",
-        "npm install -g @anthropic-ai/claude-code",
-    ),
-    ("codex", "Codex CLI", "npm install -g @openai/codex"),
-    ("gemini", "Gemini CLI", "npm install -g @google/gemini-cli"),
-    ("kiro", "Kiro CLI", "npm install -g @aws/kiro-cli"),
+    ("claude", "Claude Code", "npm install -g @anthropic-ai/claude-code"),
+    ("codex",  "Codex CLI",   "npm install -g @openai/codex"),
+    ("gemini", "Gemini CLI",  "npm install -g @google/gemini-cli"),
+    ("kiro",   "Kiro CLI",    "npm install -g @aws/kiro-cli"),
 ];
+
+// Tauri 앱은 GUI 런처로 시작되어 사용자 쉘 PATH를 상속하지 않는다.
+// 로그인 쉘로 명령을 실행해야 nvm/fnm/homebrew 등 경로가 포함된다.
+fn login_shell() -> String {
+    std::env::var("SHELL").unwrap_or_else(|_| "/bin/sh".to_string())
+}
+
+async fn shell_which(bin: &str) -> bool {
+    let shell = login_shell();
+    tokio::process::Command::new(&shell)
+        .args(["-lc", &format!("which {bin}")])
+        .output()
+        .await
+        .map(|o| o.status.success())
+        .unwrap_or(false)
+}
 
 /// List external CLI tools with install status.
 #[tauri::command]
 pub async fn list_cli_tools() -> Vec<CliToolInfo> {
     let mut result = Vec::new();
     for (bin, name, hint) in TOOLS {
-        let installed = tokio::process::Command::new("which")
-            .arg(bin)
-            .output()
-            .await
-            .map(|o| o.status.success())
-            .unwrap_or(false);
+        let installed = shell_which(bin).await;
         result.push(CliToolInfo {
             id: bin.to_string(),
             name: name.to_string(),
@@ -42,7 +49,7 @@ pub async fn list_cli_tools() -> Vec<CliToolInfo> {
     result
 }
 
-/// Install an external CLI tool via npm.
+/// Install an external CLI tool via npm (로그인 쉘 경유로 npm 경로 보장).
 #[tauri::command]
 pub async fn install_cli_tool(tool: String) -> Result<String, String> {
     let pkg = match tool.as_str() {
@@ -53,8 +60,9 @@ pub async fn install_cli_tool(tool: String) -> Result<String, String> {
         _        => return Err(format!("지원하지 않는 도구: {tool}")),
     };
 
-    let output = tokio::process::Command::new("npm")
-        .args(["install", "-g", pkg])
+    let shell = login_shell();
+    let output = tokio::process::Command::new(&shell)
+        .args(["-lc", &format!("npm install -g {pkg}")])
         .output()
         .await
         .map_err(|e| format!("npm 실행 실패: {e}"))?;
@@ -75,8 +83,11 @@ pub async fn run_cli_tool(tool: String, prompt: String) -> Result<String, String
         _ => return Err(format!("지원하지 않는 도구: {tool}")),
     };
 
-    let output = tokio::process::Command::new(bin)
-        .args(["-m", &prompt])
+    let shell = login_shell();
+    // prompt의 작은따옴표를 이스케이프하여 쉘 인젝션 방지
+    let safe_prompt = prompt.replace('\'', "'\\''");
+    let output = tokio::process::Command::new(&shell)
+        .args(["-lc", &format!("{bin} -m '{safe_prompt}'")])
         .output()
         .await
         .map_err(|e| format!("{bin} 실행 실패: {e}"))?;
