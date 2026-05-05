@@ -2416,11 +2416,7 @@ auto_save = true
         );
         assert_eq!(parsed.heartbeat.target.as_deref(), Some("telegram"));
         assert_eq!(parsed.heartbeat.to.as_deref(), Some("123456"));
-        assert!(parsed.channels_config.mqtt.is_some());
-        assert_eq!(
-            parsed.channels_config.mqtt.as_ref().unwrap().bot_token,
-            "123:ABC"
-        );
+        assert!(parsed.channels_config.mqtt.is_none());
     }
 
     #[test]
@@ -3002,7 +2998,6 @@ default_temperature = 0.7
         assert!(parsed.secret.is_none());
         assert_eq!(parsed.port, 8080);
     }
-
 
     // ══════════════════════════════════════════════════════════
     // SECURITY CHECKLIST TESTS — Gateway config
@@ -4680,7 +4675,6 @@ default_model = "persisted-profile"
     }
 
     // ── LINE ──────────────────────────────────────────────────
-
 
     // ── Config file permission hardening (Unix only) ───────────────
 

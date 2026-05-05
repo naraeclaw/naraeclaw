@@ -70,7 +70,7 @@ cargo test -p naraeclaw-tui --lib
 | P1 | Desktop/Web 유지 | CLI를 해치지 않는 범위에서 데스크탑과 웹 UX를 계속 살린다 | 완료 (Onboarding/ChannelSetup/CliTools/RemoteServers/Wiki/OllamaSettings 페이지 완성) |
 | P1 | 설정/온보딩 정리 | NaraeClaw 기본값, 경로, 문구, provider 설정을 단순화한다 | 완료 |
 | P2 | 릴리즈 경로 재정의 | macOS/Windows/Linux 설치와 배포만 남긴다 | 완료 (workflow 구현은 릴리즈 케이던스 후) |
-| P2 | 테스트 부채 축소 | 오래된 통합/컴포넌트 테스트를 핵심 경로 중심으로 재분류한다 | 미착수 |
+| P2 | 테스트 부채 축소 | 오래된 통합/컴포넌트 테스트를 핵심 경로 중심으로 재분류한다 | 완료 (채널 제거 잔재 정리). Follow-up: naraeclaw-channels 프롬프트 어셈블리 테스트 12개 drift 별도 작업 |
 
 ---
 
@@ -252,7 +252,7 @@ cargo test -p naraeclaw-tui --lib
 P0–P1 핵심 작업은 모두 완료되었다. 남은 작업:
 
 1. Desktop 파일 첨부/클립보드/알림 기능 (P1, 핵심 흐름 안정화 후)
-2. 테스트 부채 축소 — 오래된 통합/컴포넌트 테스트 재분류 (P2)
+2. naraeclaw-channels 프롬프트 어셈블리 테스트 12개 drift 수정 (P2, 채널 제거 잔재 정리 follow-up)
 3. Release workflow 실제 구현 — 릴리즈 케이던스 확정 후 (P2)
 
 ---
