@@ -723,11 +723,7 @@ fn apply_tui_selections_to_config(app: &App, config: &mut Config) {
     // Create a stub config for the selected channel with placeholder
     // values so the section appears in config.toml. The user fills in
     // real tokens via `naraeclaw config edit` or the dashboard.
-    let channel = app.selected_channel();
-    match channel {
-        // Removed channel types — skip silently
-        _ => {}
-    }
+    let _channel = app.selected_channel();
 
     // ── Web search ──────────────────────────────────────────────────
     let search = app.selected_search_provider();

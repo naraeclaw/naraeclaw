@@ -4,9 +4,9 @@ Cross-tool agent instructions for any AI coding assistant working on this reposi
 
 ## Project Identity
 
-NaraeClaw is a Korean-first, lightweight autonomous agent runtime for server management, personal knowledge workflows, desktop, and web usage.
+NaraeClaw is a Korean-first, lightweight autonomous agent runtime for server management and personal knowledge workflows. The CLI and gateway API are the primary surfaces (Desktop/Web removed 2026-05-05).
 
-The repository is currently in fast cleanup and consolidation mode. Keep the CLI, desktop, and web paths healthy, remove stale compatibility surfaces when they are no longer useful, and avoid growing new surface area without a concrete use case.
+The repository is currently in fast cleanup and consolidation mode. Keep the CLI and gateway paths healthy, remove stale compatibility surfaces when they are no longer useful, and avoid growing new surface area without a concrete use case.
 
 Internal crate and binary names use `naraeclaw-*` / `naraeclaw`. Legacy `ZEROCLAW_*` environment variables are retained only as compatibility fallbacks.
 
@@ -17,7 +17,7 @@ Internal crate and binary names use `naraeclaw-*` / `naraeclaw`. Legacy `ZEROCLA
 cargo fmt --all -- --check
 
 # Lint
-cargo clippy --workspace --exclude naraeclaw-desktop --all-targets -- -D warnings
+cargo clippy --workspace --all-targets -- -D warnings
 
 # Tests
 cargo test -p <crate-name> --lib
@@ -157,7 +157,7 @@ Suggested fast validation:
 
 ```bash
 cargo fmt --all -- --check
-cargo check --workspace --exclude naraeclaw-desktop
+cargo check --workspace
 ```
 
 Use targeted tests when the change scope needs runtime coverage. Keep the historical full-suite checks out of the fast path until they are explicitly repaired. For docs-only changes, `git diff --check` is enough unless the edited docs have a dedicated checker.

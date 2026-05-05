@@ -14,7 +14,7 @@
 NaraeClaw는 다음 사용자를 우선한다.
 
 - 개인 서버, VPS, 홈서버, 클라우드 인프라를 관리하는 사용자
-- CLI/웹/데스크탑에서 동일한 에이전트 경험을 원하는 사용자
+- CLI와 게이트웨이 API로 에이전트를 제어하려는 사용자
 - 개인 지식 관리, 로그 요약, 반복 운영 작업 자동화를 원하는 사용자
 - 한국어 기본 경험을 기대하는 사용자
 
@@ -26,7 +26,7 @@ NaraeClaw는 다음 사용자를 우선한다.
 - 아직 실제 사용자 흐름이 없는 플러그인 생태계
 - “언젠가 쓸 수도 있는” 넓은 통합 목록
 
-Desktop과 Web은 유지한다. 이 프로젝트는 서버 관리용이지만, 개인 사용자의 편의성을 위해 GUI 접근성도 핵심 제품 표면으로 본다.
+Desktop과 Web은 제거되었다 (2026-05-05). CLI + 게이트웨이 API가 유일한 제품 표면이다.
 
 ---
 
@@ -44,13 +44,13 @@ Desktop과 Web은 유지한다. 이 프로젝트는 서버 관리용이지만, �
 
 ```bash
 cargo fmt --all -- --check
-cargo check --workspace --exclude naraeclaw-desktop
+cargo check --workspace
 ```
 
 변경 범위에 따라 추가:
 
 ```bash
-cargo clippy --workspace --exclude naraeclaw-desktop --all-targets -- -D warnings
+cargo clippy --workspace --all-targets -- -D warnings
 cargo test -p naraeclaw-config --lib
 cargo test -p naraeclaw-runtime --lib
 cargo test -p naraeclaw-gateway --lib --no-run
@@ -67,7 +67,7 @@ cargo test -p naraeclaw-tui --lib
 | P0 | 핵심 경로 안정화 | `onboard -> configure -> agent/gateway -> tool use` 흐름을 깨지 않게 만든다 | 완료 |
 | P0 | 검증 루프 단순화 | 빠른 개발을 막는 과도한 CI/CD와 낡은 체크를 제거한다 | 완료 |
 | P1 | stale scope 제거 | 로봇/디바이스/marketplace/CN/legacy channel/plugin 잔재를 제거한다 | 완료 |
-| P1 | Desktop/Web 유지 | CLI를 해치지 않는 범위에서 데스크탑과 웹 UX를 계속 살린다 | 완료 (Onboarding/ChannelSetup/CliTools/RemoteServers/Wiki/OllamaSettings 페이지 완성) |
+| P1 | Desktop/Web 제거 | `apps/tauri/`와 `web/` 삭제 — CLI + 게이트웨이 API로 단일화 | 완료 (2026-05-05) |
 | P1 | 설정/온보딩 정리 | NaraeClaw 기본값, 경로, 문구, provider 설정을 단순화한다 | 완료 |
 | P2 | 릴리즈 경로 재정의 | macOS/Windows/Linux 설치와 배포만 남긴다 | 완료 (workflow 구현은 릴리즈 케이던스 후) |
 | P2 | 테스트 부채 축소 | 오래된 통합/컴포넌트 테스트를 핵심 경로 중심으로 재분류한다 | 완료 (채널 제거 잔재 정리). Follow-up: naraeclaw-channels 프롬프트 어셈블리 테스트 12개 drift 별도 작업 |
@@ -105,8 +105,7 @@ cargo test -p naraeclaw-tui --lib
 3. workspace/config 저장
 4. `naraeclaw agent` 실행
 5. shell/file/http/browser/memory 도구 사용
-6. gateway/web UI 접근
-7. desktop 앱에서 gateway 연결
+6. gateway API 접근 (포트 42617)
 
 작업:
 
@@ -114,13 +113,11 @@ cargo test -p naraeclaw-tui --lib
 - [x] CLI help와 error message에서 오래된 제품명/범위 제거
 - [x] config 저장/로드 테스트를 핵심 경로 기준으로 유지
 - [x] gateway health/session/chat 기본 경로 점검
-- [x] desktop sidecar/gateway 연결 문서화 → `docs/setup-guides/desktop-gateway.md`
 
 완료 기준:
 
 - 새 checkout에서 최소 설정 후 agent/gateway가 실행된다. ✅
-- CLI, gateway, desktop 중 하나를 고쳐도 나머지 핵심 경로가 깨지지 않는다. ✅
-- desktop sidecar/gateway 연결 문서가 있다. ✅
+- CLI, gateway 중 하나를 고쳐도 나머지 핵심 경로가 깨지지 않는다. ✅
 
 ---
 
@@ -182,31 +179,16 @@ cargo test -p naraeclaw-tui --lib
 
 ---
 
-## P1 — Desktop and Web
+## P1 — Desktop and Web (제거 완료)
 
-목표: CLI를 기본으로 두되, 개인 사용자의 편의성을 위해 Desktop/Web을 유지한다.
+**2026-05-05 결정: `apps/tauri/`와 `web/` 전체 삭제.**
 
-유지할 표면:
+바이너리 크기와 유지 부담을 줄이고 CLI + 게이트웨이 API로 단일화한다.
+릴리즈 산출물: `naraeclaw` 단일 바이너리 (~11MB, release 프로파일 기준).
 
-- `apps/tauri/`
-- `web/`
-- gateway API/WebSocket
-- desktop sidecar/gateway lifecycle
-- 시스템 알림, 파일 드롭, 클립보드 같은 개인 편의 기능
-
-작업:
-
-- [x] 앱 이름, title, identifier, icon, about text 점검
-- [x] Web UI의 한국어 기본 UX 정리
-- [x] desktop tray menu 한국어 적용 (메뉴 + tooltip)
-- [x] web index.html `lang="en"` → `lang="ko"` 변경
-- [x] desktop gateway sidecar 실행/종료 안정성 점검 (spawn 재시작 + graceful SIGTERM shutdown)
-- [ ] 파일 첨부/클립보드/알림은 핵심 흐름 안정화 후 진행
-
-완료 기준:
-
-- desktop/web이 “미리보기 앱”이 아니라 실제 사용 가능한 개인 assistant 표면이 된다.
-- CLI와 desktop이 서로 다른 설정/상태를 만들지 않는다.
+유지되는 표면:
+- `naraeclaw agent` — 대화형 CLI
+- `naraeclaw gateway` — HTTP/WebSocket API (포트 42617)
 
 ---
 
@@ -251,9 +233,8 @@ cargo test -p naraeclaw-tui --lib
 
 P0–P1 핵심 작업은 모두 완료되었다. 남은 작업:
 
-1. Desktop 파일 첨부/클립보드/알림 기능 (P1, 핵심 흐름 안정화 후)
-2. naraeclaw-channels 프롬프트 어셈블리 테스트 12개 drift 수정 (P2, 채널 제거 잔재 정리 follow-up)
-3. Release workflow 실제 구현 — 릴리즈 케이던스 확정 후 (P2)
+1. naraeclaw-channels 프롬프트 어셈블리 테스트 12개 drift 수정 (P2, 채널 제거 잔재 정리 follow-up)
+2. Release workflow 실제 구현 — CLI 단일 바이너리 기준으로 단순화, 릴리즈 케이던스 확정 후 (P2)
 
 ---
 

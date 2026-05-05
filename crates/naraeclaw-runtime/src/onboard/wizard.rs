@@ -3293,7 +3293,7 @@ fn channel_menu_choices() -> &'static [ChannelMenuChoice] {
 #[allow(clippy::too_many_lines)]
 fn setup_channels(
     existing: Option<ChannelsConfig>,
-    callbacks: &WizardCallbacks,
+    _callbacks: &WizardCallbacks,
 ) -> Result<ChannelsConfig> {
     print_bullet("Channels let you talk to NaraeClaw from anywhere.");
     print_bullet("CLI is always available. Connect more channels now.");

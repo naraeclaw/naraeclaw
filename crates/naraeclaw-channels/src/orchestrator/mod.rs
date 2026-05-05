@@ -50,7 +50,6 @@ use serde::Deserialize;
 use std::collections::{HashMap, HashSet};
 use std::fmt::Write;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::{Duration, Instant, SystemTime};
@@ -246,9 +245,6 @@ fn runtime_config_store() -> &'static Mutex<HashMap<PathBuf, RuntimeConfigState>
     static STORE: OnceLock<Mutex<HashMap<PathBuf, RuntimeConfigState>>> = OnceLock::new();
     STORE.get_or_init(|| Mutex::new(HashMap::new()))
 }
-
-const SYSTEMD_STATUS_ARGS: [&str; 3] = ["--user", "is-active", "naraeclaw.service"];
-const SYSTEMD_RESTART_ARGS: [&str; 3] = ["--user", "restart", "naraeclaw.service"];
 
 #[derive(Clone, Copy)]
 #[allow(clippy::struct_excessive_bools)]
@@ -3658,81 +3654,6 @@ async fn run_message_dispatch_loop(
 
 pub async fn bind_telegram_identity(_config: &Config, _identity: &str) -> Result<()> {
     anyhow::bail!("Telegram channel is not available in this build")
-}
-
-fn maybe_restart_managed_daemon_service() -> Result<bool> {
-    if cfg!(target_os = "macos") {
-        let home = directories::UserDirs::new()
-            .map(|u| u.home_dir().to_path_buf())
-            .context("Could not find home directory")?;
-        let plist = home
-            .join("Library")
-            .join("LaunchAgents")
-            .join("com.naraeclaw.daemon.plist");
-        if !plist.exists() {
-            return Ok(false);
-        }
-
-        let list_output = Command::new("launchctl")
-            .arg("list")
-            .output()
-            .context("Failed to query launchctl list")?;
-        let listed = String::from_utf8_lossy(&list_output.stdout);
-        if !listed.contains("com.naraeclaw.daemon") {
-            return Ok(false);
-        }
-
-        let _ = Command::new("launchctl")
-            .args(["stop", "com.naraeclaw.daemon"])
-            .output();
-        let start_output = Command::new("launchctl")
-            .args(["start", "com.naraeclaw.daemon"])
-            .output()
-            .context("Failed to start launchd daemon service")?;
-        if !start_output.status.success() {
-            let stderr = String::from_utf8_lossy(&start_output.stderr);
-            anyhow::bail!("launchctl start failed: {}", stderr.trim());
-        }
-
-        return Ok(true);
-    }
-
-    if cfg!(target_os = "linux") {
-        // Systemd (user-level)
-        let home = directories::UserDirs::new()
-            .map(|u| u.home_dir().to_path_buf())
-            .context("Could not find home directory")?;
-        let unit_path: PathBuf = home
-            .join(".config")
-            .join("systemd")
-            .join("user")
-            .join("naraeclaw.service");
-        if !unit_path.exists() {
-            return Ok(false);
-        }
-
-        let active_output = Command::new("systemctl")
-            .args(SYSTEMD_STATUS_ARGS)
-            .output()
-            .context("Failed to query systemd service state")?;
-        let state = String::from_utf8_lossy(&active_output.stdout);
-        if !state.trim().eq_ignore_ascii_case("active") {
-            return Ok(false);
-        }
-
-        let restart_output = Command::new("systemctl")
-            .args(SYSTEMD_RESTART_ARGS)
-            .output()
-            .context("Failed to restart systemd daemon service")?;
-        if !restart_output.status.success() {
-            let stderr = String::from_utf8_lossy(&restart_output.stderr);
-            anyhow::bail!("systemctl restart failed: {}", stderr.trim());
-        }
-
-        return Ok(true);
-    }
-
-    Ok(false)
 }
 
 /// Build a single channel instance by config section name (e.g. "webhook").
@@ -7577,10 +7498,7 @@ BTC is currently around $65,000 based on latest tool output."#
             prompt.contains("## 프로젝트 컨텍스트"),
             "missing Project Context"
         );
-        assert!(
-            prompt.contains("## 현재 날짜 및 시간"),
-            "missing Date/Time"
-        );
+        assert!(prompt.contains("## 현재 날짜 및 시간"), "missing Date/Time");
         assert!(prompt.contains("## 런타임"), "missing Runtime section");
     }
 
@@ -7904,7 +7822,9 @@ BTC is currently around $65,000 based on latest tool output."#
             "missing channel context"
         );
         assert!(
-            prompt.contains("자격증명, 토큰, API 키, 비밀 정보를 응답에 절대 반복하거나 노출하지 마세요"),
+            prompt.contains(
+                "자격증명, 토큰, API 키, 비밀 정보를 응답에 절대 반복하거나 노출하지 마세요"
+            ),
             "missing security instruction"
         );
     }
@@ -9198,18 +9118,6 @@ This is an example JSON object for profile settings."#;
         let join = tokio::time::timeout(Duration::from_secs(1), handle).await;
         assert!(join.is_ok(), "listener should stop after channel shutdown");
         assert!(calls.load(Ordering::SeqCst) >= 1);
-    }
-
-    #[test]
-    fn maybe_restart_daemon_systemd_args_regression() {
-        assert_eq!(
-            SYSTEMD_STATUS_ARGS,
-            ["--user", "is-active", "naraeclaw.service"]
-        );
-        assert_eq!(
-            SYSTEMD_RESTART_ARGS,
-            ["--user", "restart", "naraeclaw.service"]
-        );
     }
 
     #[test]

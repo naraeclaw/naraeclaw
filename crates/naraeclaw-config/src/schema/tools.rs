@@ -835,7 +835,6 @@ pub fn default_linkedin_api_version() -> String {
 /// It exists only so that existing `config.toml` files with a `[plugins]`
 /// section continue to parse without error. It will be removed in a future
 /// release. Do not add new fields here.
-#[deprecated(note = "Legacy compatibility stub — will be removed in a future release")]
 #[derive(Debug, Clone, Serialize, Deserialize, Configurable)]
 #[cfg_attr(feature = "schema-export", derive(schemars::JsonSchema))]
 #[prefix = "plugins"]

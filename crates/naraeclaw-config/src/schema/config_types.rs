@@ -357,7 +357,6 @@ pub struct Config {
     /// Plugin system configuration (`[plugins]`).
     #[serde(default)]
     #[nested]
-    #[allow(deprecated)]
     pub plugins: PluginsConfig,
 
     /// Locale for tool descriptions (e.g. `"en"`, `"zh-CN"`).

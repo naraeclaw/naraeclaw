@@ -96,7 +96,7 @@ Usage:
   ./install.sh [options]
 
 The installer builds NaraeClaw, configures your provider and API key,
-starts the gateway service, and opens the dashboard — all in one step.
+and starts the gateway service — all in one step.
 
 Supported platforms: macOS (x86_64, arm64), Linux (x86_64, aarch64)
 
@@ -1116,12 +1116,10 @@ if [[ "$DOCKER_MODE" == true ]]; then
   echo -e "${BOLD}Your containerized NaraeClaw data is persisted under:${RESET}"
   echo -e "  ${DIM}$DOCKER_DATA_DIR${RESET}"
   echo
-  echo -e "${BOLD}Dashboard URL:${RESET} ${BLUE}http://127.0.0.1:42617${RESET}"
-  echo
   echo -e "${BOLD}Next steps:${RESET}"
   echo -e "  ${DIM}naraeclaw status${RESET}"
-  echo -e "  ${DIM}naraeclaw agent -m \"Hello, NaraeClaw!\"${RESET}"
-  echo -e "  ${DIM}naraeclaw gateway${RESET}"
+  echo -e "  ${DIM}naraeclaw agent -m \"안녕, 나래클로!\"${RESET}"
+  echo -e "  ${DIM}naraeclaw gateway${RESET}               ${DIM}# 게이트웨이 서비스 시작 (포트 42617)${RESET}"
   echo
   echo -e "${BOLD}Docs:${RESET} ${BLUE}https://www.naraeclaw.ai/docs${RESET}"
   exit 0
@@ -1230,78 +1228,6 @@ else
   step_dot "Skipping install"
 fi
 
-# --- Build web dashboard ---
-if [[ "$SKIP_BUILD" == false && -d "$WORK_DIR/web" ]]; then
-  if have_cmd node && have_cmd npm; then
-    step_dot "Building web dashboard"
-    if (cd "$WORK_DIR/web" && npm ci --ignore-scripts 2>/dev/null && npm run build 2>/dev/null); then
-      step_ok "Web dashboard built"
-    else
-      warn "Web dashboard build failed — dashboard will not be available"
-    fi
-  else
-    warn "node/npm not found — skipping web dashboard build"
-    warn "Install Node.js (>=18) and re-run, or build manually: cd web && npm ci && npm run build"
-  fi
-else
-  if [[ "$SKIP_BUILD" == true ]]; then
-    step_dot "Skipping web dashboard build"
-  fi
-fi
-
-# --- Companion desktop app (device-class-aware) ---
-# The desktop app is a pre-built download from the website, not built from source.
-# This keeps the one-liner install fast and the CLI binary small.
-DESKTOP_DOWNLOAD_URL="https://www.naraeclaw.ai/download"
-DESKTOP_APP_DETECTED=false
-
-if [[ "$DEVICE_CLASS" == "desktop" ]]; then
-  # Check if the companion app is already installed
-  case "$OS_NAME" in
-    Darwin)
-      if [[ -d "/Applications/NaraeClaw.app" ]] || [[ -d "$HOME/Applications/NaraeClaw.app" ]]; then
-        DESKTOP_APP_DETECTED=true
-        step_ok "Companion app found (NaraeClaw.app)"
-      fi
-      ;;
-    Linux)
-      if have_cmd naraeclaw-desktop; then
-        DESKTOP_APP_DETECTED=true
-        step_ok "Companion app found (naraeclaw-desktop)"
-      elif [[ -x "$HOME/.local/bin/naraeclaw-desktop" ]]; then
-        DESKTOP_APP_DETECTED=true
-        step_ok "Companion app found (~/.local/bin/naraeclaw-desktop)"
-      fi
-      ;;
-  esac
-
-  if [[ "$DESKTOP_APP_DETECTED" == false ]]; then
-    echo
-    echo -e "${BOLD}Companion App${RESET}"
-    echo -e "  Menu bar access to your NaraeClaw agent."
-    echo -e "  Works alongside the CLI — connects to the same gateway."
-    echo
-    case "$OS_NAME" in
-      Darwin)
-        echo -e "  ${BOLD}Download for macOS:${RESET} ${BLUE}${DESKTOP_DOWNLOAD_URL}${RESET}"
-        ;;
-      Linux)
-        echo -e "  ${BOLD}Download for Linux:${RESET} ${BLUE}${DESKTOP_DOWNLOAD_URL}${RESET}"
-        ;;
-    esac
-    echo -e "  ${DIM}Or run: naraeclaw desktop --install${RESET}"
-  fi
-elif [[ "$DEVICE_CLASS" != "desktop" ]]; then
-  # Non-desktop device — explain why companion app is not offered
-  case "$DEVICE_CLASS" in
-    container)
-      step_dot "Container runtime — use the web dashboard"
-      ;;
-    server)
-      step_dot "Headless server — use the web dashboard"
-      ;;
-  esac
-fi
 
 NARAECLAW_BIN=""
 if [[ -x "$HOME/.cargo/bin/naraeclaw" ]]; then
@@ -1401,64 +1327,11 @@ if [[ "$INSTALL_MODE" == "upgrade" ]]; then
   step_dot "Upgrade complete"
 fi
 
-# --- Dashboard URL ---
-GATEWAY_PORT=42617
-DASHBOARD_URL="http://127.0.0.1:${GATEWAY_PORT}"
-echo
-echo -e "${BOLD}Dashboard URL:${RESET} ${BLUE}${DASHBOARD_URL}${RESET}"
-
-# --- Copy to clipboard ---
-COPIED_TO_CLIPBOARD=false
-if [[ -t 1 ]]; then
-  case "$OS_NAME" in
-    Darwin)
-      if have_cmd pbcopy; then
-        printf '%s' "$DASHBOARD_URL" | pbcopy 2>/dev/null && COPIED_TO_CLIPBOARD=true
-      fi
-      ;;
-    Linux)
-      if have_cmd xclip; then
-        printf '%s' "$DASHBOARD_URL" | xclip -selection clipboard 2>/dev/null && COPIED_TO_CLIPBOARD=true
-      elif have_cmd xsel; then
-        printf '%s' "$DASHBOARD_URL" | xsel --clipboard 2>/dev/null && COPIED_TO_CLIPBOARD=true
-      elif have_cmd wl-copy; then
-        printf '%s' "$DASHBOARD_URL" | wl-copy 2>/dev/null && COPIED_TO_CLIPBOARD=true
-      fi
-      ;;
-  esac
-fi
-if [[ "$COPIED_TO_CLIPBOARD" == true ]]; then
-  step_ok "Copied to clipboard"
-fi
-
-# --- Open in browser ---
-if [[ -t 1 ]]; then
-  case "$OS_NAME" in
-    Darwin)
-      if have_cmd open; then
-        open "$DASHBOARD_URL" 2>/dev/null && step_ok "Opened in your browser"
-      fi
-      ;;
-    Linux)
-      if have_cmd xdg-open; then
-        xdg-open "$DASHBOARD_URL" 2>/dev/null && step_ok "Opened in your browser"
-      fi
-      ;;
-  esac
-fi
-
 echo
 echo -e "${BOLD}Next steps:${RESET}"
 echo -e "  ${DIM}naraeclaw status${RESET}"
-echo -e "  ${DIM}naraeclaw agent -m \"Hello, NaraeClaw!\"${RESET}"
-echo -e "  ${DIM}naraeclaw gateway${RESET}"
-if [[ "$DEVICE_CLASS" == "desktop" ]]; then
-  if [[ "$DESKTOP_APP_DETECTED" == true ]]; then
-    echo -e "  ${DIM}naraeclaw desktop${RESET}                ${DIM}# Launch the menu bar app${RESET}"
-  else
-    echo -e "  ${DIM}naraeclaw desktop --install${RESET}      ${DIM}# Download the companion app${RESET}"
-  fi
-fi
+echo -e "  ${DIM}naraeclaw agent -m \"안녕, 나래클로!\"${RESET}"
+echo -e "  ${DIM}naraeclaw gateway${RESET}               ${DIM}# 게이트웨이 서비스 시작 (포트 42617)${RESET}"
 echo
 echo -e "${BOLD}Docs:${RESET} ${BLUE}https://www.naraeclaw.ai/docs${RESET}"
 echo

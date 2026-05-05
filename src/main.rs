@@ -1895,7 +1895,6 @@ async fn main() -> Result<()> {
 fn build_wizard_callbacks() -> onboard::WizardCallbacks {
     onboard::WizardCallbacks {
         whatsapp_web_available: false,
-        ..Default::default()
     }
 }
 

@@ -24,13 +24,11 @@ pub mod ws;
 use anyhow::{Context, Result};
 use axum::{
     Router,
-    body::Bytes,
-    extract::{ConnectInfo, Query, State},
+    extract::{ConnectInfo, State},
     http::{HeaderMap, StatusCode, header},
     response::{IntoResponse, Json},
     routing::{delete, get, post, put},
 };
-use naraeclaw_api::channel::{Channel, SendMessage};
 use naraeclaw_api::tool::ToolSpec;
 
 use naraeclaw_config::policy::SecurityPolicy;
@@ -44,7 +42,6 @@ use naraeclaw_runtime::platform;
 use naraeclaw_runtime::security::pairing::{PairingGuard, constant_time_eq, is_public_bind};
 use naraeclaw_runtime::tools;
 use naraeclaw_runtime::tools::CanvasStore;
-use naraeclaw_runtime::util::truncate_with_ellipsis;
 use parking_lot::Mutex;
 use std::collections::HashMap;
 use std::net::{IpAddr, SocketAddr};
@@ -85,26 +82,6 @@ pub const IDEMPOTENCY_MAX_KEYS_DEFAULT: usize = 10_000;
 
 fn webhook_memory_key() -> String {
     format!("webhook_msg_{}", Uuid::new_v4())
-}
-
-fn whatsapp_memory_key(msg: &naraeclaw_api::channel::ChannelMessage) -> String {
-    format!("whatsapp_{}_{}", msg.sender, msg.id)
-}
-
-#[cfg(feature = "channel-wati")]
-fn wati_memory_key(msg: &naraeclaw_api::channel::ChannelMessage) -> String {
-    format!("wati_{}_{}", msg.sender, msg.id)
-}
-
-fn nextcloud_talk_memory_key(msg: &naraeclaw_api::channel::ChannelMessage) -> String {
-    format!("nextcloud_talk_{}_{}", msg.sender, msg.id)
-}
-
-fn sender_session_id(channel: &str, msg: &naraeclaw_api::channel::ChannelMessage) -> String {
-    match &msg.thread_ts {
-        Some(thread_id) => format!("{channel}_{thread_id}_{}", msg.sender),
-        None => format!("{channel}_{}", msg.sender),
-    }
 }
 
 fn webhook_session_id(headers: &HeaderMap) -> Option<String> {
@@ -537,14 +514,11 @@ pub async fn run_gateway(
             })
         });
 
-    let whatsapp_app_secret: Option<Arc<str>> = None;
-
-    let wati_channel: Option<()> = None;
-
-    let nextcloud_talk_channel: Option<()> = None;
-    let nextcloud_talk_webhook_secret: Option<Arc<str>> = None;
-
-    let gmail_push_channel: Option<()> = None;
+    let _whatsapp_app_secret: Option<Arc<str>> = None;
+    let _wati_channel: Option<()> = None;
+    let _nextcloud_talk_channel: Option<()> = None;
+    let _nextcloud_talk_webhook_secret: Option<Arc<str>> = None;
+    let _gmail_push_channel: Option<()> = None;
 
     // ── Session persistence for WS chat ─────────────────────
     let session_backend: Option<Arc<dyn SessionBackend>> = if config.gateway.session_persistence {
@@ -671,13 +645,6 @@ pub async fn run_gateway(
     }
     println!("  POST {pfx}/pair      — pair a new client (X-Pairing-Code header)");
     println!("  POST {pfx}/webhook   — {{\"message\": \"your prompt\"}}");
-    if wati_channel.is_some() {
-        println!("  GET  {pfx}/wati      — WATI webhook verification");
-        println!("  POST {pfx}/wati      — WATI message webhook");
-    }
-    if nextcloud_talk_channel.is_some() {
-        println!("  POST {pfx}/nextcloud-talk — Nextcloud Talk bot webhook");
-    }
     println!("  GET  {pfx}/api/*     — REST API (bearer token required)");
     println!("  GET  {pfx}/ws/chat   — WebSocket agent chat");
     if config.nodes.enabled {
@@ -1202,19 +1169,6 @@ async fn run_gateway_chat_simple(state: &AppState, message: &str) -> anyhow::Res
         .await
 }
 
-/// Full-featured chat with tools for channel handlers (WhatsApp, WATI, Nextcloud Talk).
-async fn run_gateway_chat_with_tools(
-    state: &AppState,
-    message: &str,
-    session_id: Option<&str>,
-) -> anyhow::Result<String> {
-    let config = state.config.lock().clone();
-    Box::pin(naraeclaw_runtime::agent::process_message(
-        config, message, session_id,
-    ))
-    .await
-}
-
 /// Webhook request body
 #[derive(serde::Deserialize)]
 pub struct WebhookBody {
@@ -1474,7 +1428,6 @@ async fn handle_wati_verify() -> impl IntoResponse {
     (StatusCode::NOT_FOUND, "WATI not configured")
 }
 
-#[cfg(feature = "channel-wati")]
 #[derive(Debug, serde::Deserialize)]
 pub struct WatiVerifyQuery {
     #[serde(rename = "hub.challenge")]
@@ -1651,7 +1604,6 @@ mod tests {
     use axum::http::HeaderValue;
     use axum::response::IntoResponse;
     use http_body_util::BodyExt;
-    use naraeclaw_api::channel::ChannelMessage;
     use naraeclaw_memory::{Memory, MemoryCategory, MemoryEntry};
     use naraeclaw_providers::Provider;
     use parking_lot::Mutex;
@@ -2005,24 +1957,6 @@ mod tests {
         assert!(key1.starts_with("webhook_msg_"));
         assert!(key2.starts_with("webhook_msg_"));
         assert_ne!(key1, key2);
-    }
-
-    #[test]
-    fn whatsapp_memory_key_includes_sender_and_message_id() {
-        let msg = ChannelMessage {
-            id: "wamid-123".into(),
-            sender: "+1234567890".into(),
-            reply_target: "+1234567890".into(),
-            content: "hello".into(),
-            channel: "whatsapp".into(),
-            timestamp: 1,
-            thread_ts: None,
-            interruption_scope_id: None,
-            attachments: vec![],
-        };
-
-        let key = whatsapp_memory_key(&msg);
-        assert_eq!(key, "whatsapp_+1234567890_wamid-123");
     }
 
     #[derive(Default)]
