@@ -50,6 +50,7 @@ function Icon({ d, size = 16 }: { d: React.ReactNode; size?: number }) {
 }
 
 const Icons = {
+  profiles:  <Icon d={<><circle cx="9" cy="7" r="4"/><path d="M3 21v-2a4 4 0 014-4h4a4 4 0 014 4v2"/><path d="M16 3.13a4 4 0 010 7.75"/><path d="M21 21v-2a4 4 0 00-3-3.87"/></>}/>,
   dashboard: <Icon d={<><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></>}/>,
   chat:      <Icon d={<><path d="M21 12c0 4.4-4 8-9 8-1.3 0-2.5-.2-3.6-.6L4 21l1.2-3.8C3.8 15.8 3 14 3 12c0-4.4 4-8 9-8s9 3.6 9 8z"/></>}/>,
   memory:    <Icon d={<><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></>}/>,
@@ -67,10 +68,10 @@ const Icons = {
 
 // ── Nav 정의 ──────────────────────────────────────────────────────────
 const workItems = [
-  { to: '/',       label: '대시보드', icon: Icons.dashboard },
-  { to: '/agent',  label: '에이전트', icon: Icons.chat },
-  { to: '/wiki',   label: '위키',     icon: Icons.wiki },
-  { to: '/cron',   label: '스케줄',   icon: Icons.cron },
+  { to: '/',         label: '대시보드', icon: Icons.dashboard },
+  { to: '/agent',    label: '에이전트', icon: Icons.chat },
+  { to: '/profiles', label: '프로필',   icon: Icons.profiles },
+  { to: '/cron',     label: '스케줄',   icon: Icons.cron },
 ];
 
 const sysItems = [
