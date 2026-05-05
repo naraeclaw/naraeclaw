@@ -1026,7 +1026,11 @@ code, kbd, pre {
   text-transform: uppercase;
   letter-spacing: 0.1em;
   margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
+.msg-row:hover .msg-copy { opacity: 1 !important; }
 .msg-meta b { font-weight: 600; color: var(--pc-text-secondary); margin-right: 8px; letter-spacing: 0; text-transform: none; }
 .msg-content { font-size: 14px; line-height: 1.65; color: var(--pc-text-primary); }
 .msg-content p { margin: 0 0 10px; }
@@ -1188,3 +1192,44 @@ code, kbd, pre {
 .kv .k { font-size: 13px; color: var(--pc-text-secondary); font-weight: 500; }
 .kv .k .desc { display: block; font-size: 11.5px; color: var(--pc-text-muted); font-weight: 400; margin-top: 2px; }
 .kv .v { font-size: 13px; color: var(--pc-text-primary); display: flex; align-items: center; gap: 8px; }
+
+/* ── Shared utility aliases (design system) ── */
+.tiny  { font-size: 11px; color: var(--pc-text-muted); }
+.muted { color: var(--pc-text-muted); }
+.mono  { font-family: var(--pc-font-mono); }
+.fade-in { animation: fade-in 0.28s ease-out both; }
+
+/* ── Kanagawa button (design system .btn) ── */
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 13px;
+  border-radius: 8px;
+  font-size: 12.5px; font-weight: 600;
+  border: 1px solid var(--pc-border);
+  background: var(--pc-bg-elevated);
+  color: var(--pc-text-primary);
+  cursor: pointer;
+  transition: all 0.15s;
+  user-select: none;
+}
+.btn:hover { background: var(--pc-hover-strong); border-color: var(--pc-border-strong); }
+.btn.primary {
+  background: var(--pc-accent); color: #1a1a22;
+  border-color: transparent;
+  box-shadow: 0 4px 14px rgba(var(--pc-accent-rgb), 0.25);
+}
+.btn.primary:hover { filter: brightness(1.08); }
+.btn.ghost { background: transparent; border-color: transparent; color: var(--pc-text-muted); }
+.btn.ghost:hover { background: var(--pc-hover); color: var(--pc-text-primary); }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ── Spinner ── */
+@keyframes narae-spin { to { transform: rotate(360deg); } }
+.narae-spinner {
+  width: 18px; height: 18px;
+  border: 2px solid var(--pc-border);
+  border-top-color: var(--pc-accent);
+  border-radius: 50%;
+  animation: narae-spin 0.7s linear infinite;
+  display: inline-block;
+}
