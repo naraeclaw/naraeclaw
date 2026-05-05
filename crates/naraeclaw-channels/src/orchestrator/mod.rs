@@ -7571,17 +7571,17 @@ BTC is currently around $65,000 based on latest tool output."#
 
         // Section headers
         assert!(prompt.contains("## Tools"), "missing Tools section");
-        assert!(prompt.contains("## Safety"), "missing Safety section");
-        assert!(prompt.contains("## Workspace"), "missing Workspace section");
+        assert!(prompt.contains("## 안전 규칙"), "missing Safety section");
+        assert!(prompt.contains("## 작업 공간"), "missing Workspace section");
         assert!(
-            prompt.contains("## Project Context"),
+            prompt.contains("## 프로젝트 컨텍스트"),
             "missing Project Context"
         );
         assert!(
-            prompt.contains("## Current Date & Time"),
+            prompt.contains("## 현재 날짜 및 시간"),
             "missing Date/Time"
         );
-        assert!(prompt.contains("## Runtime"), "missing Runtime section");
+        assert!(prompt.contains("## 런타임"), "missing Runtime section");
     }
 
     #[test]
@@ -7623,9 +7623,9 @@ BTC is currently around $65,000 based on latest tool output."#
         let ws = make_workspace();
         let prompt = build_system_prompt(ws.path(), "model", &[], &[], None, None);
 
-        assert!(prompt.contains("Do not exfiltrate private data"));
-        assert!(prompt.contains("Respect the runtime autonomy policy"));
-        assert!(prompt.contains("Prefer `trash` over `rm`"));
+        assert!(prompt.contains("개인 데이터를 유출하지 마세요"));
+        assert!(prompt.contains("런타임 자율성 정책을 준수하세요"));
+        assert!(prompt.contains("`rm` 대신 `trash`를 선호하세요"));
     }
 
     #[test]
@@ -7660,9 +7660,9 @@ BTC is currently around $65,000 based on latest tool output."#
         // Empty workspace — no files at all
         let prompt = build_system_prompt(tmp.path(), "model", &[], &[], None, None);
 
-        assert!(prompt.contains("[File not found: SOUL.md]"));
-        assert!(prompt.contains("[File not found: AGENTS.md]"));
-        assert!(prompt.contains("[File not found: IDENTITY.md]"));
+        assert!(prompt.contains("[파일을 찾을 수 없음: SOUL.md]"));
+        assert!(prompt.contains("[파일을 찾을 수 없음: AGENTS.md]"));
+        assert!(prompt.contains("[파일을 찾을 수 없음: IDENTITY.md]"));
     }
 
     #[test]
@@ -7850,7 +7850,7 @@ BTC is currently around $65,000 based on latest tool output."#
         let prompt = build_system_prompt(ws.path(), "model", &[], &[], None, None);
 
         assert!(
-            prompt.contains("truncated at"),
+            prompt.contains("자에서 잘림"),
             "large files should be truncated"
         );
         assert!(
@@ -7896,15 +7896,15 @@ BTC is currently around $65,000 based on latest tool output."#
         let prompt = build_system_prompt(ws.path(), "model", &[], &[], None, None);
 
         assert!(
-            prompt.contains("## Channel Capabilities"),
+            prompt.contains("## 채널 기능"),
             "missing Channel Capabilities section"
         );
         assert!(
-            prompt.contains("running as a messaging bot"),
+            prompt.contains("메시징 봇으로 실행 중입니다"),
             "missing channel context"
         );
         assert!(
-            prompt.contains("NEVER repeat, describe, or echo credentials"),
+            prompt.contains("자격증명, 토큰, API 키, 비밀 정보를 응답에 절대 반복하거나 노출하지 마세요"),
             "missing security instruction"
         );
     }
@@ -7931,11 +7931,11 @@ BTC is currently around $65,000 based on latest tool output."#
         );
 
         assert!(
-            prompt.contains("execute it directly instead of asking the user for extra approval"),
+            prompt.contains("사용자의 추가 승인을 구하지 말고 직접 실행하세요"),
             "full autonomy should instruct direct execution for allowed tools"
         );
         assert!(
-            prompt.contains("Never pretend you are waiting for a human approval"),
+            prompt.contains("인간의 승인이나 확인을 기다리는 척하지 마세요"),
             "full autonomy should not simulate interactive approval flows"
         );
     }
@@ -7962,11 +7962,11 @@ BTC is currently around $65,000 based on latest tool output."#
         );
 
         assert!(
-            prompt.contains("this runtime is read-only for side effects"),
+            prompt.contains("부작용에 대해 읽기 전용입니다"),
             "read-only prompt should expose the runtime restriction"
         );
         assert!(
-            prompt.contains("instead of simulating an approval flow"),
+            prompt.contains("승인 대화를 시뮬레이션하는 대신 제한 사항을 직접 설명하세요"),
             "read-only prompt should explain restrictions instead of faking approval"
         );
     }
@@ -7976,7 +7976,7 @@ BTC is currently around $65,000 based on latest tool output."#
         let ws = make_workspace();
         let prompt = build_system_prompt(ws.path(), "model", &[], &[], None, None);
 
-        assert!(prompt.contains(&format!("Working directory: `{}`", ws.path().display())));
+        assert!(prompt.contains(&format!("작업 디렉터리: `{}`", ws.path().display())));
     }
 
     #[test]
@@ -8004,11 +8004,11 @@ BTC is currently around $65,000 based on latest tool output."#
         );
         // Core safety rules should still be present
         assert!(
-            prompt.contains("Do not exfiltrate private data"),
+            prompt.contains("개인 데이터를 유출하지 마세요"),
             "data exfiltration guard must remain"
         );
         assert!(
-            prompt.contains("Prefer `trash` over `rm`"),
+            prompt.contains("`rm` 대신 `trash`를 선호하세요"),
             "trash-over-rm hint must remain"
         );
     }
@@ -8029,11 +8029,11 @@ BTC is currently around $65,000 based on latest tool output."#
         );
 
         assert!(
-            prompt.contains("without asking"),
+            prompt.contains("외부에 영향을 주는 행동은 실행 전에 확인을 구하세요"),
             "supervised prompt must include ask-before-acting instruction"
         );
         assert!(
-            prompt.contains("ask before acting externally"),
+            prompt.contains("현재 정책이 실제로 요구하는 경우에만 승인을 구하세요"),
             "supervised prompt must include ask-before-acting instruction"
         );
     }
