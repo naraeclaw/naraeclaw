@@ -27,5 +27,16 @@ export const colorThemes: ColorThemeDef[] = themesData as unknown as ColorThemeD
 export const colorThemeMap: Record<ColorThemeId, ColorThemeDef> =
   Object.fromEntries(colorThemes.map(t => [t.id, t])) as Record<ColorThemeId, ColorThemeDef>;
 
-export const DEFAULT_DARK_THEME: ColorThemeId = 'default-dark';
-export const DEFAULT_LIGHT_THEME: ColorThemeId = 'default-light';
+export const DEFAULT_DARK_THEME: ColorThemeId = 'kanagawa-wave';
+export const DEFAULT_LIGHT_THEME: ColorThemeId = 'kanagawa-lotus';
+
+// Kanagawa secondary palette — added to vars at apply time
+export const KANAGAWA_EXTRA_VARS: Record<string, string> = {
+  '--pc-iris':    '#957fb8',
+  '--pc-spring':  '#98bb6c',
+  '--pc-carp':    '#e6c384',
+  '--pc-sakura':  '#d27e99',
+  '--pc-wave':    '#7fb4ca',
+  '--pc-autumn':  '#ffa066',
+  '--pc-samurai': '#e82424',
+};

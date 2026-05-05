@@ -1,5 +1,5 @@
 import { createContext, useState, useEffect, useCallback, type ReactNode } from 'react';
-import { colorThemeMap, DEFAULT_DARK_THEME, DEFAULT_LIGHT_THEME, type ColorThemeId } from './colorThemes';
+import { colorThemeMap, DEFAULT_DARK_THEME, DEFAULT_LIGHT_THEME, KANAGAWA_EXTRA_VARS, type ColorThemeId } from './colorThemes';
 
 // ── Types (was ThemeContextDef.ts) ───────────────────────────────────────────
 
@@ -42,8 +42,8 @@ export interface ThemeContextValue {
 
 export const ThemeContext = createContext<ThemeContextValue>({
   theme: 'dark',
-  accent: 'cyan',
-  colorTheme: 'default-dark',
+  accent: 'blue',
+  colorTheme: 'kanagawa-wave',
   uiFont: 'system',
   monoFont: 'jetbrains',
   uiFontSize: 15,
@@ -113,8 +113,8 @@ interface StoredTheme {
 
 const DEFAULTS: StoredTheme = {
   theme: 'dark',
-  accent: 'cyan',
-  colorTheme: 'default-dark',
+  accent: 'blue',
+  colorTheme: 'kanagawa-wave',
   uiFont: 'system',
   monoFont: 'jetbrains',
   uiFontSize: 15,
@@ -246,9 +246,12 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     const resolvedId = resolveColorTheme(s.theme, s.colorTheme);
     const ct = colorThemeMap[resolvedId];
     const themeVars = ct?.vars ?? colorThemeMap[DEFAULT_DARK_THEME].vars;
+    const isKanagawa = resolvedId.startsWith('kanagawa-');
+    // Kanagawa 테마는 테마 자체 accent가 정의되어 있으므로 accent override 생략
     applyVars({
       ...themeVars,
-      ...accents[s.accent],
+      ...(isKanagawa ? KANAGAWA_EXTRA_VARS : {}),
+      ...(isKanagawa ? {} : accents[s.accent]),
       ...fontVars(s.uiFont, s.monoFont, s.uiFontSize, s.monoFontSize),
     });
   }, []);
