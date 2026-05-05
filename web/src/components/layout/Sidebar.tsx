@@ -68,10 +68,8 @@ const Icons = {
 
 // ── Nav 정의 ──────────────────────────────────────────────────────────
 const workItems = [
-  { to: '/',         label: '대시보드', icon: Icons.dashboard },
-  { to: '/agent',    label: '에이전트', icon: Icons.chat },
-  { to: '/profiles', label: '프로필',   icon: Icons.profiles },
-  { to: '/cron',     label: '스케줄',   icon: Icons.cron },
+  { to: '/',      label: '대시보드', icon: Icons.dashboard },
+  { to: '/cron',  label: '스케줄',   icon: Icons.cron },
 ];
 
 const sysItems = [

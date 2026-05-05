@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { AlertCircle } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -17,6 +18,7 @@ import {
   saveChatHistory,
   uiMessagesToPersisted,
 } from '@/lib/chatHistoryStorage';
+import { getAgent, touchAgent, COLOR_VARS } from '@/lib/agentStore';
 
 interface ChatMessage {
   id: string;
@@ -30,7 +32,6 @@ interface ChatMessage {
 
 const DRAFT_KEY = 'agent-chat';
 
-// SVG icon paths for the composer
 const ICON_ATTACH = '<path d="M21.4 11.05l-9.2 9.2a5.5 5.5 0 01-7.78-7.78l9.2-9.2a3.7 3.7 0 015.22 5.22l-9.2 9.2a1.85 1.85 0 01-2.61-2.61L14 7.7"/>';
 const ICON_SEND = '<path d="M5 12l14-7-5 14-3-7-6 0z" fill="currentColor" stroke="none"/>';
 
@@ -43,8 +44,16 @@ function SvgIcon({ path, size = 14, sw = 1.7 }: { path: string; size?: number; s
 }
 
 export default function AgentChat() {
-  const sessionIdRef = useRef(getOrCreateSessionId());
-  const { draft, saveDraft, clearDraft } = useDraft(DRAFT_KEY);
+  const { agentId } = useParams<{ agentId: string }>();
+  const navigate = useNavigate();
+
+  const agent = agentId ? getAgent(agentId) : undefined;
+  const agentColor = agent ? COLOR_VARS[agent.color] : 'var(--pc-accent)';
+
+  // sessionId: agent-scoped UUID if agent exists, else global fallback
+  const sessionIdRef = useRef(agent ? agent.sessionId : getOrCreateSessionId());
+
+  const { draft, saveDraft, clearDraft } = useDraft(agentId ? `agent-chat-${agentId}` : DRAFT_KEY);
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
     const persisted = loadChatHistory(sessionIdRef.current);
     return persisted.length > 0 ? persistedToUiMessages(persisted) : [];
@@ -65,6 +74,11 @@ export default function AgentChat() {
   const capturedThinkingRef = useRef('');
   const [streamingContent, setStreamingContent] = useState('');
   const [streamingThinking, setStreamingThinking] = useState('');
+
+  // Redirect if agentId given but agent not found
+  useEffect(() => {
+    if (agentId && !agent) navigate('/', { replace: true });
+  }, [agentId, agent, navigate]);
 
   useEffect(() => { saveDraft(input); }, [input, saveDraft]);
 
@@ -144,7 +158,11 @@ export default function AgentChat() {
           const content = msg.full_response ?? msg.content ?? pendingContentRef.current;
           const thinking = capturedThinkingRef.current || pendingThinkingRef.current || undefined;
           if (content) {
-            setMessages(prev => [...prev, { id: generateUUID(), role: 'agent', content, thinking, markdown: true, timestamp: new Date() }]);
+            setMessages(prev => {
+              const next = [...prev, { id: generateUUID(), role: 'agent' as const, content, thinking, markdown: true, timestamp: new Date() }];
+              if (agentId) touchAgent(agentId, next.filter(m => !m.toolCall).length);
+              return next;
+            });
           }
           pendingContentRef.current = '';
           pendingThinkingRef.current = '';
@@ -234,7 +252,11 @@ export default function AgentChat() {
   const handleSend = () => {
     const trimmed = input.trim();
     if (!trimmed || !wsRef.current?.connected) return;
-    setMessages(prev => [...prev, { id: generateUUID(), role: 'user', content: trimmed, timestamp: new Date() }]);
+    setMessages(prev => {
+      const next = [...prev, { id: generateUUID(), role: 'user' as const, content: trimmed, timestamp: new Date() }];
+      if (agentId) touchAgent(agentId, next.filter(m => !m.toolCall).length);
+      return next;
+    });
     try {
       wsRef.current.sendMessage(trimmed);
       setTyping(true);
@@ -288,6 +310,7 @@ export default function AgentChat() {
   }, []);
 
   const msgCount = messages.filter(m => !m.toolCall).length;
+  const agentInitial = agent ? agent.name.charAt(0).toUpperCase() : 'N';
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', position: 'relative', minHeight: 0 }}>
@@ -316,11 +339,31 @@ export default function AgentChat() {
       {/* Page header */}
       <div className="page-head" style={{ paddingBottom: 14 }}>
         <div style={{ flex: 1 }}>
-          <div className="crumb">에이전트</div>
-          <h1>대화</h1>
-          <div className="sub">
-            <span className="mono" style={{ color: 'var(--pc-text-secondary)' }}>{sessionIdRef.current.slice(0, 16)}</span>
-            {' '}· {msgCount} 메시지
+          <div className="crumb">
+            <button
+              onClick={() => navigate('/')}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--pc-text-muted)', fontSize: 11.5, padding: 0, display: 'inline-flex', alignItems: 'center', gap: 4 }}
+            >
+              ← 에이전트 목록
+            </button>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 4 }}>
+            {agent && (
+              <div style={{
+                width: 32, height: 32, borderRadius: 10, flexShrink: 0,
+                background: `linear-gradient(135deg, ${agentColor}, ${agentColor}88)`,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontWeight: 700, fontSize: 14, color: '#1a1a22',
+              }}>{agentInitial}</div>
+            )}
+            <div>
+              <h1 style={{ margin: 0 }}>{agent ? agent.name : '대화'}</h1>
+              <div className="sub">
+                {agent && <span style={{ color: 'var(--pc-text-muted)', marginRight: 6 }}>{agent.provider} · {agent.model}</span>}
+                <span className="mono" style={{ color: 'var(--pc-text-secondary)', fontSize: 10.5 }}>{sessionIdRef.current.slice(0, 12)}…</span>
+                {' '}· {msgCount} 메시지
+              </div>
+            </div>
           </div>
         </div>
         <div style={{ display: 'flex', gap: 6 }}>
@@ -362,15 +405,25 @@ export default function AgentChat() {
       >
         {dragOver && (
           <div style={{ textAlign: 'center', padding: '8px 0', fontSize: 12.5, color: 'var(--pc-accent)' }}>
-            📎 파일을 놓으면 에이전트에게 전달됩니다
+            파일을 놓으면 에이전트에게 전달됩니다
           </div>
         )}
 
         {messages.length === 0 && (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 12, color: 'var(--pc-text-muted)' }}>
-            <div style={{ width: 56, height: 56, borderRadius: 16, background: 'var(--pc-bg-elevated)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24 }}>나</div>
+            <div style={{
+              width: 56, height: 56, borderRadius: 16,
+              background: agent ? `linear-gradient(135deg, ${agentColor}, ${agentColor}88)` : 'var(--pc-bg-elevated)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 24, fontWeight: 700, color: '#1a1a22',
+            }}>{agentInitial}</div>
             <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--pc-text-primary)', marginBottom: 4 }}>나래 에이전트</div>
+              <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--pc-text-primary)', marginBottom: 4 }}>
+                {agent ? agent.name : '나래 에이전트'}
+              </div>
+              {agent?.description && (
+                <div style={{ fontSize: 12.5, color: 'var(--pc-text-muted)', marginBottom: 4, maxWidth: 300 }}>{agent.description}</div>
+              )}
               <div style={{ fontSize: 13 }}>{t('agent.start_conversation')}</div>
             </div>
           </div>
@@ -379,23 +432,25 @@ export default function AgentChat() {
         {messages.map((msg, i) => (
           <div key={msg.id} className="msg-row fade-in">
             <div className="msg-author">
-              <div className={`av ${msg.role}`}>
-                {msg.role === 'user' ? '나' : 'N'}
+              <div
+                className={`av ${msg.role}`}
+                style={msg.role === 'agent' && agent ? { background: `linear-gradient(135deg, ${agentColor}, ${agentColor}88)`, color: '#1a1a22' } : undefined}
+              >
+                {msg.role === 'user' ? '나' : agentInitial}
               </div>
               {i < messages.length - 1 && <div className="line" />}
             </div>
             <div className="msg-body">
               <div className="msg-meta">
-                <b>{msg.role === 'user' ? '사용자' : '나래'}</b>
+                <b>{msg.role === 'user' ? '사용자' : (agent?.name ?? '나래')}</b>
                 {' '}
                 <span style={{ fontSize: 11, color: 'var(--pc-text-faint)' }}>
                   {msg.timestamp.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
                 </span>
                 <button
                   onClick={() => handleCopy(msg.id, msg.content)}
-                  style={{ marginLeft: 'auto', opacity: 0, padding: '1px 6px', borderRadius: 5, border: '1px solid var(--pc-border)', background: 'transparent', color: 'var(--pc-text-muted)', cursor: 'pointer', fontSize: 11 }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.opacity = '1'; }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.opacity = '0'; }}
+                  className="msg-copy"
+                  style={{ marginLeft: 'auto', padding: '1px 6px', borderRadius: 5, border: '1px solid var(--pc-border)', background: 'transparent', color: 'var(--pc-text-muted)', cursor: 'pointer', fontSize: 11 }}
                 >
                   {copiedId === msg.id ? '✓' : '복사'}
                 </button>
@@ -423,14 +478,16 @@ export default function AgentChat() {
           </div>
         ))}
 
-        {/* Streaming / typing indicator */}
         {typing && (
           <div className="msg-row fade-in">
             <div className="msg-author">
-              <div className="av agent">N</div>
+              <div
+                className="av agent"
+                style={agent ? { background: `linear-gradient(135deg, ${agentColor}, ${agentColor}88)`, color: '#1a1a22' } : undefined}
+              >{agentInitial}</div>
             </div>
             <div className="msg-body">
-              <div className="msg-meta"><b>나래</b></div>
+              <div className="msg-meta"><b>{agent?.name ?? '나래'}</b></div>
               <div className="msg-content">
                 {streamingThinking && (
                   <details style={{ marginBottom: 8 }} open={!streamingContent}>
@@ -460,7 +517,7 @@ export default function AgentChat() {
           <textarea
             ref={inputRef}
             rows={1}
-            placeholder={connected ? '나래에게 무엇이든 물어보세요…' : t('agent.connecting')}
+            placeholder={connected ? `${agent?.name ?? '나래'}에게 무엇이든 물어보세요…` : t('agent.connecting')}
             value={input}
             onChange={handleTextareaChange}
             onKeyDown={handleKeyDown}
@@ -471,7 +528,7 @@ export default function AgentChat() {
             <button title="파일 첨부" style={{ padding: '4px 8px', borderRadius: 7, border: '1px solid var(--pc-border)', background: 'transparent', color: 'var(--pc-text-muted)', cursor: 'pointer' }}>
               <SvgIcon path={ICON_ATTACH} size={14} />
             </button>
-            <span className="pill" style={{ fontSize: 11 }}>claude-haiku-4-5</span>
+            <span className="pill" style={{ fontSize: 11 }}>{agent?.model ?? 'claude-haiku-4-5'}</span>
             <span className="pill" style={{ fontSize: 11 }}>
               <span style={{ display: 'inline-block', width: 5, height: 5, borderRadius: '50%', background: connected ? 'var(--color-status-success)' : 'var(--color-status-error)', marginRight: 4, boxShadow: connected ? '0 0 5px var(--color-status-success)' : 'none', verticalAlign: 1 }} />
               {connected ? '연결됨' : '연결 중…'}
