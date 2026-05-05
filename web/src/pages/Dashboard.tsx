@@ -1,372 +1,358 @@
-import { useState, useEffect, useCallback } from 'react';
-import type { StatusResponse, CostSummary, Session, ChannelDetail } from '@/types/api';
-import { getStatus, getCost, getSessions, getChannels } from '@/lib/api';
-import { useSSE } from '@/hooks/useSSE';
-import { t } from '@/lib/i18n';
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { listAgents, createAgent, deleteAgent, type Agent, type AgentColor, COLOR_VARS, COLOR_LABELS } from '@/lib/agentStore';
 
-// ─── helpers ──────────────────────────────────────────────────────────────────
+// ─── 헬퍼 ────────────────────────────────────────────────────────────────────
 
-function formatUptime(seconds: number): string {
-  const d = Math.floor(seconds / 86400);
-  const h = Math.floor((seconds % 86400) / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  if (d > 0) return `${d}일 ${h}시간`;
-  if (h > 0) return `${h}시간 ${m}분`;
-  return `${m}분`;
-}
-
-function formatRelative(iso: string): string {
+function formatRelative(iso?: string): string {
+  if (!iso) return '';
   try {
     const diff = Date.now() - new Date(iso).getTime();
     const s = Math.floor(diff / 1000);
-    if (s < 60) return `${s}초 전`;
+    if (s < 60) return '방금';
     const m = Math.floor(s / 60);
     if (m < 60) return `${m}분 전`;
     const h = Math.floor(m / 60);
     if (h < 24) return `${h}시간 전`;
     return `${Math.floor(h / 24)}일 전`;
-  } catch { return iso; }
+  } catch { return ''; }
 }
 
-function healthStatus(s: string) {
-  const lc = s.toLowerCase();
-  if (lc === 'ok' || lc === 'healthy') return 'ok';
-  if (lc === 'warn' || lc === 'warning' || lc === 'degraded') return 'warn';
-  return 'err';
+function autoSlug(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9가-힣]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 32) || 'agent';
 }
 
-// ─── Sparkline ────────────────────────────────────────────────────────────────
+const PROVIDERS = [
+  { id: 'anthropic',  label: 'Anthropic',  models: ['claude-haiku-4-5', 'claude-sonnet-4-6'] },
+  { id: 'openrouter', label: 'OpenRouter',  models: ['anthropic/claude-sonnet-4-6', 'openai/gpt-4o-mini'] },
+  { id: 'ollama',     label: 'Ollama',      models: ['gemma3:latest', 'llama3.2:latest', 'qwen2.5:latest'] },
+  { id: 'openai',     label: 'OpenAI',      models: ['gpt-4o-mini', 'gpt-4o'] },
+];
 
-function Sparkline({ data, color = 'var(--pc-accent)', h = 36 }: {
-  data: number[];
-  color?: string;
-  h?: number;
-}) {
-  if (data.length < 2) return null;
-  const max = Math.max(...data, 0.001);
-  const W = 80;
-  const pts = data.map((v, i) =>
-    `${(i / (data.length - 1)) * W},${h - (v / max) * (h - 2) - 1}`
-  );
-  const ptsStr = pts.join(' ');
-  const first = pts[0]!.split(',');
-  const last = pts[pts.length - 1]!.split(',');
-  const areaPath = `M${first[0]},${h} L${ptsStr.split(' ').join(' L')} L${last[0]},${h} Z`;
-  const id = `sp${color.replace(/[^a-z0-9]/gi, '')}`;
-  return (
-    <svg width={W} height={h} viewBox={`0 0 ${W} ${h}`} style={{ overflow: 'visible', flexShrink: 0 }}>
-      <defs>
-        <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={color} stopOpacity="0.22" />
-          <stop offset="100%" stopColor={color} stopOpacity="0.01" />
-        </linearGradient>
-      </defs>
-      <path d={areaPath} fill={`url(#${id})`} />
-      <polyline points={ptsStr} fill="none" stroke={color} strokeWidth="1.5"
-        strokeLinejoin="round" strokeLinecap="round" />
-    </svg>
-  );
+const COLORS: AgentColor[] = ['accent', 'iris', 'spring', 'sakura', 'carp', 'wave'];
+
+// ─── 에이전트 생성 모달 ───────────────────────────────────────────────────────
+
+interface CreateModalProps {
+  onClose: () => void;
+  onCreate: (agent: Agent) => void;
 }
 
-// ─── Sessions Tab ─────────────────────────────────────────────────────────────
+function CreateModal({ onClose, onCreate }: CreateModalProps) {
+  const [name, setName] = useState('');
+  const [id, setId] = useState('');
+  const [idTouched, setIdTouched] = useState(false);
+  const [provider, setProvider] = useState('anthropic');
+  const [model, setModel] = useState('claude-haiku-4-5');
+  const [color, setColor] = useState<AgentColor>('accent');
+  const [description, setDescription] = useState('');
+  const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
-function SessionsTab() {
-  const [sessions, setSessions] = useState<Session[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [selected, setSelected] = useState<Session | null>(null);
-  const { events } = useSSE({ filterTypes: ['session_update', 'session_created', 'session_closed'], autoConnect: true });
-  const load = useCallback(() => {
-    getSessions().then(d => { setSessions(d); setLoading(false); }).catch(e => { setError(e.message); setLoading(false); });
-  }, []);
-  useEffect(() => { load(); }, [load]);
-  useEffect(() => { if (events.length > 0) load(); }, [events.length, load]);
+  const selectedProvider = PROVIDERS.find(p => p.id === provider)!;
 
-  if (loading) return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 120, color: 'var(--pc-text-muted)', fontSize: 13 }}>
-      세션 불러오는 중…
-    </div>
-  );
-  if (error) return (
-    <div className="kw-card" style={{ padding: 14, color: 'var(--color-status-error)', borderColor: 'rgba(195,64,67,0.3)', background: 'rgba(195,64,67,0.05)' }}>
-      세션 로드 실패: {error}
-    </div>
-  );
+  const handleNameChange = (v: string) => {
+    setName(v);
+    if (!idTouched) setId(autoSlug(v));
+  };
+
+  const handleProviderChange = (pid: string) => {
+    setProvider(pid);
+    const p = PROVIDERS.find(x => x.id === pid);
+    if (p) setModel(p.models[0] ?? '');
+  };
+
+  const submit = async () => {
+    if (!name.trim()) { setError('이름을 입력하세요'); return; }
+    if (!id.trim()) { setError('ID를 입력하세요'); return; }
+    if (!model.trim()) { setError('모델을 입력하세요'); return; }
+    setSubmitting(true); setError('');
+    try {
+      const agent = createAgent({ id, name, provider, model, color, description: description || undefined });
+      onCreate(agent);
+      onClose();
+    } catch (e: unknown) {
+      setError(String(e));
+      setSubmitting(false);
+    }
+  };
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 260px', gap: 14 }}>
-      <div className="kw-card" style={{ padding: 0, overflow: 'hidden' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 72px 100px', padding: '11px 18px', fontSize: 11, fontWeight: 600, color: 'var(--pc-text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', borderBottom: '1px solid var(--pc-separator)' }}>
-          <div>세션 ID</div><div>메시지</div><div>마지막 활동</div>
+    <div
+      style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(15,15,20,0.8)', backdropFilter: 'blur(8px)' }}
+      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div style={{ width: 480, background: 'var(--pc-bg-surface)', border: '1px solid var(--pc-border-strong)', borderRadius: 20, padding: 28, boxShadow: '0 32px 80px rgba(0,0,0,0.55)' }}>
+        <div style={{ marginBottom: 22 }}>
+          <div style={{ fontSize: 17, fontWeight: 700, color: 'var(--pc-text-primary)' }}>새 에이전트 만들기</div>
+          <div className="tiny" style={{ marginTop: 4 }}>이름, 모델, 개성을 설정하면 독립된 대화 공간이 생성됩니다</div>
         </div>
-        {sessions.length === 0
-          ? <div style={{ padding: '28px 18px', textAlign: 'center', color: 'var(--pc-text-faint)', fontSize: 13 }}>세션 없음</div>
-          : sessions.map(s => (
-            <div key={s.session_id} onClick={() => setSelected(s)} style={{
-              display: 'grid', gridTemplateColumns: '1fr 72px 100px',
-              padding: '13px 18px', fontSize: 13, cursor: 'pointer',
-              borderBottom: '1px solid var(--pc-separator)',
-              background: selected?.session_id === s.session_id ? 'rgba(126,156,216,0.08)' : 'transparent',
-            }}
-              onMouseEnter={e => { if (selected?.session_id !== s.session_id) (e.currentTarget as HTMLElement).style.background = 'var(--pc-hover)'; }}
-              onMouseLeave={e => { if (selected?.session_id !== s.session_id) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
-            >
-              <div className="mono" style={{ fontSize: 12, color: 'var(--pc-text-secondary)' }}>{s.session_id.slice(0, 16)}…</div>
-              <div style={{ fontWeight: 600 }}>{s.message_count}</div>
-              <div className="muted">{formatRelative(s.last_activity)}</div>
-            </div>
-          ))}
-      </div>
-      <div className="kw-card" style={{ padding: 16 }}>
-        <div className="card-h" style={{ marginBottom: 14 }}>세션 상세</div>
-        {selected
-          ? <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <div><div className="tiny" style={{ marginBottom: 3 }}>세션 ID</div><div className="mono" style={{ fontSize: 11, wordBreak: 'break-all', color: 'var(--pc-text-secondary)' }}>{selected.session_id}</div></div>
-            <div><div className="tiny" style={{ marginBottom: 3 }}>메시지 수</div><div style={{ fontSize: 13, fontWeight: 600 }}>{selected.message_count}</div></div>
-            <div><div className="tiny" style={{ marginBottom: 3 }}>마지막 활동</div><div style={{ fontSize: 13 }}>{formatRelative(selected.last_activity)}</div></div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {/* 이름 */}
+          <div>
+            <label className="tiny" style={{ display: 'block', marginBottom: 5 }}>에이전트 이름 *</label>
+            <input className="input-electric" placeholder="예: 코딩 도우미, 업무용 Claude" value={name}
+              onChange={e => handleNameChange(e.target.value)} style={{ width: '100%' }} autoFocus />
           </div>
-          : <div style={{ color: 'var(--pc-text-faint)', fontSize: 13, textAlign: 'center', paddingTop: 24 }}>세션을 선택하세요</div>
-        }
-      </div>
-    </div>
-  );
-}
 
-// ─── Channels Tab ─────────────────────────────────────────────────────────────
-
-function ChannelsTab() {
-  const [channels, setChannels] = useState<ChannelDetail[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const { events } = useSSE({ filterTypes: ['channel_update', 'channel_status'], autoConnect: true });
-  const load = useCallback(() => {
-    getChannels().then(d => { setChannels(d); setLoading(false); }).catch(e => { setError(e.message); setLoading(false); });
-  }, []);
-  useEffect(() => { load(); }, [load]);
-  useEffect(() => { if (events.length > 0) load(); }, [events.length, load]);
-
-  if (loading) return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 120, color: 'var(--pc-text-muted)', fontSize: 13 }}>
-      채널 불러오는 중…
-    </div>
-  );
-  if (error) return (
-    <div className="kw-card" style={{ padding: 14, color: 'var(--color-status-error)', borderColor: 'rgba(195,64,67,0.3)', background: 'rgba(195,64,67,0.05)' }}>
-      채널 로드 실패: {error}
-    </div>
-  );
-  if (channels.length === 0) return (
-    <div className="kw-card" style={{ padding: 32, textAlign: 'center', color: 'var(--pc-text-faint)', fontSize: 13 }}>연결된 채널 없음</div>
-  );
-
-  return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
-      {channels.map(c => {
-        const hs = healthStatus(c.health);
-        return (
-          <div key={c.name} className="kw-card fade-in" style={{ padding: 16 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-              <div style={{
-                width: 34, height: 34, borderRadius: 9, fontWeight: 700, fontSize: 14,
-                textTransform: 'uppercase' as const, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                background: hs === 'ok' ? 'rgba(152,187,108,0.12)' : hs === 'warn' ? 'rgba(230,195,132,0.12)' : 'rgba(195,64,67,0.12)',
-                color: hs === 'ok' ? 'var(--color-status-success)' : hs === 'warn' ? 'var(--color-status-warning)' : 'var(--color-status-error)',
-              }}>{c.name[0]}</div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 14, fontWeight: 600, textTransform: 'capitalize' as const }}>{c.name}</div>
-                <div className="tiny">{c.type}</div>
-              </div>
-              {hs === 'ok' && <span className="pill ok"><span className="d" />활성</span>}
-              {hs === 'warn' && <span className="pill warn"><span className="d" />주의</span>}
-              {hs === 'err' && <span className="pill err"><span className="d" />오류</span>}
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, paddingTop: 10, borderTop: '1px solid var(--pc-separator)' }}>
-              {[
-                { k: '메시지', v: c.message_count.toLocaleString(), mono: true },
-                { k: '마지막', v: c.last_message_at ? formatRelative(c.last_message_at) : '-' },
-                { k: '상태', v: c.status, style: { color: hs === 'ok' ? 'var(--color-status-success)' : hs === 'warn' ? 'var(--color-status-warning)' : 'var(--color-status-error)', textTransform: 'capitalize' as const } },
-              ].map(({ k, v, mono, style }) => (
-                <div key={k}>
-                  <div className="tiny" style={{ marginBottom: 2 }}>{k}</div>
-                  <div className={mono ? 'mono' : ''} style={{ fontSize: 13, fontWeight: 600, ...style }}>{v}</div>
-                </div>
+          {/* 색상 */}
+          <div>
+            <label className="tiny" style={{ display: 'block', marginBottom: 8 }}>아바타 색상</label>
+            <div style={{ display: 'flex', gap: 10 }}>
+              {COLORS.map(c => (
+                <button key={c} onClick={() => setColor(c)} title={COLOR_LABELS[c]} style={{
+                  width: 28, height: 28, borderRadius: '50%', border: color === c ? '2px solid var(--pc-text-primary)' : '2px solid transparent',
+                  background: COLOR_VARS[c], cursor: 'pointer', outline: color === c ? `3px solid ${COLOR_VARS[c]}` : 'none', outlineOffset: 2,
+                }} />
               ))}
             </div>
           </div>
-        );
-      })}
+
+          {/* 공급자 */}
+          <div>
+            <label className="tiny" style={{ display: 'block', marginBottom: 8 }}>공급자 *</label>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
+              {PROVIDERS.map(p => (
+                <button key={p.id} onClick={() => handleProviderChange(p.id)} style={{
+                  padding: '9px 14px', borderRadius: 10, border: '1px solid',
+                  borderColor: provider === p.id ? COLOR_VARS.accent : 'var(--pc-border)',
+                  background: provider === p.id ? 'rgba(126,156,216,0.10)' : 'var(--pc-bg-elevated)',
+                  cursor: 'pointer', textAlign: 'left' as const,
+                }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: provider === p.id ? 'var(--pc-accent)' : 'var(--pc-text-primary)' }}>{p.label}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* 모델 */}
+          <div>
+            <label className="tiny" style={{ display: 'block', marginBottom: 5 }}>모델 *</label>
+            <input className="input-electric" placeholder={selectedProvider.models[0]} value={model}
+              onChange={e => setModel(e.target.value)}
+              style={{ width: '100%', fontFamily: 'var(--pc-font-mono)', fontSize: 12.5 }} />
+            <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap' as const }}>
+              {selectedProvider.models.map(m => (
+                <button key={m} onClick={() => setModel(m)} style={{
+                  padding: '2px 8px', borderRadius: 6, border: '1px solid',
+                  borderColor: model === m ? 'var(--pc-accent)' : 'var(--pc-border)',
+                  background: model === m ? 'rgba(126,156,216,0.1)' : 'transparent',
+                  color: model === m ? 'var(--pc-accent)' : 'var(--pc-text-muted)',
+                  fontSize: 10.5, cursor: 'pointer', fontFamily: 'var(--pc-font-mono)',
+                }}>
+                  {m}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* ID & 설명 */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div>
+              <label className="tiny" style={{ display: 'block', marginBottom: 5 }}>ID (영문·숫자·하이픈)</label>
+              <input className="input-electric" value={id}
+                onChange={e => { setId(e.target.value); setIdTouched(true); }}
+                style={{ width: '100%', fontFamily: 'var(--pc-font-mono)', fontSize: 12 }} />
+            </div>
+            <div>
+              <label className="tiny" style={{ display: 'block', marginBottom: 5 }}>한 줄 설명 (선택)</label>
+              <input className="input-electric" placeholder="이 에이전트의 역할…" value={description}
+                onChange={e => setDescription(e.target.value)} style={{ width: '100%' }} />
+            </div>
+          </div>
+        </div>
+
+        {error && (
+          <div style={{ marginTop: 14, padding: '8px 12px', borderRadius: 8, background: 'rgba(195,64,67,0.1)', border: '1px solid rgba(195,64,67,0.25)', color: 'var(--color-status-error)', fontSize: 12.5 }}>
+            {error}
+          </div>
+        )}
+
+        <div style={{ display: 'flex', gap: 10, marginTop: 22, justifyContent: 'flex-end' }}>
+          <button className="btn ghost" onClick={onClose}>취소</button>
+          <button className="btn primary" onClick={submit} disabled={submitting}>
+            {submitting ? '생성 중…' : '에이전트 만들기'}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
 
-// ─── Overview ─────────────────────────────────────────────────────────────────
+// ─── 에이전트 카드 ─────────────────────────────────────────────────────────────
 
-const SPARK_SHAPE = [0.4, 0.6, 0.9, 1.2, 1.0, 1.6, 1.4, 2.0, 2.2, 1.8, 2.6, 3.4, 3.1, 3.8];
-
-function OverviewTab({ status, cost }: { status: StatusResponse; cost: CostSummary }) {
-  const compEntries = Object.entries(status.health.components);
-  const chanEntries = Object.entries(status.channels);
-  const activeCount = chanEntries.filter(([, v]) => v).length;
+function AgentCard({ agent, onClick, onDelete }: { agent: Agent; onClick: () => void; onDelete: () => void }) {
+  const col = COLOR_VARS[agent.color];
+  const [hover, setHover] = useState(false);
 
   return (
-    <>
-      {/* Component status strip */}
-      <div className="status-strip">
-        {compEntries.length === 0
-          ? <span className="tiny">컴포넌트 없음</span>
-          : compEntries.map(([name, comp]) => {
-            const hs = healthStatus(comp.status);
-            const col = hs === 'ok' ? 'var(--color-status-success)' : hs === 'warn' ? 'var(--color-status-warning)' : 'var(--color-status-error)';
-            return (
-              <span key={name} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11.5, color: 'var(--pc-text-secondary)' }}>
-                <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: col, boxShadow: `0 0 5px ${col}` }} />
-                {name}
-              </span>
-            );
-          })}
-        <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--pc-text-faint)' }}>
-          가동 {formatUptime(status.uptime_seconds)}
-        </span>
+    <div
+      className="kw-card fade-in"
+      onClick={onClick}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        padding: 20, cursor: 'pointer', transition: 'all 0.18s',
+        borderColor: hover ? `${col}60` : 'var(--pc-border)',
+        background: hover ? `${col}08` : 'var(--pc-bg-surface)',
+        transform: hover ? 'translateY(-2px)' : 'none',
+        boxShadow: hover ? `0 8px 24px ${col}18` : 'none',
+      }}
+    >
+      {/* Avatar + header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 14 }}>
+        <div style={{
+          width: 48, height: 48, borderRadius: 14, flexShrink: 0,
+          background: `${col}20`, color: col,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 22, fontWeight: 700,
+          boxShadow: hover ? `0 0 16px ${col}30` : 'none',
+          transition: 'box-shadow 0.18s',
+        }}>
+          {agent.name[0]?.toUpperCase() ?? 'A'}
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--pc-text-primary)', marginBottom: 2 }}>{agent.name}</div>
+          {agent.description && <div className="tiny" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{agent.description}</div>}
+        </div>
+        <button
+          onClick={e => { e.stopPropagation(); if (confirm(`'${agent.name}'을 삭제할까요?\n대화 기록도 모두 사라집니다.`)) onDelete(); }}
+          style={{ opacity: hover ? 0.6 : 0, padding: '4px 7px', borderRadius: 7, border: '1px solid var(--pc-border)', background: 'var(--pc-bg-input)', color: 'var(--pc-text-muted)', cursor: 'pointer', fontSize: 12, transition: 'opacity 0.15s' }}
+        >
+          삭제
+        </button>
       </div>
 
-      {/* 3-col stat cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
-        {[
-          { label: '세션 비용', value: `$${cost.session_cost_usd.toFixed(4)}`, sub: `${cost.total_tokens.toLocaleString()} 토큰`, color: 'var(--pc-accent)', spark: SPARK_SHAPE.map(v => v * cost.session_cost_usd + 0.001) },
-          { label: '오늘 비용', value: `$${cost.daily_cost_usd.toFixed(3)}`, sub: `${cost.request_count}건 요청`, color: 'var(--pc-spring)', spark: SPARK_SHAPE.map(v => v * cost.daily_cost_usd + 0.001) },
-          { label: '이번 달', value: `$${cost.monthly_cost_usd.toFixed(2)}`, sub: `${status.provider} · ${status.model}`, color: 'var(--pc-iris)', spark: SPARK_SHAPE },
-        ].map(({ label, value, sub, color, spark }) => (
-          <div key={label} className="kw-card">
-            <div className="card-h" style={{ marginBottom: 8 }}>{label}</div>
-            <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
-              <div>
-                <div className="big-num">{value}</div>
-                <div className="tiny" style={{ marginTop: 3 }}>{sub}</div>
-              </div>
-              <Sparkline data={spark} color={color} />
-            </div>
+      {/* Stats */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, paddingTop: 12, borderTop: '1px solid var(--pc-separator)' }}>
+        <div>
+          <div className="tiny" style={{ marginBottom: 3 }}>모델</div>
+          <div className="mono" style={{ fontSize: 11, color: 'var(--pc-text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{agent.model}</div>
+        </div>
+        <div>
+          <div className="tiny" style={{ marginBottom: 3 }}>메시지</div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--pc-text-primary)' }}>
+            {agent.messageCount > 0 ? agent.messageCount : '—'}
+          </div>
+        </div>
+        <div>
+          <div className="tiny" style={{ marginBottom: 3 }}>공급자</div>
+          <div style={{ fontSize: 11.5, color: col, fontWeight: 600, textTransform: 'capitalize' as const }}>{agent.provider}</div>
+        </div>
+        <div>
+          <div className="tiny" style={{ marginBottom: 3 }}>마지막 대화</div>
+          <div style={{ fontSize: 12, color: 'var(--pc-text-muted)' }}>{formatRelative(agent.lastMessageAt) || '없음'}</div>
+        </div>
+      </div>
+
+      {/* CTA */}
+      <div style={{
+        marginTop: 14, padding: '8px 0 0', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        color: col, fontSize: 12.5, fontWeight: 600, opacity: hover ? 1 : 0,
+        transition: 'opacity 0.18s',
+      }}>
+        대화 시작하기 →
+      </div>
+    </div>
+  );
+}
+
+// ─── 빈 상태 ──────────────────────────────────────────────────────────────────
+
+function EmptyState({ onNew }: { onNew: () => void }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 360, gap: 20, color: 'var(--pc-text-muted)' }}>
+      {/* Decorative marks */}
+      <div style={{ display: 'flex', gap: 16 }}>
+        {(['accent', 'iris', 'spring'] as AgentColor[]).map((c, i) => (
+          <div key={c} style={{
+            width: 56, height: 56, borderRadius: 16,
+            background: `${COLOR_VARS[c]}18`, border: `1px solid ${COLOR_VARS[c]}30`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 22, fontWeight: 700, color: COLOR_VARS[c],
+            transform: i === 1 ? 'translateY(-8px)' : 'none',
+            opacity: i === 1 ? 1 : 0.5,
+          }}>
+            {i === 0 ? 'A' : i === 1 ? '나' : 'B'}
           </div>
         ))}
       </div>
-
-      {/* Component health grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
-        {compEntries.length === 0
-          ? <div className="kw-card" style={{ gridColumn: '1/-1', padding: '28px 18px', textAlign: 'center', color: 'var(--pc-text-faint)', fontSize: 13 }}>컴포넌트 없음</div>
-          : compEntries.map(([name, comp]) => {
-            const hs = healthStatus(comp.status);
-            const ok = hs === 'ok';
-            const warn = hs === 'warn';
-            return (
-              <div key={name} className="kw-card fade-in" style={{
-                padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 14,
-                borderColor: ok ? 'var(--pc-border)' : warn ? 'rgba(230,195,132,0.25)' : 'rgba(195,64,67,0.25)',
-                background: ok ? 'var(--pc-bg-surface)' : warn ? 'rgba(230,195,132,0.05)' : 'rgba(195,64,67,0.05)',
-              }}>
-                <div style={{
-                  width: 28, height: 28, borderRadius: 8, fontWeight: 700, fontSize: 14,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  background: ok ? 'rgba(152,187,108,0.15)' : warn ? 'rgba(230,195,132,0.15)' : 'rgba(195,64,67,0.15)',
-                  color: ok ? 'var(--color-status-success)' : warn ? 'var(--color-status-warning)' : 'var(--color-status-error)',
-                }}>{ok ? '✓' : warn ? '!' : '✕'}</div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 13.5, fontWeight: 600, textTransform: 'capitalize' as const }}>{name}</div>
-                  <div className="tiny" style={{ marginTop: 2 }}>
-                    {comp.status}{comp.restart_count > 0 ? ` · 재시작 ${comp.restart_count}회` : ''}
-                  </div>
-                </div>
-                {ok && <span className="pill ok"><span className="d" />OK</span>}
-                {warn && <span className="pill warn"><span className="d" />주의</span>}
-                {!ok && !warn && <span className="pill err"><span className="d" />오류</span>}
-              </div>
-            );
-          })}
-      </div>
-
-      {/* Channels strip */}
-      <div className="kw-card" style={{ padding: '14px 18px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12 }}>
-          <div className="card-h" style={{ flex: 1 }}>채널</div>
-          <span className="tiny">{activeCount}개 활성 / {chanEntries.length}개 전체</span>
-        </div>
-        <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: 8 }}>
-          {chanEntries.length === 0
-            ? <span className="tiny">채널 없음</span>
-            : chanEntries.map(([name, active]) => (
-              <span key={name} className={active ? 'pill ok' : 'pill'} style={active ? {} : { color: 'var(--pc-text-faint)', borderColor: 'var(--pc-border)' }}>
-                <span className="d" style={active ? {} : { background: 'var(--pc-text-faint)' }} />
-                {name}
-              </span>
-            ))}
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--pc-text-primary)', marginBottom: 8 }}>에이전트가 없습니다</div>
+        <div style={{ fontSize: 13.5, lineHeight: 1.6 }}>
+          에이전트를 만들면 각자 독립된 대화 공간이 생깁니다.<br />
+          업무용, 코딩용, 한국어 전용 등 목적에 맞게 구성하세요.
         </div>
       </div>
-    </>
+      <button className="btn primary" onClick={onNew} style={{ fontSize: 14, padding: '10px 22px' }}>
+        + 첫 에이전트 만들기
+      </button>
+    </div>
   );
 }
 
-// ─── Main ─────────────────────────────────────────────────────────────────────
-
-type TabId = 'overview' | 'sessions' | 'channels';
-const TABS: { id: TabId; label: string }[] = [
-  { id: 'overview', label: '개요' },
-  { id: 'sessions', label: '세션' },
-  { id: 'channels', label: '채널' },
-];
+// ─── 메인 ─────────────────────────────────────────────────────────────────────
 
 export default function Dashboard() {
-  const [status, setStatus] = useState<StatusResponse | null>(null);
-  const [cost, setCost] = useState<CostSummary | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<TabId>('overview');
+  const navigate = useNavigate();
+  const [agents, setAgents] = useState<Agent[]>([]);
+  const [showCreate, setShowCreate] = useState(false);
 
-  useEffect(() => {
-    Promise.all([getStatus(), getCost()])
-      .then(([s, c]) => { setStatus(s); setCost(c); })
-      .catch(e => setError(e.message));
-  }, []);
+  useEffect(() => { setAgents(listAgents()); }, []);
 
-  if (error) return (
-    <div style={{ padding: '24px 32px' }}>
-      <div className="kw-card" style={{ padding: 16, color: 'var(--color-status-error)', borderColor: 'rgba(195,64,67,0.3)', background: 'rgba(195,64,67,0.05)' }}>
-        {t('dashboard.load_error')}: {error}
-      </div>
-    </div>
-  );
+  const handleCreate = (agent: Agent) => {
+    setAgents(listAgents());
+    navigate(`/chat/${agent.id}`);
+  };
 
-  if (!status || !cost) return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200 }}>
-      <div style={{ fontSize: 13, color: 'var(--pc-text-muted)' }}>데이터 불러오는 중…</div>
-    </div>
-  );
+  const handleDelete = (id: string) => {
+    deleteAgent(id);
+    setAgents(listAgents());
+  };
 
   return (
     <div style={{ flex: 1, overflowY: 'auto' }}>
       <div className="page-head">
         <div style={{ flex: 1 }}>
-          <div className="crumb">대시보드</div>
-          <h1>안녕하세요</h1>
-          <div className="sub">나래 에이전트 · {status.model ?? 'unknown'} · {status.provider ?? 'local'}</div>
+          <div className="crumb">나래클로</div>
+          <h1>에이전트</h1>
+          <div className="sub">
+            {agents.length > 0
+              ? `${agents.length}개의 에이전트 · 각자 독립된 대화 공간을 가집니다`
+              : '첫 에이전트를 만들어보세요'}
+          </div>
         </div>
-        <div style={{ display: 'flex', gap: 4, background: 'var(--pc-bg-elevated)', padding: 4, borderRadius: 10 }}>
-          {TABS.map(tab => (
-            <button key={tab.id} onClick={() => setActiveTab(tab.id)} style={{
-              padding: '6px 14px', borderRadius: 7, border: 'none', cursor: 'pointer',
-              fontSize: 12.5, fontWeight: 500, transition: 'all 0.15s',
-              background: activeTab === tab.id ? 'var(--pc-bg-surface)' : 'transparent',
-              color: activeTab === tab.id ? 'var(--pc-accent)' : 'var(--pc-text-muted)',
-              boxShadow: activeTab === tab.id ? '0 1px 3px rgba(0,0,0,0.15)' : 'none',
-            }}>
-              {tab.label}
-            </button>
-          ))}
-        </div>
+        {agents.length > 0 && (
+          <button className="btn primary" onClick={() => setShowCreate(true)}>
+            + 새 에이전트
+          </button>
+        )}
       </div>
 
-      <div style={{ padding: '4px 32px 36px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-        {activeTab === 'overview' && <OverviewTab status={status} cost={cost} />}
-        {activeTab === 'sessions' && <SessionsTab />}
-        {activeTab === 'channels' && <ChannelsTab />}
+      <div style={{ padding: '4px 32px 48px' }}>
+        {agents.length === 0 ? (
+          <EmptyState onNew={() => setShowCreate(true)} />
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 14 }}>
+            {agents.map(a => (
+              <AgentCard
+                key={a.id}
+                agent={a}
+                onClick={() => navigate(`/chat/${a.id}`)}
+                onDelete={() => handleDelete(a.id)}
+              />
+            ))}
+          </div>
+        )}
       </div>
+
+      {showCreate && (
+        <CreateModal
+          onClose={() => setShowCreate(false)}
+          onCreate={handleCreate}
+        />
+      )}
     </div>
   );
 }
