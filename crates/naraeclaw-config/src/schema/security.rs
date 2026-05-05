@@ -82,6 +82,7 @@ pub fn default_auto_approve() -> Vec<String> {
     vec![
         "file_read".into(),
         "memory_recall".into(),
+        "memory_store".into(),
         "web_search_tool".into(),
         "web_fetch".into(),
         "calculator".into(),
