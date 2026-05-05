@@ -3157,7 +3157,7 @@ fn setup_project_context() -> Result<ProjectContext> {
         "US/Pacific (PST/PDT)",
         "Europe/London (GMT/BST)",
         "Europe/Berlin (CET/CEST)",
-        "Asia/Tokyo (JST)",
+        "Asia/Seoul (KST)",
         "UTC",
         "Other (type manually)",
     ];
