@@ -2614,9 +2614,7 @@ mod tests {
         assert!(create_provider("moonshot", Some("key")).is_ok());
         assert!(create_provider("kimi", Some("key")).is_ok());
         assert!(create_provider("moonshot-intl", Some("key")).is_ok());
-        assert!(create_provider("moonshot-cn", Some("key")).is_ok());
         assert!(create_provider("kimi-intl", Some("key")).is_ok());
-        assert!(create_provider("kimi-cn", Some("key")).is_ok());
     }
 
     #[test]

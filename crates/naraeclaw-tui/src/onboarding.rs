@@ -3189,54 +3189,6 @@ mod tests {
     // ── End-to-end: full wizard flow ────────────────────────────────
 
     #[test]
-    fn e2e_full_setup_anthropic_telegram_brave() {
-        let mut app = test_app();
-        // Provider: Anthropic (tier 0, idx 2)
-        app.provider_tier_idx = 0;
-        app.provider_idx = 2;
-        app.api_key_input = "sk-ant-api-key".to_string();
-        // Model: Claude Opus
-        app.model_idx = 2; // claude-opus-4-20250514
-        // Channel: Telegram
-        app.channel_idx = 0;
-        // Web search: Brave
-        app.search_provider_idx = 0;
-        app.search_api_key_input = "brave-key-123".to_string();
-        // Skills: obsidian (idx 12)
-        app.skills_idx = 12;
-        // Hooks: enabled
-        app.hooks_idx = 0;
-        // Gateway
-        app.gateway_port = 8080;
-        app.gateway_host = "192.168.1.100".to_string();
-        app.pairing_required = true;
-
-        let mut config = Config::default();
-        apply_tui_selections_to_config(&app, &mut config);
-
-        // Verify everything was persisted
-        assert_eq!(config.default_provider.as_deref(), Some("anthropic"));
-        assert_eq!(config.api_key.as_deref(), Some("sk-ant-api-key"));
-        assert_eq!(
-            config.default_model.as_deref(),
-            Some("claude-opus-4-20250514")
-        );
-        assert!(config.channels_config.telegram.is_some());
-        assert!(config.web_search.enabled);
-        assert_eq!(config.web_search.provider, "brave");
-        assert_eq!(
-            config.web_search.brave_api_key.as_deref(),
-            Some("brave-key-123")
-        );
-        assert!(config.skills.open_skills_enabled);
-        assert!(config.hooks.enabled);
-        assert!(config.hooks.builtin.command_logger);
-        assert_eq!(config.gateway.port, 8080);
-        assert_eq!(config.gateway.host, "192.168.1.100");
-        assert!(config.gateway.require_pairing);
-    }
-
-    #[test]
     fn e2e_minimal_setup_ollama_skip_everything() {
         let mut app = test_app();
         // Provider: Ollama (tier 4, idx 0)
@@ -3264,47 +3216,11 @@ mod tests {
         assert_eq!(config.default_provider.as_deref(), Some("ollama"));
         assert!(config.api_key.is_none());
         assert!(config.default_model.is_none());
-        assert!(config.channels_config.telegram.is_none());
-        assert!(config.channels_config.discord.is_none());
+        assert!(config.channels_config.webhook.is_none());
+        assert!(config.channels_config.mqtt.is_none());
         assert!(!config.skills.open_skills_enabled);
         assert!(!config.hooks.enabled);
         assert!(!config.gateway.require_pairing);
-    }
-
-    #[test]
-    fn e2e_discord_searxng_with_hooks() {
-        let mut app = test_app();
-        // Provider: OpenAI (tier 0, idx 3)
-        app.provider_tier_idx = 0;
-        app.provider_idx = 3;
-        app.api_key_input = "sk-openai-key".to_string();
-        // Model: gpt-4o
-        app.model_idx = 3;
-        // Channel: Discord (idx 2)
-        app.channel_idx = 2;
-        // Web search: SearxNG (idx 1) with instance URL
-        app.search_provider_idx = 1;
-        app.search_api_key_input = "https://search.local".to_string();
-        // Skills: Skip
-        app.skills_idx = 0;
-        // Hooks: enabled
-        app.hooks_idx = 0;
-        app.gateway_host = "0.0.0.0".to_string();
-
-        let mut config = Config::default();
-        apply_tui_selections_to_config(&app, &mut config);
-
-        assert_eq!(config.default_provider.as_deref(), Some("openai"));
-        assert_eq!(config.default_model.as_deref(), Some("gpt-4o"));
-        let dc = config.channels_config.discord.as_ref().unwrap();
-        assert_eq!(dc.bot_token, "YOUR_DISCORD_BOT_TOKEN");
-        assert_eq!(config.web_search.provider, "searxng");
-        assert_eq!(
-            config.web_search.searxng_instance_url.as_deref(),
-            Some("https://search.local")
-        );
-        assert!(config.hooks.enabled);
-        assert_eq!(config.gateway.host, "0.0.0.0");
     }
 
     #[test]
@@ -3346,7 +3262,7 @@ mod tests {
         let mut app = test_app();
         app.provider_tier_idx = 0;
         app.provider_idx = 0;
-        app.channel_idx = 0; // Telegram
+        app.channel_idx = 0;
         app.hooks_idx = 0;
         app.search_provider_idx = 0;
         app.search_api_key_input = "brave-key".to_string();
@@ -3354,12 +3270,9 @@ mod tests {
         let mut config = Config::default();
         apply_tui_selections_to_config(&app, &mut config);
 
-        // Serialize to TOML and parse back
         let toml_str = toml::to_string(&config).expect("config should serialize to TOML");
-        assert!(toml_str.contains("YOUR_TELEGRAM_BOT_TOKEN"));
         assert!(toml_str.contains("openrouter"));
 
-        // Verify it parses back
         let _: Config = toml::from_str(&toml_str).expect("serialized TOML should parse back");
     }
 

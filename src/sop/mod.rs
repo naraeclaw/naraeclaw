@@ -394,7 +394,7 @@ type = "manual"
     #[test]
     fn extract_bold_title_with_dash() {
         let (title, body) = extract_bold_title("**Stop service** — Disable endpoint.").unwrap();
-        assert_eq!(title, "Close valve");
+        assert_eq!(title, "Stop service");
         assert_eq!(body, "Disable endpoint.");
     }
 

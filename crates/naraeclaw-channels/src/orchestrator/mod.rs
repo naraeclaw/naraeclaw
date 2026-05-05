@@ -2432,7 +2432,6 @@ async fn process_channel_message(
         msg.content = Box::pin(pipeline.process(&msg.content, &msg.attachments)).await;
     }
 
-
     let target_channel = ctx
         .channels_by_name
         .get(&msg.channel)
@@ -3755,12 +3754,9 @@ fn build_channel_by_id(config: &Config, channel_id: &str) -> Result<Arc<dyn Chan
                 wh.secret.clone(),
             )))
         }
-        other => anyhow::bail!(
-            "Unknown channel '{other}'. Supported: webhook"
-        ),
+        other => anyhow::bail!("Unknown channel '{other}'. Supported: webhook"),
     }
 }
-
 
 /// Send a one-off message to a configured channel.
 pub async fn send_channel_message(
@@ -3833,7 +3829,6 @@ fn collect_configured_channels(
 pub async fn doctor_channels(config: Config) -> Result<()> {
     #[allow(unused_mut)]
     let mut channels = collect_configured_channels(&config, "health check");
-
 
     if channels.is_empty() {
         println!("No real-time channels configured. Run `naraeclaw onboard` first.");
@@ -9082,35 +9077,6 @@ This is an example JSON object for profile settings."#;
         assert_eq!(state, ChannelHealthState::Timeout);
     }
 
-    #[test]
-    fn collect_configured_channels_includes_mattermost_when_configured() {
-        let mut config = Config::default();
-        config.channels_config.mattermost = Some(naraeclaw_config::schema::MattermostConfig {
-            enabled: true,
-            url: "https://mattermost.example.com".to_string(),
-            bot_token: "test-token".to_string(),
-            channel_id: Some("channel-1".to_string()),
-            allowed_users: vec![],
-            thread_replies: Some(true),
-            mention_only: Some(false),
-            interrupt_on_new_message: false,
-            proxy_url: None,
-        });
-
-        let channels = collect_configured_channels(&config, "test");
-
-        assert!(
-            channels
-                .iter()
-                .any(|entry| entry.display_name == "Mattermost")
-        );
-        assert!(
-            channels
-                .iter()
-                .any(|entry| entry.channel.name() == "mattermost")
-        );
-    }
-
     struct AlwaysFailChannel {
         name: &'static str,
         calls: Arc<AtomicUsize>,
@@ -10166,45 +10132,6 @@ This is an example JSON object for profile settings."#;
                 .as_slice(),
             &["code-model".to_string()]
         );
-    }
-
-    #[test]
-    fn build_channel_by_id_unconfigured_telegram_returns_error() {
-        let config = Config::default();
-        match build_channel_by_id(&config, "telegram") {
-            Err(e) => {
-                let err_msg = e.to_string();
-                assert!(
-                    err_msg.contains("not configured"),
-                    "expected 'not configured' in error, got: {err_msg}"
-                );
-            }
-            Ok(_) => panic!("should fail when telegram is not configured"),
-        }
-    }
-
-    #[test]
-    fn build_channel_by_id_configured_telegram_succeeds() {
-        let mut config = Config::default();
-        config.channels_config.telegram = Some(naraeclaw_config::schema::TelegramConfig {
-            enabled: true,
-            bot_token: "test-token".to_string(),
-            allowed_users: vec![],
-            stream_mode: naraeclaw_config::schema::StreamMode::Off,
-            draft_update_interval_ms: 1000,
-            interrupt_on_new_message: false,
-            mention_only: false,
-            ack_reactions: None,
-            proxy_url: None,
-            webhook_url: None,
-            webhook_listen_addr: "0.0.0.0:8443".to_string(),
-            webhook_path: "/telegram/webhook".to_string(),
-            webhook_secret_token: None,
-        });
-        match build_channel_by_id(&config, "telegram") {
-            Ok(channel) => assert_eq!(channel.name(), "telegram"),
-            Err(e) => panic!("should succeed when telegram is configured: {e}"),
-        }
     }
 
     // ── is_stop_command tests ─────────────────────────────────────────────
