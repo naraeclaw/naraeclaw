@@ -19,6 +19,7 @@ import ChannelSetup from './pages/ChannelSetup';
 import CliTools from './pages/CliTools';
 import RemoteServers from './pages/RemoteServers';
 import Wiki from './pages/Wiki';
+import AgentProfiles from './pages/AgentProfiles';
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import { DraftContext, useDraftStore } from './hooks/useDraft';
 import { setLocale, t, type Locale } from './lib/i18n';
@@ -249,6 +250,7 @@ function AppContent() {
             <Route path="/cli-tools" element={<CliTools />} />
             <Route path="/remote" element={<RemoteServers />} />
             <Route path="/wiki" element={<Wiki />} />
+            <Route path="/profiles" element={<AgentProfiles />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>
