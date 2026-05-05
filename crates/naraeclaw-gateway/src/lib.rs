@@ -33,14 +33,6 @@ use axum::{
 use naraeclaw_api::channel::{Channel, SendMessage};
 use naraeclaw_api::tool::ToolSpec;
 
-use parking_lot::Mutex;
-use std::collections::HashMap;
-use std::net::{IpAddr, SocketAddr};
-use std::sync::Arc;
-use std::time::{Duration, Instant};
-use tower_http::limit::RequestBodyLimitLayer;
-use tower_http::timeout::TimeoutLayer;
-use uuid::Uuid;
 use naraeclaw_config::policy::SecurityPolicy;
 use naraeclaw_config::schema::Config;
 use naraeclaw_infra::session_backend::SessionBackend;
@@ -53,6 +45,14 @@ use naraeclaw_runtime::security::pairing::{PairingGuard, constant_time_eq, is_pu
 use naraeclaw_runtime::tools;
 use naraeclaw_runtime::tools::CanvasStore;
 use naraeclaw_runtime::util::truncate_with_ellipsis;
+use parking_lot::Mutex;
+use std::collections::HashMap;
+use std::net::{IpAddr, SocketAddr};
+use std::sync::Arc;
+use std::time::{Duration, Instant};
+use tower_http::limit::RequestBodyLimitLayer;
+use tower_http::timeout::TimeoutLayer;
+use uuid::Uuid;
 
 /// Maximum request body size (64KB) — prevents memory exhaustion
 pub const MAX_BODY_SIZE: usize = 65_536;
@@ -1437,7 +1437,6 @@ async fn handle_whatsapp_verify() -> impl IntoResponse {
     (StatusCode::NOT_FOUND, "WhatsApp not configured")
 }
 
-
 /// Verify `WhatsApp` webhook signature (`X-Hub-Signature-256`).
 /// Returns true if the signature is valid, false otherwise.
 /// See: <https://developers.facebook.com/docs/graph-api/webhooks/getting-started#verification-requests>
@@ -1470,12 +1469,10 @@ async fn handle_whatsapp_message() -> impl IntoResponse {
     (StatusCode::NOT_FOUND, "WhatsApp not configured")
 }
 
-
 /// GET /wati — not available
 async fn handle_wati_verify() -> impl IntoResponse {
     (StatusCode::NOT_FOUND, "WATI not configured")
 }
-
 
 #[cfg(feature = "channel-wati")]
 #[derive(Debug, serde::Deserialize)]
@@ -1489,18 +1486,18 @@ async fn handle_wati_webhook() -> impl IntoResponse {
     (StatusCode::NOT_FOUND, "WATI not configured")
 }
 
-
-
 /// POST /nextcloud-talk — not available
 async fn handle_nextcloud_talk_webhook() -> impl IntoResponse {
     (StatusCode::NOT_FOUND, "Nextcloud Talk not configured")
 }
 
-
 /// Maximum request body size for the Gmail webhook endpoint (1 MB).
 /// POST /webhook/gmail — not available
 async fn handle_gmail_push_webhook() -> impl IntoResponse {
-    (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Gmail push not configured"})))
+    (
+        StatusCode::NOT_FOUND,
+        Json(serde_json::json!({"error": "Gmail push not configured"})),
+    )
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -1730,6 +1727,8 @@ mod tests {
             rate_limiter: Arc::new(GatewayRateLimiter::new(100, 100, 100)),
             auth_limiter: Arc::new(auth_rate_limit::AuthRateLimiter::new()),
             idempotency_store: Arc::new(IdempotencyStore::new(Duration::from_secs(300), 1000)),
+            whatsapp_app_secret: None,
+            nextcloud_talk_webhook_secret: None,
             observer: Arc::new(naraeclaw_runtime::observability::NoopObserver),
             tools_registry: Arc::new(Vec::new()),
             cost_tracker: None,
@@ -2182,6 +2181,8 @@ mod tests {
             rate_limiter: Arc::new(GatewayRateLimiter::new(100, 100, 100)),
             auth_limiter: Arc::new(auth_rate_limit::AuthRateLimiter::new()),
             idempotency_store: Arc::new(IdempotencyStore::new(Duration::from_secs(300), 1000)),
+            whatsapp_app_secret: None,
+            nextcloud_talk_webhook_secret: None,
             observer: Arc::new(naraeclaw_runtime::observability::NoopObserver),
             tools_registry: Arc::new(Vec::new()),
             cost_tracker: None,
@@ -2254,6 +2255,8 @@ mod tests {
             rate_limiter: Arc::new(GatewayRateLimiter::new(100, 100, 100)),
             auth_limiter: Arc::new(auth_rate_limit::AuthRateLimiter::new()),
             idempotency_store: Arc::new(IdempotencyStore::new(Duration::from_secs(300), 1000)),
+            whatsapp_app_secret: None,
+            nextcloud_talk_webhook_secret: None,
             observer: Arc::new(naraeclaw_runtime::observability::NoopObserver),
             tools_registry: Arc::new(Vec::new()),
             cost_tracker: None,
@@ -2338,6 +2341,8 @@ mod tests {
             rate_limiter: Arc::new(GatewayRateLimiter::new(100, 100, 100)),
             auth_limiter: Arc::new(auth_rate_limit::AuthRateLimiter::new()),
             idempotency_store: Arc::new(IdempotencyStore::new(Duration::from_secs(300), 1000)),
+            whatsapp_app_secret: None,
+            nextcloud_talk_webhook_secret: None,
             observer: Arc::new(naraeclaw_runtime::observability::NoopObserver),
             tools_registry: Arc::new(Vec::new()),
             cost_tracker: None,
@@ -2394,6 +2399,8 @@ mod tests {
             rate_limiter: Arc::new(GatewayRateLimiter::new(100, 100, 100)),
             auth_limiter: Arc::new(auth_rate_limit::AuthRateLimiter::new()),
             idempotency_store: Arc::new(IdempotencyStore::new(Duration::from_secs(300), 1000)),
+            whatsapp_app_secret: None,
+            nextcloud_talk_webhook_secret: None,
             observer: Arc::new(naraeclaw_runtime::observability::NoopObserver),
             tools_registry: Arc::new(Vec::new()),
             cost_tracker: None,
@@ -2455,6 +2462,8 @@ mod tests {
             rate_limiter: Arc::new(GatewayRateLimiter::new(100, 100, 100)),
             auth_limiter: Arc::new(auth_rate_limit::AuthRateLimiter::new()),
             idempotency_store: Arc::new(IdempotencyStore::new(Duration::from_secs(300), 1000)),
+            whatsapp_app_secret: None,
+            nextcloud_talk_webhook_secret: None,
             observer: Arc::new(naraeclaw_runtime::observability::NoopObserver),
             tools_registry: Arc::new(Vec::new()),
             cost_tracker: None,
@@ -2491,140 +2500,6 @@ mod tests {
 
         assert_eq!(response.status(), StatusCode::OK);
         assert_eq!(provider_impl.calls.load(Ordering::SeqCst), 1);
-    }
-
-    fn compute_nextcloud_signature_hex(secret: &str, random: &str, body: &str) -> String {
-        use hmac::{Hmac, KeyInit, Mac};
-        use sha2::Sha256;
-
-        let payload = format!("{random}{body}");
-        let mut mac = Hmac::<Sha256>::new_from_slice(secret.as_bytes()).unwrap();
-        mac.update(payload.as_bytes());
-        hex::encode(mac.finalize().into_bytes())
-    }
-
-    #[tokio::test]
-    async fn nextcloud_talk_webhook_returns_not_found_when_not_configured() {
-        let provider: Arc<dyn Provider> = Arc::new(MockProvider::default());
-        let memory: Arc<dyn Memory> = Arc::new(MockMemory);
-
-        let state = AppState {
-            config: Arc::new(Mutex::new(Config::default())),
-            provider,
-            model: "test-model".into(),
-            temperature: 0.0,
-            mem: memory,
-            auto_save: false,
-            webhook_secret_hash: None,
-            pairing: Arc::new(PairingGuard::new(false, &[])),
-            trust_forwarded_headers: false,
-            rate_limiter: Arc::new(GatewayRateLimiter::new(100, 100, 100)),
-            auth_limiter: Arc::new(auth_rate_limit::AuthRateLimiter::new()),
-            idempotency_store: Arc::new(IdempotencyStore::new(Duration::from_secs(300), 1000)),
-            observer: Arc::new(naraeclaw_runtime::observability::NoopObserver),
-            tools_registry: Arc::new(Vec::new()),
-            cost_tracker: None,
-            event_tx: tokio::sync::broadcast::channel(16).0,
-            event_buffer: Arc::new(sse::EventBuffer::new(16)),
-            shutdown_tx: tokio::sync::watch::channel(false).0,
-            node_registry: Arc::new(nodes::NodeRegistry::new(16)),
-            path_prefix: String::new(),
-            web_dist_dir: None,
-            session_backend: None,
-            session_queue: std::sync::Arc::new(crate::session_queue::SessionActorQueue::new(
-                8, 30, 600,
-            )),
-            device_registry: None,
-            pending_pairings: None,
-            canvas_store: CanvasStore::new(),
-            #[cfg(feature = "webauthn")]
-            webauthn: None,
-        };
-
-        let response = Box::pin(handle_nextcloud_talk_webhook(
-            State(state),
-            HeaderMap::new(),
-            Bytes::from_static(br#"{"type":"message"}"#),
-        ))
-        .await
-        .into_response();
-
-        assert_eq!(response.status(), StatusCode::NOT_FOUND);
-    }
-
-    #[tokio::test]
-    async fn nextcloud_talk_webhook_rejects_invalid_signature() {
-        let provider_impl = Arc::new(MockProvider::default());
-        let provider: Arc<dyn Provider> = provider_impl.clone();
-        let memory: Arc<dyn Memory> = Arc::new(MockMemory);
-
-        let channel = Arc::new(NextcloudTalkChannel::new(
-            "https://cloud.example.com".into(),
-            "app-token".into(),
-            String::new(),
-            vec!["*".into()],
-        ));
-
-        let secret = "nextcloud-test-secret";
-        let random = "seed-value";
-        let body = r#"{"type":"message","object":{"token":"room-token"},"message":{"actorType":"users","actorId":"user_a","message":"hello"}}"#;
-        let _valid_signature = compute_nextcloud_signature_hex(secret, random, body);
-        let invalid_signature = "deadbeef";
-
-        let state = AppState {
-            config: Arc::new(Mutex::new(Config::default())),
-            provider,
-            model: "test-model".into(),
-            temperature: 0.0,
-            mem: memory,
-            auto_save: false,
-            webhook_secret_hash: None,
-            pairing: Arc::new(PairingGuard::new(false, &[])),
-            trust_forwarded_headers: false,
-            rate_limiter: Arc::new(GatewayRateLimiter::new(100, 100, 100)),
-            auth_limiter: Arc::new(auth_rate_limit::AuthRateLimiter::new()),
-            idempotency_store: Arc::new(IdempotencyStore::new(Duration::from_secs(300), 1000)),
-            nextcloud_talk: Some(channel),
-            nextcloud_talk_webhook_secret: Some(Arc::from(secret)),
-            observer: Arc::new(naraeclaw_runtime::observability::NoopObserver),
-            tools_registry: Arc::new(Vec::new()),
-            cost_tracker: None,
-            event_tx: tokio::sync::broadcast::channel(16).0,
-            event_buffer: Arc::new(sse::EventBuffer::new(16)),
-            shutdown_tx: tokio::sync::watch::channel(false).0,
-            node_registry: Arc::new(nodes::NodeRegistry::new(16)),
-            path_prefix: String::new(),
-            web_dist_dir: None,
-            session_backend: None,
-            session_queue: std::sync::Arc::new(crate::session_queue::SessionActorQueue::new(
-                8, 30, 600,
-            )),
-            device_registry: None,
-            pending_pairings: None,
-            canvas_store: CanvasStore::new(),
-            #[cfg(feature = "webauthn")]
-            webauthn: None,
-        };
-
-        let mut headers = HeaderMap::new();
-        headers.insert(
-            "X-Nextcloud-Talk-Random",
-            HeaderValue::from_str(random).unwrap(),
-        );
-        headers.insert(
-            "X-Nextcloud-Talk-Signature",
-            HeaderValue::from_str(invalid_signature).unwrap(),
-        );
-
-        let response = Box::pin(handle_nextcloud_talk_webhook(
-            State(state),
-            headers,
-            Bytes::from(body),
-        ))
-        .await
-        .into_response();
-        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
-        assert_eq!(provider_impl.calls.load(Ordering::SeqCst), 0);
     }
 
     // ══════════════════════════════════════════════════════════

@@ -135,8 +135,7 @@ pub async fn complete_onboarding(
     };
     std::fs::create_dir_all(&config_dir).map_err(|e| format!("디렉토리 생성 실패: {e}"))?;
 
-    let toml = build_config_toml(&settings)
-        .map_err(|e| format!("config 생성 실패: {e}"))?;
+    let toml = build_config_toml(&settings).map_err(|e| format!("config 생성 실패: {e}"))?;
     std::fs::write(config_dir.join("config.toml"), toml)
         .map_err(|e| format!("config.toml 저장 실패: {e}"))?;
 
@@ -159,10 +158,7 @@ fn build_config_toml(s: &OnboardingSettings) -> Result<String, String> {
         "default_provider".into(),
         toml::Value::String(s.provider.clone()),
     );
-    root.insert(
-        "default_model".into(),
-        toml::Value::String(s.model.clone()),
-    );
+    root.insert("default_model".into(), toml::Value::String(s.model.clone()));
     if let Some(ref key) = s.api_key {
         root.insert("api_key".into(), toml::Value::String(key.clone()));
     }

@@ -1454,12 +1454,8 @@ mod tests {
             rate_limiter: Arc::new(GatewayRateLimiter::new(100, 100, 100)),
             auth_limiter: Arc::new(crate::auth_rate_limit::AuthRateLimiter::new()),
             idempotency_store: Arc::new(IdempotencyStore::new(Duration::from_secs(300), 1000)),
-            whatsapp: None,
             whatsapp_app_secret: None,
-            nextcloud_talk: None,
             nextcloud_talk_webhook_secret: None,
-            wati: None,
-            gmail_push: None,
             observer: Arc::new(naraeclaw_runtime::observability::NoopObserver),
             tools_registry: Arc::new(Vec::new()),
             cost_tracker: None,
@@ -1499,29 +1495,6 @@ mod tests {
             token: "cf-token".to_string(),
         });
         cfg.memory.qdrant.api_key = Some("qdrant-key".to_string());
-        cfg.channels_config.wati = Some(naraeclaw_config::schema::WatiConfig {
-            enabled: true,
-            api_token: "wati-token".to_string(),
-            api_url: "https://live-mt-server.wati.io".to_string(),
-            tenant_id: None,
-            allowed_numbers: vec![],
-            proxy_url: None,
-        });
-        cfg.channels_config.email = Some(naraeclaw_config::scattered_types::EmailConfig {
-            imap_host: "imap.example.com".to_string(),
-            imap_port: 993,
-            imap_folder: "INBOX".to_string(),
-            smtp_host: "smtp.example.com".to_string(),
-            smtp_port: 465,
-            smtp_tls: true,
-            username: "agent@example.com".to_string(),
-            password: "email-password-secret".to_string(),
-            from_address: "agent@example.com".to_string(),
-            idle_timeout_secs: 1740,
-            allowed_senders: vec!["*".to_string()],
-            default_subject: "NaraeClaw Message".to_string(),
-            max_attachment_bytes: 25 * 1024 * 1024,
-        });
         cfg.model_routes = vec![naraeclaw_config::schema::ModelRouteConfig {
             hint: "reasoning".to_string(),
             provider: "openrouter".to_string(),
@@ -1554,14 +1527,6 @@ mod tests {
             parsed.tunnel.cloudflare.as_ref().map(|v| v.token.as_str()),
             Some(MASKED_SECRET)
         );
-        assert_eq!(
-            parsed
-                .channels_config
-                .wati
-                .as_ref()
-                .map(|v| v.api_token.as_str()),
-            Some(MASKED_SECRET)
-        );
         assert_eq!(parsed.memory.qdrant.api_key.as_deref(), Some(MASKED_SECRET));
         assert_eq!(
             parsed
@@ -1575,14 +1540,6 @@ mod tests {
                 .embedding_routes
                 .first()
                 .and_then(|v| v.api_key.as_deref()),
-            Some(MASKED_SECRET)
-        );
-        assert_eq!(
-            parsed
-                .channels_config
-                .email
-                .as_ref()
-                .map(|v| v.password.as_str()),
             Some(MASKED_SECRET)
         );
     }
@@ -1603,29 +1560,6 @@ mod tests {
             domain: None,
         });
         current.memory.qdrant.api_key = Some("qdrant-real".to_string());
-        current.channels_config.wati = Some(naraeclaw_config::schema::WatiConfig {
-            enabled: true,
-            api_token: "wati-real".to_string(),
-            api_url: "https://live-mt-server.wati.io".to_string(),
-            tenant_id: None,
-            allowed_numbers: vec![],
-            proxy_url: None,
-        });
-        current.channels_config.email = Some(naraeclaw_config::scattered_types::EmailConfig {
-            imap_host: "imap.example.com".to_string(),
-            imap_port: 993,
-            imap_folder: "INBOX".to_string(),
-            smtp_host: "smtp.example.com".to_string(),
-            smtp_port: 465,
-            smtp_tls: true,
-            username: "agent@example.com".to_string(),
-            password: "email-password-real".to_string(),
-            from_address: "agent@example.com".to_string(),
-            idle_timeout_secs: 1740,
-            allowed_senders: vec!["*".to_string()],
-            default_subject: "NaraeClaw Message".to_string(),
-            max_attachment_bytes: 25 * 1024 * 1024,
-        });
         current.model_routes = vec![
             naraeclaw_config::schema::ModelRouteConfig {
                 hint: "reasoning".to_string(),
@@ -1669,12 +1603,6 @@ mod tests {
             ngrok.auth_token = MASKED_SECRET.to_string();
         }
         incoming.memory.qdrant.api_key = Some(MASKED_SECRET.to_string());
-        if let Some(wati) = incoming.channels_config.wati.as_mut() {
-            wati.api_token = MASKED_SECRET.to_string();
-        }
-        if let Some(email) = incoming.channels_config.email.as_mut() {
-            email.password = MASKED_SECRET.to_string();
-        }
         incoming.model_routes[1].api_key = Some("route-model-key-2-new".to_string());
         incoming.embedding_routes[1].api_key = Some("route-embed-key-2-new".to_string());
 
@@ -1713,14 +1641,6 @@ mod tests {
             Some("qdrant-real")
         );
         assert_eq!(
-            hydrated
-                .channels_config
-                .wati
-                .as_ref()
-                .map(|v| v.api_token.as_str()),
-            Some("wati-real")
-        );
-        assert_eq!(
             hydrated.model_routes[0].api_key.as_deref(),
             Some("route-model-key-1")
         );
@@ -1735,14 +1655,6 @@ mod tests {
         assert_eq!(
             hydrated.embedding_routes[1].api_key.as_deref(),
             Some("route-embed-key-2-new")
-        );
-        assert_eq!(
-            hydrated
-                .channels_config
-                .email
-                .as_ref()
-                .map(|v| v.password.as_str()),
-            Some("email-password-real")
         );
     }
 
