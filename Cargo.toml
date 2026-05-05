@@ -1,5 +1,5 @@
 [workspace]
-members = [".", "crates/naraeclaw-api", "crates/naraeclaw-infra", "crates/naraeclaw-config", "crates/naraeclaw-providers", "crates/naraeclaw-memory", "crates/naraeclaw-channels", "crates/naraeclaw-tools", "crates/naraeclaw-runtime", "crates/naraeclaw-tui", "crates/naraeclaw-gateway", "crates/naraeclaw-tool-call-parser", "crates/naraeclaw-macros", "apps/tauri"]
+members = [".", "crates/naraeclaw-api", "crates/naraeclaw-infra", "crates/naraeclaw-config", "crates/naraeclaw-providers", "crates/naraeclaw-memory", "crates/naraeclaw-channels", "crates/naraeclaw-tools", "crates/naraeclaw-runtime", "crates/naraeclaw-tui", "crates/naraeclaw-gateway", "crates/naraeclaw-tool-call-parser", "crates/naraeclaw-macros"]
 resolver = "2"
 
 [workspace.package]
