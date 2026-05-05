@@ -281,7 +281,7 @@ mod tests {
         let pipeline = MediaPipeline::new(&config, &tc, false);
 
         let result = pipeline.process("", &[sample_audio()]).await;
-        assert_eq!(result, "[Audio: attached]");
+        assert_eq!(result, "[Audio: transcription not available]");
     }
 
     #[tokio::test]
@@ -295,7 +295,7 @@ mod tests {
         let result = pipeline.process("context", &attachments).await;
 
         assert!(
-            result.contains("[Audio: attached]"),
+            result.contains("[Audio: transcription not available]"),
             "missing audio annotation"
         );
         assert!(
