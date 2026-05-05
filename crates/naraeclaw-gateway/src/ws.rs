@@ -36,7 +36,7 @@ use tracing::debug;
 /// parameters are extracted and an acknowledgement is sent back. Old clients
 /// that send `{"type":"message",...}` as the first frame still work — the
 /// message is processed normally (backward-compatible).
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Default)]
 struct ConnectParams {
     #[serde(rename = "type")]
     msg_type: String,
@@ -49,6 +49,29 @@ struct ConnectParams {
     /// Client capabilities
     #[serde(default)]
     capabilities: Vec<String>,
+
+    // ── 에이전트별 정책 오버라이드 ─────────────────────────────
+    /// 기본 작업 디렉토리 (빈 문자열이면 전역 config 사용)
+    #[serde(default)]
+    working_dir: Option<String>,
+    /// 워크스페이스 외부 접근 차단 여부
+    #[serde(default)]
+    workspace_only: Option<bool>,
+    /// 허용 명령어 목록 (빈 배열이면 전역 config 사용)
+    #[serde(default)]
+    allowed_commands: Option<Vec<String>>,
+    /// 추가 접근 허용 경로 목록
+    #[serde(default)]
+    allowed_roots: Option<Vec<String>>,
+    /// 쉘 타임아웃 (초)
+    #[serde(default)]
+    shell_timeout_secs: Option<u64>,
+    /// 자동 승인 도구 목록
+    #[serde(default)]
+    auto_approve_tools: Option<Vec<String>>,
+    /// 항상 확인 도구 목록
+    #[serde(default)]
+    always_ask_tools: Option<Vec<String>>,
 }
 
 /// The sub-protocol we support for the chat WebSocket.
@@ -161,8 +184,132 @@ async fn handle_socket(
     let session_id = session_id.unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
     let session_key = format!("{GW_SESSION_PREFIX}{session_id}");
 
-    // Build a persistent Agent for this connection so history is maintained across turns.
-    let config = state.config.lock().clone();
+    // ── 세션 메타데이터 조회 (agent 초기화 전에 수행) ────────────────────────────
+    // session_start는 session backend에서만 필요 — agent 없이도 보낼 수 있다.
+    let mut resumed = false;
+    let mut message_count: usize = 0;
+    let mut effective_name: Option<String> = None;
+    let persisted_messages: Vec<naraeclaw_providers::ChatMessage> = if let Some(ref backend) =
+        state.session_backend
+    {
+        let msgs = backend.load(&session_key);
+        if !msgs.is_empty() {
+            message_count = msgs.len();
+            resumed = true;
+        }
+        if let Some(ref name) = session_name
+            && !name.is_empty()
+        {
+            let _ = backend.set_session_name(&session_key, name);
+            effective_name = Some(name.clone());
+        }
+        if effective_name.is_none() {
+            effective_name = backend.get_session_name(&session_key).unwrap_or(None);
+        }
+        msgs
+    } else {
+        vec![]
+    };
+
+    // Send session_start message to client (agent 초기화 전 — 빠른 응답)
+    let mut session_start = serde_json::json!({
+        "type": "session_start",
+        "session_id": session_id,
+        "resumed": resumed,
+        "message_count": message_count,
+    });
+    if let Some(ref name) = effective_name {
+        session_start["name"] = serde_json::Value::String(name.clone());
+    }
+    let _ = sender
+        .send(Message::Text(session_start.to_string().into()))
+        .await;
+
+    // ── Optional connect handshake (에이전트 정책 오버라이드 포함) ──────────────
+    // 첫 메시지가 `{"type":"connect",...}`면 정책 오버라이드를 추출하고 ack 전송.
+    // 구버전 클라이언트가 바로 `{"type":"message",...}`를 보내도 동작 (backward-compat).
+    let mut connect_params = ConnectParams::default();
+    let mut first_msg_fallback: Option<String> = None;
+
+    if let Some(first) = receiver.next().await {
+        match first {
+            Ok(Message::Text(text)) => {
+                if let Ok(cp) = serde_json::from_str::<ConnectParams>(&text) {
+                    if cp.msg_type == "connect" {
+                        debug!(
+                            session_id = ?cp.session_id,
+                            device_name = ?cp.device_name,
+                            capabilities = ?cp.capabilities,
+                            working_dir = ?cp.working_dir,
+                            allowed_commands = ?cp.allowed_commands,
+                            "WebSocket connect params received"
+                        );
+                        connect_params = cp;
+                        let ack = serde_json::json!({
+                            "type": "connected",
+                            "message": "Connection established"
+                        });
+                        let _ = sender.send(Message::Text(ack.to_string().into())).await;
+                    } else {
+                        first_msg_fallback = Some(text.to_string());
+                    }
+                } else {
+                    first_msg_fallback = Some(text.to_string());
+                }
+            }
+            Ok(Message::Close(_)) | Err(_) => return,
+            _ => {}
+        }
+    }
+
+    // ── config 클론 후 에이전트 정책 오버라이드 적용 ────────────────────────────
+    // connect 메시지 수신 후에 config를 클론하고 정책을 적용한다.
+    // state.config는 Mutex로 보호되므로 클론 후 독립적으로 변경 가능.
+    let mut config = state.config.lock().clone();
+
+    if let Some(ref wd) = connect_params.working_dir {
+        if !wd.is_empty() {
+            let expanded = if wd.starts_with('~') {
+                if let Ok(home) = std::env::var("HOME") {
+                    wd.replacen('~', &home, 1)
+                } else {
+                    wd.clone()
+                }
+            } else {
+                wd.clone()
+            };
+            config.workspace_dir = std::path::PathBuf::from(expanded);
+        }
+    }
+    if let Some(workspace_only) = connect_params.workspace_only {
+        config.autonomy.workspace_only = workspace_only;
+    }
+    if let Some(ref cmds) = connect_params.allowed_commands {
+        if !cmds.is_empty() {
+            config.autonomy.allowed_commands = cmds.clone();
+        }
+    }
+    if let Some(ref roots) = connect_params.allowed_roots {
+        // 기존 allowed_roots에 추가 (전역 설정 유지 + 에이전트별 추가)
+        for root in roots {
+            if !config.autonomy.allowed_roots.contains(root) {
+                config.autonomy.allowed_roots.push(root.clone());
+            }
+        }
+    }
+    if let Some(timeout) = connect_params.shell_timeout_secs {
+        config.autonomy.shell_timeout_secs = timeout;
+    }
+    if let Some(ref tools) = connect_params.auto_approve_tools {
+        if !tools.is_empty() {
+            config.autonomy.auto_approve = tools.clone();
+        }
+    }
+    if let Some(ref tools) = connect_params.always_ask_tools {
+        config.autonomy.always_ask = tools.clone();
+    }
+
+    // ── Agent 초기화 (정책이 적용된 config로) ────────────────────────────────────
     let mut agent = match naraeclaw_runtime::agent::Agent::from_config(&config).await {
         Ok(a) => a,
         Err(e) => {
@@ -184,86 +331,15 @@ async fn handle_socket(
             return;
         }
     };
-    agent.set_memory_session_id(Some(session_id.clone()));
 
-    // Hydrate agent from persisted session (if available)
-    let mut resumed = false;
-    let mut message_count: usize = 0;
-    let mut effective_name: Option<String> = None;
-    if let Some(ref backend) = state.session_backend {
-        let messages = backend.load(&session_key);
-        if !messages.is_empty() {
-            message_count = messages.len();
-            agent.seed_history(&messages);
-            resumed = true;
-        }
-        // Set session name if provided (non-empty) on connect
-        if let Some(ref name) = session_name
-            && !name.is_empty()
-        {
-            let _ = backend.set_session_name(&session_key, name);
-            effective_name = Some(name.clone());
-        }
-        // If no name was provided via query param, load the stored name
-        if effective_name.is_none() {
-            effective_name = backend.get_session_name(&session_key).unwrap_or(None);
-        }
-    }
+    // session_id override from connect params
+    let effective_sid = connect_params.session_id
+        .unwrap_or_else(|| session_id.clone());
+    agent.set_memory_session_id(Some(effective_sid));
 
-    // Send session_start message to client
-    let mut session_start = serde_json::json!({
-        "type": "session_start",
-        "session_id": session_id,
-        "resumed": resumed,
-        "message_count": message_count,
-    });
-    if let Some(ref name) = effective_name {
-        session_start["name"] = serde_json::Value::String(name.clone());
-    }
-    let _ = sender
-        .send(Message::Text(session_start.to_string().into()))
-        .await;
-
-    // ── Optional connect handshake ──────────────────────────────────
-    // The first message may be a `{"type":"connect",...}` frame carrying
-    // connection parameters.  If it is, we extract the params, send an
-    // ack, and proceed to the normal message loop.  If the first message
-    // is a regular `{"type":"message",...}` frame, we fall through and
-    // process it immediately (backward-compatible).
-    let mut first_msg_fallback: Option<String> = None;
-
-    if let Some(first) = receiver.next().await {
-        match first {
-            Ok(Message::Text(text)) => {
-                if let Ok(cp) = serde_json::from_str::<ConnectParams>(&text) {
-                    if cp.msg_type == "connect" {
-                        debug!(
-                            session_id = ?cp.session_id,
-                            device_name = ?cp.device_name,
-                            capabilities = ?cp.capabilities,
-                            "WebSocket connect params received"
-                        );
-                        // Override session_id if provided in connect params
-                        if let Some(sid) = &cp.session_id {
-                            agent.set_memory_session_id(Some(sid.clone()));
-                        }
-                        let ack = serde_json::json!({
-                            "type": "connected",
-                            "message": "Connection established"
-                        });
-                        let _ = sender.send(Message::Text(ack.to_string().into())).await;
-                    } else {
-                        // Not a connect message — fall through to normal processing
-                        first_msg_fallback = Some(text.to_string());
-                    }
-                } else {
-                    // Not parseable as ConnectParams — fall through
-                    first_msg_fallback = Some(text.to_string());
-                }
-            }
-            Ok(Message::Close(_)) | Err(_) => return,
-            _ => {}
-        }
+    // 세션 히스토리 주입 (이미 위에서 로드한 메시지 사용)
+    if !persisted_messages.is_empty() {
+        agent.seed_history(&persisted_messages);
     }
 
     // Process the first message if it was not a connect frame
