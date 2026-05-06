@@ -333,106 +333,279 @@ impl Channel for SlackChannel {
     }
 }
 
-/// Parse a Slack `events_api` payload into a `ChannelMessage`.
-///
-/// Routing rules:
-/// - `app_mention` — always handled (explicit @bot mention in any channel or thread)
-/// - `message` in DM (channel starts with `D`) — always handled
-/// - `message` in public/private channel — ignored (use @mention instead)
-fn parse_events_api(payload: &serde_json::Value) -> Option<ChannelMessage> {
+// ── parse_events_api helpers (CC ≤ 4 each) ───────────────────────
+
+struct SlackEventFields {
+    user: String,
+    channel: String,
+    text: String,
+    ts: String,
+    thread_ts: Option<String>,
+}
+
+/// Extract the `event` object and its `type` string from an `events_api` payload.
+/// CC=3 (base + 2×?)
+fn get_event_type(payload: &serde_json::Value) -> Option<(&serde_json::Value, &str)> {
     let event = payload.get("event")?;
     let event_type = event["type"].as_str()?;
+    Some((event, event_type))
+}
 
-    // Accept explicit @mention events and plain message events (for DM routing below)
-    if event_type != "message" && event_type != "app_mention" {
-        return None;
-    }
+/// Returns true for event types this bot handles.
+/// CC=2 (base + 1×||)
+fn is_supported_event(event_type: &str) -> bool {
+    event_type == "message" || event_type == "app_mention"
+}
 
-    // Ignore bot messages and edited/deleted subtypes
-    if event.get("subtype").is_some() {
-        return None;
-    }
-    if event.get("bot_id").is_some() {
-        return None;
-    }
+/// Returns true for bot-generated or system messages (subtypes) to ignore.
+/// CC=2 (base + 1×||)
+fn is_passive_message(event: &serde_json::Value) -> bool {
+    event.get("subtype").is_some() || event.get("bot_id").is_some()
+}
 
-    let channel = event["channel"].as_str()?.to_string();
+/// Returns true if this message should be routed to the agent.
+/// app_mention = always; plain message = only in DMs (channel starts with 'D').
+/// CC=2 (base + 1×||)
+fn is_routable(event_type: &str, channel: &str) -> bool {
+    event_type == "app_mention" || channel.starts_with('D')
+}
 
-    // For plain `message` events, only respond in DMs (channel ID starts with 'D').
-    // In channels, require an explicit @mention (`app_mention` event type).
-    if event_type == "message" && !channel.starts_with('D') {
-        return None;
-    }
+/// Returns Some(()) when all routing guards pass, None otherwise.
+/// CC=4 (base + 3×&&)
+fn guard_event(event_type: &str, event: &serde_json::Value, f: &SlackEventFields) -> Option<()> {
+    (is_supported_event(event_type)
+        && !is_passive_message(event)
+        && !f.text.is_empty()
+        && is_routable(event_type, &f.channel))
+    .then_some(())
+}
 
-    let user = event["user"].as_str()?.to_string();
-    let text = event["text"].as_str().unwrap_or("").to_string();
-    let ts = event["ts"].as_str()?.to_string();
+/// Extract required message fields from an event object.
+/// CC=4 (base + 3×?)
+fn extract_event_fields(event: &serde_json::Value) -> Option<SlackEventFields> {
+    Some(SlackEventFields {
+        user: event["user"].as_str()?.to_string(),
+        channel: event["channel"].as_str()?.to_string(),
+        ts: event["ts"].as_str()?.to_string(),
+        text: event["text"].as_str().unwrap_or("").to_string(),
+        thread_ts: event["thread_ts"].as_str().map(str::to_string),
+    })
+}
 
-    if text.is_empty() {
-        return None;
-    }
-
-    // thread_ts is set when the message is inside a thread
-    let thread_ts = event["thread_ts"].as_str().map(|s| s.to_string());
-    // Use thread_ts as the interruption scope when in a thread
-    let interruption_scope_id = thread_ts.clone();
-
-    let reply_target = channel.clone();
-
-    let timestamp = ts
+/// Build a ChannelMessage from validated event fields.
+/// CC=1 (no branches; all guards have already passed)
+fn build_channel_message(f: SlackEventFields) -> ChannelMessage {
+    let timestamp = f
+        .ts
         .split('.')
         .next()
         .and_then(|s| s.parse::<u64>().ok())
         .unwrap_or_default();
-
-    Some(ChannelMessage {
-        id: format!("slack_{channel}_{ts}"),
-        sender: user,
-        reply_target,
-        content: text,
+    ChannelMessage {
+        id: format!("slack_{}_{}", f.channel, f.ts),
+        sender: f.user,
+        reply_target: f.channel.clone(),
+        content: f.text,
         channel: "slack".to_string(),
         timestamp,
-        thread_ts: Some(ts),
-        interruption_scope_id,
+        thread_ts: Some(f.ts),
+        interruption_scope_id: f.thread_ts,
         attachments: vec![],
-        // app_mention = explicit @bot call; message in DM = always direct
-        is_mention: event_type == "app_mention" || channel.starts_with('D'),
-    })
+        is_mention: true, // guard_event already confirmed app_mention or DM
+    }
+}
+
+/// Parse a Slack `events_api` payload into a `ChannelMessage`.
+/// CC=4 (base + 3×?) — delegates all decisions to focused helpers.
+fn parse_events_api(payload: &serde_json::Value) -> Option<ChannelMessage> {
+    let (event, event_type) = get_event_type(payload)?;
+    let f = extract_event_fields(event)?;
+    guard_event(event_type, event, &f)?;
+    Some(build_channel_message(f))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn make_dm_payload(user: &str, text: &str, ts: &str) -> serde_json::Value {
-        serde_json::json!({
-            "type": "event_callback",
-            "event": {
-                "type": "message",
-                "user": user,
-                "channel": "D456",  // DM channel (starts with 'D')
-                "text": text,
-                "ts": ts
-            }
-        })
+    // ── 테스트 픽스처 ──────────────────────────────────────────────
+
+    fn dm_event(user: &str, text: &str, ts: &str) -> serde_json::Value {
+        serde_json::json!({ "event": { "type": "message", "user": user, "channel": "D456", "text": text, "ts": ts } })
     }
 
-    fn make_mention_payload(user: &str, channel: &str, text: &str, ts: &str) -> serde_json::Value {
-        serde_json::json!({
-            "type": "event_callback",
-            "event": {
-                "type": "app_mention",
-                "user": user,
-                "channel": channel,
-                "text": text,
-                "ts": ts
-            }
-        })
+    fn mention_event(user: &str, channel: &str, text: &str, ts: &str) -> serde_json::Value {
+        serde_json::json!({ "event": { "type": "app_mention", "user": user, "channel": channel, "text": text, "ts": ts } })
+    }
+
+    // ── get_event_type (CC=3) ──────────────────────────────────────
+
+    #[test]
+    fn get_event_type_extracts_event_and_type() {
+        let payload = dm_event("U1", "hi", "1.0");
+        let (_, event_type) = get_event_type(&payload).unwrap();
+        assert_eq!(event_type, "message");
     }
 
     #[test]
+    fn get_event_type_missing_event_returns_none() {
+        assert!(get_event_type(&serde_json::json!({})).is_none());
+    }
+
+    #[test]
+    fn get_event_type_missing_type_returns_none() {
+        assert!(get_event_type(&serde_json::json!({ "event": {} })).is_none());
+    }
+
+    // ── is_supported_event (CC=2) ──────────────────────────────────
+
+    #[test]
+    fn is_supported_event_accepts_message_and_app_mention() {
+        assert!(is_supported_event("message"));
+        assert!(is_supported_event("app_mention"));
+    }
+
+    #[test]
+    fn is_supported_event_rejects_other_types() {
+        assert!(!is_supported_event("reaction_added"));
+        assert!(!is_supported_event(""));
+    }
+
+    // ── is_passive_message (CC=2) ──────────────────────────────────
+
+    #[test]
+    fn is_passive_message_detects_bot_id() {
+        let event = serde_json::json!({ "bot_id": "B1" });
+        assert!(is_passive_message(&event));
+    }
+
+    #[test]
+    fn is_passive_message_detects_subtype() {
+        let event = serde_json::json!({ "subtype": "message_changed" });
+        assert!(is_passive_message(&event));
+    }
+
+    #[test]
+    fn is_passive_message_passes_normal_user_message() {
+        let event = serde_json::json!({ "user": "U1" });
+        assert!(!is_passive_message(&event));
+    }
+
+    // ── is_routable (CC=2) ────────────────────────────────────────
+
+    #[test]
+    fn is_routable_app_mention_in_public_channel() {
+        assert!(is_routable("app_mention", "C123"));
+    }
+
+    #[test]
+    fn is_routable_dm_message() {
+        assert!(is_routable("message", "D123"));
+    }
+
+    #[test]
+    fn is_routable_channel_message_without_mention() {
+        assert!(!is_routable("message", "C123"));
+    }
+
+    // ── guard_event (CC=4) ────────────────────────────────────────
+
+    fn valid_fields() -> SlackEventFields {
+        SlackEventFields {
+            user: "U1".into(),
+            channel: "D1".into(),
+            text: "hello".into(),
+            ts: "1.0".into(),
+            thread_ts: None,
+        }
+    }
+
+    #[test]
+    fn guard_event_passes_valid_dm_message() {
+        let event = serde_json::json!({ "type": "message" });
+        assert!(guard_event("message", &event, &valid_fields()).is_some());
+    }
+
+    #[test]
+    fn guard_event_rejects_unsupported_type() {
+        let event = serde_json::json!({});
+        assert!(guard_event("reaction_added", &event, &valid_fields()).is_none());
+    }
+
+    #[test]
+    fn guard_event_rejects_passive_message() {
+        let event = serde_json::json!({ "bot_id": "B1" });
+        assert!(guard_event("message", &event, &valid_fields()).is_none());
+    }
+
+    #[test]
+    fn guard_event_rejects_empty_text() {
+        let event = serde_json::json!({});
+        let mut f = valid_fields();
+        f.text = String::new();
+        assert!(guard_event("message", &event, &f).is_none());
+    }
+
+    // ── extract_event_fields (CC=4) ───────────────────────────────
+
+    #[test]
+    fn extract_event_fields_returns_all_fields() {
+        let event = serde_json::json!({
+            "user": "U1", "channel": "D1", "ts": "1.0", "text": "hi", "thread_ts": "0.0"
+        });
+        let f = extract_event_fields(&event).unwrap();
+        assert_eq!(f.user, "U1");
+        assert_eq!(f.channel, "D1");
+        assert_eq!(f.ts, "1.0");
+        assert_eq!(f.text, "hi");
+        assert_eq!(f.thread_ts.as_deref(), Some("0.0"));
+    }
+
+    #[test]
+    fn extract_event_fields_missing_user_returns_none() {
+        let event = serde_json::json!({ "channel": "D1", "ts": "1.0", "text": "hi" });
+        assert!(extract_event_fields(&event).is_none());
+    }
+
+    #[test]
+    fn extract_event_fields_missing_channel_returns_none() {
+        let event = serde_json::json!({ "user": "U1", "ts": "1.0", "text": "hi" });
+        assert!(extract_event_fields(&event).is_none());
+    }
+
+    #[test]
+    fn extract_event_fields_missing_ts_returns_none() {
+        let event = serde_json::json!({ "user": "U1", "channel": "D1", "text": "hi" });
+        assert!(extract_event_fields(&event).is_none());
+    }
+
+    // ── build_channel_message (CC=1) ─────────────────────────────
+
+    #[test]
+    fn build_channel_message_maps_fields_correctly() {
+        let f = SlackEventFields {
+            user: "U1".into(),
+            channel: "D9".into(),
+            text: "hello".into(),
+            ts: "1700000000.123456".into(),
+            thread_ts: Some("1700000000.000000".into()),
+        };
+        let msg = build_channel_message(f);
+        assert_eq!(msg.sender, "U1");
+        assert_eq!(msg.reply_target, "D9");
+        assert_eq!(msg.content, "hello");
+        assert_eq!(msg.id, "slack_D9_1700000000.123456");
+        assert_eq!(msg.timestamp, 1700000000);
+        assert_eq!(msg.thread_ts.as_deref(), Some("1700000000.123456"));
+        assert_eq!(msg.interruption_scope_id.as_deref(), Some("1700000000.000000"));
+        assert!(msg.is_mention);
+    }
+
+    // ── parse_events_api integration (CC=4) ──────────────────────
+
+    #[test]
     fn dm_message_parsed() {
-        let payload = make_dm_payload("U123", "Hello!", "1234567890.123456");
+        let payload = dm_event("U123", "Hello!", "1234567890.123456");
         let msg = parse_events_api(&payload).unwrap();
         assert_eq!(msg.sender, "U123");
         assert_eq!(msg.reply_target, "D456");
@@ -440,28 +613,23 @@ mod tests {
         assert_eq!(msg.channel, "slack");
         assert_eq!(msg.id, "slack_D456_1234567890.123456");
         assert_eq!(msg.thread_ts.as_deref(), Some("1234567890.123456"));
+        assert!(msg.is_mention);
     }
 
     #[test]
     fn app_mention_in_channel_parsed() {
-        let payload = make_mention_payload("U123", "C456", "@bot help me", "1234567890.123456");
+        let payload = mention_event("U123", "C456", "@bot help me", "1234567890.123456");
         let msg = parse_events_api(&payload).unwrap();
         assert_eq!(msg.sender, "U123");
         assert_eq!(msg.reply_target, "C456");
         assert_eq!(msg.content, "@bot help me");
+        assert!(msg.is_mention);
     }
 
     #[test]
     fn channel_message_without_mention_ignored() {
-        // Plain message in a public channel (C...) should be ignored
         let payload = serde_json::json!({
-            "event": {
-                "type": "message",
-                "user": "U123",
-                "channel": "C456",
-                "text": "talking to another bot",
-                "ts": "1234567890.000001"
-            }
+            "event": { "type": "message", "user": "U123", "channel": "C456", "text": "hi", "ts": "1.0" }
         });
         assert!(parse_events_api(&payload).is_none());
     }
@@ -469,14 +637,7 @@ mod tests {
     #[test]
     fn ignores_bot_messages() {
         let payload = serde_json::json!({
-            "event": {
-                "type": "message",
-                "user": "U123",
-                "bot_id": "B999",
-                "channel": "D456",
-                "text": "I am a bot",
-                "ts": "1234567890.000001"
-            }
+            "event": { "type": "message", "user": "U123", "bot_id": "B999", "channel": "D456", "text": "I am a bot", "ts": "1.0" }
         });
         assert!(parse_events_api(&payload).is_none());
     }
@@ -484,46 +645,30 @@ mod tests {
     #[test]
     fn ignores_message_subtypes() {
         let payload = serde_json::json!({
-            "event": {
-                "type": "message",
-                "subtype": "message_changed",
-                "user": "U123",
-                "channel": "D456",
-                "text": "edited",
-                "ts": "1234567890.000002"
-            }
+            "event": { "type": "message", "subtype": "message_changed", "user": "U123", "channel": "D456", "text": "edited", "ts": "1.0" }
         });
         assert!(parse_events_api(&payload).is_none());
     }
 
     #[test]
     fn ignores_empty_text() {
-        let payload = make_dm_payload("U123", "", "1234567890.000003");
+        let payload = dm_event("U123", "", "1.0");
         assert!(parse_events_api(&payload).is_none());
     }
 
     #[test]
     fn threaded_dm_sets_interruption_scope() {
         let payload = serde_json::json!({
-            "event": {
-                "type": "message",
-                "user": "U123",
-                "channel": "D456",
-                "text": "reply in thread",
-                "ts": "1234567891.000001",
-                "thread_ts": "1234567890.000000"
-            }
+            "event": { "type": "message", "user": "U123", "channel": "D456",
+                       "text": "reply", "ts": "1234567891.0", "thread_ts": "1234567890.0" }
         });
         let msg = parse_events_api(&payload).unwrap();
-        assert_eq!(
-            msg.interruption_scope_id.as_deref(),
-            Some("1234567890.000000")
-        );
+        assert_eq!(msg.interruption_scope_id.as_deref(), Some("1234567890.0"));
     }
 
     #[test]
     fn timestamp_parsed_from_ts() {
-        let payload = make_dm_payload("U123", "hi", "1700000000.123456");
+        let payload = dm_event("U123", "hi", "1700000000.123456");
         let msg = parse_events_api(&payload).unwrap();
         assert_eq!(msg.timestamp, 1700000000);
     }
