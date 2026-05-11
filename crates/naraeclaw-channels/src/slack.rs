@@ -21,6 +21,10 @@ pub struct SlackChannel {
     app_token: String,
     bot_token: String,
     default_channel: Option<String>,
+    /// Lazily-resolved bot user ID (e.g. `Uxxxxx`) discovered via `auth.test`.
+    /// Used so the reply-intent classifier can tell self-mentions apart from
+    /// mentions of other users.
+    bot_user_id: tokio::sync::OnceCell<Option<String>>,
 }
 
 impl SlackChannel {
@@ -29,7 +33,31 @@ impl SlackChannel {
             app_token,
             bot_token,
             default_channel,
+            bot_user_id: tokio::sync::OnceCell::new(),
         }
+    }
+
+    /// Resolve the bot's own user ID via `auth.test` and cache it for the
+    /// lifetime of the channel. Returns `None` if the call fails so the caller
+    /// can fall back gracefully — the classifier still works, it just won't
+    /// have the extra grounding signal.
+    async fn resolve_bot_user_id(&self) -> Option<String> {
+        let resp = self
+            .http_client()
+            .post(format!("{SLACK_API_BASE}/auth.test"))
+            .header("Authorization", format!("Bearer {}", self.bot_token))
+            .send()
+            .await
+            .ok()?;
+        let body: serde_json::Value = resp.json().await.ok()?;
+        if !body["ok"].as_bool().unwrap_or(false) {
+            warn!(
+                "Slack auth.test failed: {}",
+                body["error"].as_str().unwrap_or("unknown")
+            );
+            return None;
+        }
+        body["user_id"].as_str().map(|s| s.to_string())
     }
 
     fn http_client(&self) -> reqwest::Client {
@@ -194,6 +222,13 @@ struct AckPayload<'a> {
 impl Channel for SlackChannel {
     fn name(&self) -> &str {
         "slack"
+    }
+
+    async fn bot_self_id(&self) -> Option<String> {
+        self.bot_user_id
+            .get_or_init(|| async { self.resolve_bot_user_id().await })
+            .await
+            .clone()
     }
 
     async fn send(&self, message: &SendMessage) -> Result<()> {
