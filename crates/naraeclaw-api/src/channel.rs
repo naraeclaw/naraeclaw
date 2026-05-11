@@ -110,6 +110,14 @@ pub trait Channel: Send + Sync {
         true
     }
 
+    /// The bot's own user ID on this platform (e.g. Slack `Uxxxxx`), if known.
+    /// Returned to the orchestrator so the reply-intent classifier can recognize
+    /// when an `<@id>` mention refers to the assistant itself rather than another user.
+    /// Channels with no notion of a stable self-ID should leave the default `None`.
+    async fn bot_self_id(&self) -> Option<String> {
+        None
+    }
+
     /// Signal that the bot is processing a response (e.g. "typing" indicator).
     async fn start_typing(&self, _recipient: &str) -> anyhow::Result<()> {
         Ok(())

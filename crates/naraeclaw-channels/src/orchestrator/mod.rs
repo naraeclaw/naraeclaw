@@ -553,6 +553,7 @@ fn build_channel_system_prompt(
     channel_name: &str,
     reply_target: &str,
     sender: &str,
+    bot_self_id: Option<&str>,
 ) -> String {
     let mut prompt = base_prompt.to_string();
 
@@ -595,6 +596,17 @@ fn build_channel_system_prompt(
              reaches the user."
         );
         prompt.push_str(&context);
+    }
+
+    if let Some(self_id) = bot_self_id.filter(|s| !s.is_empty()) {
+        let identity = format!(
+            "\n\nYour own user ID on channel={channel_name} is {self_id}. \
+             Any `<@{self_id}>` token (or the bare ID {self_id}) in an inbound message \
+             refers to YOU — treat it as a direct address to the assistant, not to a \
+             third-party user. Other `<@...>` tokens with different IDs refer to other \
+             users."
+        );
+        prompt.push_str(&identity);
     }
 
     prompt
@@ -2655,11 +2667,16 @@ async fn process_channel_message(
     } else {
         refreshed_new_session_system_prompt(ctx.as_ref())
     };
+    let bot_self_id = match ctx.channels_by_name.get(&msg.channel) {
+        Some(ch) => ch.bot_self_id().await,
+        None => None,
+    };
     let mut system_prompt = build_channel_system_prompt(
         &base_system_prompt,
         &msg.channel,
         &msg.reply_target,
         &msg.sender,
+        bot_self_id.as_deref(),
     );
     if !memory_context.is_empty() {
         let _ = write!(system_prompt, "\n\n{memory_context}");
@@ -10497,6 +10514,7 @@ This is an example JSON object for profile settings."#;
             "mattermost",
             "channel123:root456",
             "user_abc123",
+            None,
         );
         assert!(prompt.contains("sender=user_abc123"));
         assert!(prompt.contains("channel=mattermost"));
@@ -10505,17 +10523,43 @@ This is an example JSON object for profile settings."#;
 
     #[test]
     fn build_channel_system_prompt_omits_context_when_reply_target_empty() {
-        let prompt = build_channel_system_prompt("Base prompt.", "mattermost", "", "user_abc123");
+        let prompt =
+            build_channel_system_prompt("Base prompt.", "mattermost", "", "user_abc123", None);
         assert!(!prompt.contains("sender="));
         assert!(!prompt.contains("Channel context:"));
     }
 
     #[test]
     fn build_channel_system_prompt_sender_distinguishes_users() {
-        let prompt_a = build_channel_system_prompt("Base.", "mattermost", "ch:thread", "user_aaa");
-        let prompt_b = build_channel_system_prompt("Base.", "mattermost", "ch:thread", "user_bbb");
+        let prompt_a =
+            build_channel_system_prompt("Base.", "mattermost", "ch:thread", "user_aaa", None);
+        let prompt_b =
+            build_channel_system_prompt("Base.", "mattermost", "ch:thread", "user_bbb", None);
         assert!(prompt_a.contains("sender=user_aaa"));
         assert!(prompt_b.contains("sender=user_bbb"));
         assert_ne!(prompt_a, prompt_b);
+    }
+
+    #[test]
+    fn build_channel_system_prompt_includes_bot_self_id_when_provided() {
+        let prompt = build_channel_system_prompt(
+            "Base.",
+            "slack",
+            "C123",
+            "U_sender",
+            Some("U0AQD9PN746"),
+        );
+        assert!(prompt.contains("U0AQD9PN746"));
+        assert!(prompt.contains("refers to YOU"));
+    }
+
+    #[test]
+    fn build_channel_system_prompt_omits_bot_self_id_when_none_or_empty() {
+        let p_none =
+            build_channel_system_prompt("Base.", "slack", "C123", "U_sender", None);
+        let p_empty =
+            build_channel_system_prompt("Base.", "slack", "C123", "U_sender", Some(""));
+        assert!(!p_none.contains("refers to YOU"));
+        assert!(!p_empty.contains("refers to YOU"));
     }
 }
