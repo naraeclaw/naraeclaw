@@ -359,9 +359,12 @@ enabled = false                  # M4 기본 off
 - **D3** 스킬 인덱스 메모리 적재 (`Custom("skill_index")`, importance 0.8)
 - **검증**: 같은 세션에서 생성→재사용 시나리오, consolidation 회귀 fixture replay
 
-### M4 — SkillForge 스케줄러 (저위험, 보너스)
-- cron 1회 등록 (`skillforge.scheduler.enabled` flag)
-- **검증**: 짧은 주기(테스트용)로 도는지 확인
+### M4 — SkillForge 스케줄러 (저위험, 보너스) ✅ 2026-05-13
+- `[skillforge.scheduler]` 서브섹션 신설 (`enabled`, `interval_secs` 테스트 오버라이드)
+- daemon supervisor에 `skillforge-scheduler` 컴포넌트 등록 — `cron::scheduler::run`과 동일 패턴
+- `crates/naraeclaw-runtime/src/skillforge/scheduler.rs`: `tokio::time::interval` 기반 백그라운드 루프, 최소 주기 60초 클램프
+- `SkillForgeConfig`를 `naraeclaw-config::schema`로 승격 (runtime은 re-export)
+- **검증**: 단위 테스트 6개 추가 — interval 계산(4) + disabled 경로 + enabled 경로의 health 상태 전환
 
 ### M5 — 포맷 호환 레이어 (저위험, D5 신규)
 - `skills/format/{native, hermes, convert, mod}.rs` 신설
@@ -397,3 +400,4 @@ enabled = false                  # M4 기본 off
 
 - **2026-05-13 (제안)** — 초기 작성, Status: Proposed, 오픈 질문 6개 (Q1~Q6)
 - **2026-05-13 (확정)** — Status: Accepted. D1~D6 결정 확정 (`Decision` 섹션 참조). M5 신설(포맷 호환 레이어). Section 8 오픈 질문 제거 → `Decision` 표로 흡수
+- **2026-05-13 (M4 구현)** — SkillForge 백그라운드 스케줄러 도입. `[skillforge.scheduler]` config + daemon supervisor + 단위 테스트 6개. 기본값 off. 다음: M5 포맷 호환 레이어

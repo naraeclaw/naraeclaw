@@ -170,6 +170,16 @@ pub struct Config {
     #[nested]
     pub cron: CronConfig,
 
+    /// SkillForge external skill discovery configuration (`[skillforge]`).
+    ///
+    /// Drives the scout → evaluate → integrate pipeline that pulls community
+    /// skills from GitHub/ClawHub. The pipeline only runs when
+    /// `[skillforge] enabled = true`; ADR-005 M4 adds a background scheduler
+    /// gated on `[skillforge.scheduler] enabled = true`.
+    #[serde(default)]
+    #[nested]
+    pub skillforge: SkillForgeConfig,
+
     /// Channel configurations: Telegram, Discord, Slack, etc. (`[channels_config]`).
     #[serde(default)]
     #[nested]

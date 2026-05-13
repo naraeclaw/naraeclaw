@@ -3,6 +3,7 @@ mod channels;
 mod config_types;
 mod providers;
 mod security;
+mod skillforge;
 mod tools;
 
 pub use automation::*;
@@ -10,6 +11,7 @@ pub use channels::*;
 pub use config_types::*;
 pub use providers::*;
 pub use security::*;
+pub use skillforge::*;
 pub use tools::*;
 
 use crate::autonomy::AutonomyLevel;
@@ -113,6 +115,7 @@ impl Default for Config {
             embedding_routes: Vec::new(),
             heartbeat: HeartbeatConfig::default(),
             cron: CronConfig::default(),
+            skillforge: SkillForgeConfig::default(),
             channels_config: ChannelsConfig::default(),
             memory: MemoryConfig::default(),
             storage: StorageConfig::default(),
@@ -2338,6 +2341,7 @@ auto_save = true
                 ..HeartbeatConfig::default()
             },
             cron: CronConfig::default(),
+            skillforge: SkillForgeConfig::default(),
             channels_config: ChannelsConfig {
                 cli: true,
                 slack: None,
@@ -2867,6 +2871,7 @@ default_temperature = 0.7
             query_classification: QueryClassificationConfig::default(),
             heartbeat: HeartbeatConfig::default(),
             cron: CronConfig::default(),
+            skillforge: SkillForgeConfig::default(),
             channels_config: ChannelsConfig::default(),
             memory: MemoryConfig::default(),
             storage: StorageConfig::default(),
