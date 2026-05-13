@@ -3538,6 +3538,108 @@ async fn dispatch_worker(
     completion.mark_done();
 }
 
+type InFlightMap = Arc<tokio::sync::Mutex<HashMap<String, InFlightSenderTaskState>>>;
+
+enum DebounceOutcome {
+    Spawned,
+    Ready(ChannelMessage),
+}
+
+/// Handle a /stop command. Returns `true` if the message was a stop command and
+/// has been fully handled (the caller should `continue` to the next message).
+async fn handle_stop_command(
+    msg: &ChannelMessage,
+    ctx: &ChannelRuntimeContext,
+    in_flight: &InFlightMap,
+) -> bool {
+    if msg.channel == "cli" || !is_stop_command(&msg.content) {
+        return false;
+    }
+
+    let scope_key = interruption_scope_key(msg);
+    let previous = in_flight.lock().await.remove(&scope_key);
+    let reply = if let Some(state) = previous {
+        state.cancellation.cancel();
+        "Stop signal sent.".to_string()
+    } else {
+        "No in-flight task for this sender scope.".to_string()
+    };
+
+    let channel = ctx
+        .channels_by_name
+        .get(&msg.channel)
+        .or_else(|| {
+            // Multi-room channels use "name:qualifier" format (e.g. "matrix:!roomId");
+            // fall back to base channel name for routing.
+            msg.channel
+                .split_once(':')
+                .and_then(|(base, _)| ctx.channels_by_name.get(base))
+        })
+        .cloned();
+
+    if let Some(channel) = channel {
+        let reply_target = msg.reply_target.clone();
+        let thread_ts = msg.thread_ts.clone();
+        tokio::spawn(async move {
+            let _ = channel
+                .send(&SendMessage::new(reply, &reply_target).in_thread(thread_ts))
+                .await;
+        });
+    } else {
+        tracing::warn!(
+            channel = %msg.channel,
+            "stop command: no registered channel found for reply"
+        );
+    }
+    true
+}
+
+/// Apply debounce logic to an incoming message. Returns `Spawned` when the
+/// message was queued for deferred dispatch (caller should `continue`), or
+/// `Ready(msg)` when the message is ready to be dispatched immediately.
+async fn apply_debounce(
+    msg: ChannelMessage,
+    ctx: Arc<ChannelRuntimeContext>,
+    in_flight: InFlightMap,
+    semaphore: Arc<tokio::sync::Semaphore>,
+    task_sequence: Arc<AtomicU64>,
+    workers: &mut tokio::task::JoinSet<()>,
+) -> DebounceOutcome {
+    if msg.channel == "cli" || !ctx.debouncer.enabled() {
+        return DebounceOutcome::Ready(msg);
+    }
+
+    let debounce_key = conversation_history_key(&msg);
+    match ctx.debouncer.debounce(&debounce_key, &msg.content).await {
+        naraeclaw_infra::debounce::DebounceResult::Pending(rx) => {
+            let mut debounce_msg = msg;
+            workers.spawn(async move {
+                let combined = match rx.await {
+                    Ok(combined) => combined,
+                    Err(_) => return, // Receiver dropped — a newer message superseded this one.
+                };
+                debounce_msg.content = combined;
+                tracing::info!(
+                    channel = %debounce_msg.channel,
+                    sender = %debounce_msg.sender,
+                    "Debounced message ready — dispatching combined message"
+                );
+                let permit = match semaphore.acquire_owned().await {
+                    Ok(permit) => permit,
+                    Err(_) => return,
+                };
+                dispatch_worker(ctx, debounce_msg, in_flight, task_sequence, permit).await;
+            });
+            DebounceOutcome::Spawned
+        }
+        naraeclaw_infra::debounce::DebounceResult::Passthrough(content) => {
+            let mut m = msg;
+            m.content = content;
+            DebounceOutcome::Ready(m)
+        }
+    }
+}
+
 async fn run_message_dispatch_loop(
     mut rx: tokio::sync::mpsc::Receiver<naraeclaw_api::channel::ChannelMessage>,
     ctx: Arc<ChannelRuntimeContext>,
@@ -3545,59 +3647,14 @@ async fn run_message_dispatch_loop(
 ) {
     let semaphore = Arc::new(tokio::sync::Semaphore::new(max_in_flight_messages));
     let mut workers = tokio::task::JoinSet::new();
-    let in_flight_by_sender = Arc::new(tokio::sync::Mutex::new(HashMap::<
-        String,
-        InFlightSenderTaskState,
-    >::new()));
+    let in_flight: InFlightMap = Arc::new(tokio::sync::Mutex::new(HashMap::new()));
     let task_sequence = Arc::new(AtomicU64::new(1));
 
     while let Some(msg) = rx.recv().await {
-        // Fast path: /stop cancels the in-flight task for this sender scope without
-        // spawning a worker or registering a new task. Handled here — before semaphore
-        // acquisition — so the target task is still in the store and is never replaced.
-        if msg.channel != "cli" && is_stop_command(&msg.content) {
-            let scope_key = interruption_scope_key(&msg);
-            let previous = {
-                let mut active = in_flight_by_sender.lock().await;
-                active.remove(&scope_key)
-            };
-            let reply = if let Some(state) = previous {
-                state.cancellation.cancel();
-                "Stop signal sent.".to_string()
-            } else {
-                "No in-flight task for this sender scope.".to_string()
-            };
-            let channel = ctx
-                .channels_by_name
-                .get(&msg.channel)
-                .or_else(|| {
-                    // Multi-room channels use "name:qualifier" format (e.g. "matrix:!roomId");
-                    // fall back to base channel name for routing.
-                    msg.channel
-                        .split_once(':')
-                        .and_then(|(base, _)| ctx.channels_by_name.get(base))
-                })
-                .cloned();
-            if let Some(channel) = channel {
-                let reply_target = msg.reply_target.clone();
-                let thread_ts = msg.thread_ts.clone();
-                tokio::spawn(async move {
-                    let _ = channel
-                        .send(&SendMessage::new(reply, &reply_target).in_thread(thread_ts))
-                        .await;
-                });
-            } else {
-                tracing::warn!(
-                    channel = %msg.channel,
-                    "stop command: no registered channel found for reply"
-                );
-            }
+        if handle_stop_command(&msg, &ctx, &in_flight).await {
             continue;
         }
 
-        // Skip passive channel monitoring messages — only respond when explicitly mentioned.
-        // Channels set is_mention=false for messages like Slack's message.channels events
-        // where the bot was not @mentioned. The agent only reacts to direct requests.
         if !msg.is_mention {
             tracing::debug!(
                 channel = %msg.channel,
@@ -3607,59 +3664,19 @@ async fn run_message_dispatch_loop(
             continue;
         }
 
-        // ── Debounce: accumulate rapid messages per sender ──────────
-        // CLI messages bypass debouncing so the interactive loop stays responsive.
-        let msg = if msg.channel != "cli" && ctx.debouncer.enabled() {
-            let debounce_key = conversation_history_key(&msg);
-            match ctx.debouncer.debounce(&debounce_key, &msg.content).await {
-                naraeclaw_infra::debounce::DebounceResult::Pending(rx) => {
-                    // Spawn a lightweight task that waits for the debounce window
-                    // to expire, then feeds the combined message through the normal
-                    // worker path below.
-                    let debounce_ctx = Arc::clone(&ctx);
-                    let debounce_in_flight = Arc::clone(&in_flight_by_sender);
-                    let debounce_semaphore = Arc::clone(&semaphore);
-                    let debounce_task_seq = Arc::clone(&task_sequence);
-                    let mut debounce_msg = msg;
-                    workers.spawn(async move {
-                        let combined = match rx.await {
-                            Ok(combined) => combined,
-                            Err(_) => {
-                                // Receiver dropped — a newer message superseded this one.
-                                return;
-                            }
-                        };
-                        debounce_msg.content = combined;
-                        tracing::info!(
-                            channel = %debounce_msg.channel,
-                            sender = %debounce_msg.sender,
-                            "Debounced message ready — dispatching combined message"
-                        );
+        let outcome = apply_debounce(
+            msg,
+            Arc::clone(&ctx),
+            Arc::clone(&in_flight),
+            Arc::clone(&semaphore),
+            Arc::clone(&task_sequence),
+            &mut workers,
+        )
+        .await;
 
-                        let permit = match debounce_semaphore.acquire_owned().await {
-                            Ok(permit) => permit,
-                            Err(_) => return,
-                        };
-
-                        dispatch_worker(
-                            debounce_ctx,
-                            debounce_msg,
-                            debounce_in_flight,
-                            debounce_task_seq,
-                            permit,
-                        )
-                        .await;
-                    });
-                    continue;
-                }
-                naraeclaw_infra::debounce::DebounceResult::Passthrough(content) => {
-                    let mut m = msg;
-                    m.content = content;
-                    m
-                }
-            }
-        } else {
-            msg
+        let msg = match outcome {
+            DebounceOutcome::Spawned => continue,
+            DebounceOutcome::Ready(m) => m,
         };
 
         let permit = match Arc::clone(&semaphore).acquire_owned().await {
@@ -3667,11 +3684,11 @@ async fn run_message_dispatch_loop(
             Err(_) => break,
         };
 
-        let worker_ctx = Arc::clone(&ctx);
-        let in_flight = Arc::clone(&in_flight_by_sender);
-        let task_sequence = Arc::clone(&task_sequence);
-        workers.spawn(async move {
-            dispatch_worker(worker_ctx, msg, in_flight, task_sequence, permit).await;
+        workers.spawn({
+            let worker_ctx = Arc::clone(&ctx);
+            let in_flight = Arc::clone(&in_flight);
+            let task_seq = Arc::clone(&task_sequence);
+            async move { dispatch_worker(worker_ctx, msg, in_flight, task_seq, permit).await }
         });
 
         while let Some(result) = workers.try_join_next() {

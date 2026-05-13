@@ -152,6 +152,66 @@ fn load_sop(sop_dir: &Path, default_execution_mode: SopExecutionMode) -> Result<
 
 // ── Markdown step parser ────────────────────────────────────────
 
+/// Accumulates mutable state for the step currently being parsed.
+struct StepAccumulator {
+    number: Option<u32>,
+    title: String,
+    body: String,
+    tools: Vec<String>,
+    requires_confirmation: bool,
+    kind: SopStepKind,
+}
+
+impl StepAccumulator {
+    fn new() -> Self {
+        Self {
+            number: None,
+            title: String::new(),
+            body: String::new(),
+            tools: Vec::new(),
+            requires_confirmation: false,
+            kind: SopStepKind::Execute,
+        }
+    }
+
+    fn active(&self) -> bool {
+        self.number.is_some()
+    }
+
+    fn start(&mut self, num: u32, title: String, body: String) {
+        self.number = Some(num);
+        self.title = title;
+        self.body = body;
+        self.tools = Vec::new();
+        self.requires_confirmation = false;
+        self.kind = SopStepKind::Execute;
+    }
+
+    fn append_body(&mut self, text: &str) {
+        if !self.body.is_empty() {
+            self.body.push('\n');
+        }
+        self.body.push_str(text);
+    }
+
+    fn flush(&mut self, steps: &mut Vec<SopStep>) {
+        if let Some(n) = self.number.take() {
+            steps.push(SopStep {
+                number: n,
+                title: std::mem::take(&mut self.title),
+                body: self.body.trim().to_string(),
+                suggested_tools: std::mem::take(&mut self.tools),
+                requires_confirmation: self.requires_confirmation,
+                kind: self.kind,
+                schema: None,
+            });
+            self.body = String::new();
+            self.requires_confirmation = false;
+            self.kind = SopStepKind::Execute;
+        }
+    }
+}
+
 /// Parse procedure steps from SOP.md content.
 ///
 /// Expects a `## Steps` heading followed by numbered items (`1.`, `2.`, …).
@@ -160,35 +220,18 @@ fn load_sop(sop_dir: &Path, default_execution_mode: SopExecutionMode) -> Result<
 pub fn parse_steps(md: &str) -> Vec<SopStep> {
     let mut steps = Vec::new();
     let mut in_steps_section = false;
-    let mut current_number: Option<u32> = None;
-    let mut current_title = String::new();
-    let mut current_body = String::new();
-    let mut current_tools: Vec<String> = Vec::new();
-    let mut current_requires_confirmation = false;
-    let mut current_kind = SopStepKind::Execute;
+    let mut acc = StepAccumulator::new();
 
     for line in md.lines() {
         let trimmed = line.trim();
 
-        // Detect ## Steps heading
         if trimmed.starts_with("## ") {
-            if trimmed.eq_ignore_ascii_case("## steps") || trimmed.eq_ignore_ascii_case("## Steps")
-            {
+            if trimmed.eq_ignore_ascii_case("## steps") {
                 in_steps_section = true;
                 continue;
             }
-            // Any other ## heading ends the steps section
             if in_steps_section {
-                // Flush pending step
-                flush_step(
-                    &mut steps,
-                    &mut current_number,
-                    &mut current_title,
-                    &mut current_body,
-                    &mut current_tools,
-                    &mut current_requires_confirmation,
-                    &mut current_kind,
-                );
+                acc.flush(&mut steps);
                 in_steps_section = false;
             }
             continue;
@@ -198,116 +241,46 @@ pub fn parse_steps(md: &str) -> Vec<SopStep> {
             continue;
         }
 
-        // Check for numbered item: `1.`, `2.`, etc.
         if let Some(rest) = parse_numbered_item(trimmed) {
-            // Flush previous step
-            flush_step(
-                &mut steps,
-                &mut current_number,
-                &mut current_title,
-                &mut current_body,
-                &mut current_tools,
-                &mut current_requires_confirmation,
-                &mut current_kind,
-            );
-
+            acc.flush(&mut steps);
             let step_num = u32::try_from(steps.len())
                 .unwrap_or(u32::MAX)
                 .saturating_add(1);
-            current_number = Some(step_num);
-
-            // Extract title from bold text: **title** — body
-            if let Some((title, body)) = extract_bold_title(rest) {
-                current_title = title;
-                current_body = body;
-            } else {
-                current_title = rest.to_string();
-                current_body = String::new();
-            }
-            current_tools = Vec::new();
-            current_requires_confirmation = false;
+            let (title, body) = extract_bold_title(rest)
+                .unwrap_or_else(|| (rest.to_string(), String::new()));
+            acc.start(step_num, title, body);
             continue;
         }
 
-        // Sub-bullet parsing (only when inside a step)
-        if current_number.is_some() && trimmed.starts_with("- ") {
+        if acc.active() && trimmed.starts_with("- ") {
             let bullet = trimmed.trim_start_matches("- ").trim();
             if let Some(tools_str) = bullet.strip_prefix("tools:") {
-                current_tools = tools_str
+                acc.tools = tools_str
                     .split(',')
                     .map(|t| t.trim().to_string())
                     .filter(|t| !t.is_empty())
                     .collect();
-            } else if bullet.starts_with("requires_confirmation:") {
-                if let Some(val) = bullet.strip_prefix("requires_confirmation:") {
-                    current_requires_confirmation = val.trim().eq_ignore_ascii_case("true");
-                }
-            } else if bullet.starts_with("kind:") {
-                if let Some(val) = bullet.strip_prefix("kind:") {
-                    let val = val.trim();
-                    if val.eq_ignore_ascii_case("checkpoint") {
-                        current_kind = SopStepKind::Checkpoint;
-                    } else {
-                        current_kind = SopStepKind::Execute;
-                    }
-                }
+            } else if let Some(val) = bullet.strip_prefix("requires_confirmation:") {
+                acc.requires_confirmation = val.trim().eq_ignore_ascii_case("true");
+            } else if let Some(val) = bullet.strip_prefix("kind:") {
+                acc.kind = if val.trim().eq_ignore_ascii_case("checkpoint") {
+                    SopStepKind::Checkpoint
+                } else {
+                    SopStepKind::Execute
+                };
             } else {
-                // Continuation body line
-                if !current_body.is_empty() {
-                    current_body.push('\n');
-                }
-                current_body.push_str(trimmed);
+                acc.append_body(trimmed);
             }
             continue;
         }
 
-        // Continuation line for step body
-        if current_number.is_some() && !trimmed.is_empty() {
-            if !current_body.is_empty() {
-                current_body.push('\n');
-            }
-            current_body.push_str(trimmed);
+        if acc.active() && !trimmed.is_empty() {
+            acc.append_body(trimmed);
         }
     }
 
-    // Flush final step
-    flush_step(
-        &mut steps,
-        &mut current_number,
-        &mut current_title,
-        &mut current_body,
-        &mut current_tools,
-        &mut current_requires_confirmation,
-        &mut current_kind,
-    );
-
+    acc.flush(&mut steps);
     steps
-}
-
-/// Flush accumulated step state into the steps vector.
-fn flush_step(
-    steps: &mut Vec<SopStep>,
-    number: &mut Option<u32>,
-    title: &mut String,
-    body: &mut String,
-    tools: &mut Vec<String>,
-    requires_confirmation: &mut bool,
-    kind: &mut SopStepKind,
-) {
-    if let Some(n) = number.take() {
-        steps.push(SopStep {
-            number: n,
-            title: std::mem::take(title),
-            body: body.trim().to_string(),
-            suggested_tools: std::mem::take(tools),
-            requires_confirmation: *requires_confirmation,
-            kind: *kind,
-            schema: None,
-        });
-        *body = String::new();
-        *requires_confirmation = false;
-        *kind = SopStepKind::Execute;
-    }
 }
 
 /// Try to parse `N. rest` from a line, returning `rest` if successful.

@@ -279,6 +279,53 @@ where
     })
 }
 
+fn spawn_deadman_watcher(
+    timeout_minutes: u32,
+    config: Config,
+    delivery: Option<(String, String)>,
+    metrics: std::sync::Arc<parking_lot::Mutex<crate::heartbeat::engine::HeartbeatMetrics>>,
+) {
+    if timeout_minutes == 0 {
+        return;
+    }
+    tokio::spawn(async move {
+        let check_interval = Duration::from_secs(60);
+        let timeout = chrono::Duration::minutes(i64::from(timeout_minutes));
+        loop {
+            tokio::time::sleep(check_interval).await;
+            let last_tick = metrics.lock().last_tick_at;
+            if let Some(last) = last_tick
+                && chrono::Utc::now() - last > timeout
+            {
+                let alert = format!(
+                    "⚠️ Heartbeat dead-man's switch: no tick in {timeout_minutes} minutes"
+                );
+                let (channel, target) = if let Some(ch) = &config.heartbeat.deadman_channel {
+                    let to = config
+                        .heartbeat
+                        .deadman_to
+                        .as_deref()
+                        .or(config.heartbeat.to.as_deref())
+                        .unwrap_or_default();
+                    (ch.clone(), to.to_string())
+                } else if let Some((ch, to)) = &delivery {
+                    (ch.clone(), to.clone())
+                } else {
+                    continue;
+                };
+                let delivery_fut = crate::cron::scheduler::deliver_announcement(
+                    &config, &channel, &target, &alert,
+                );
+                match tokio::time::timeout(Duration::from_secs(30), delivery_fut).await {
+                    Ok(Err(e)) => tracing::warn!("Deadman alert delivery failed: {e}"),
+                    Err(_) => tracing::warn!("Deadman alert delivery timed out (30s)"),
+                    Ok(Ok(())) => {}
+                }
+            }
+        }
+    });
+}
+
 async fn run_heartbeat_worker(config: Config) -> Result<()> {
     use crate::heartbeat::engine::{
         HeartbeatEngine, HeartbeatTask, TaskPriority, TaskStatus, compute_adaptive_interval,
@@ -298,53 +345,12 @@ async fn run_heartbeat_worker(config: Config) -> Result<()> {
     let adaptive = config.heartbeat.adaptive;
     let start_time = std::time::Instant::now();
 
-    // ── Deadman watcher ──────────────────────────────────────────
-    let deadman_timeout = config.heartbeat.deadman_timeout_minutes;
-    if deadman_timeout > 0 {
-        let dm_metrics = Arc::clone(&metrics);
-        let dm_config = config.clone();
-        let dm_delivery = delivery.clone();
-        tokio::spawn(async move {
-            let check_interval = Duration::from_secs(60);
-            let timeout = chrono::Duration::minutes(i64::from(deadman_timeout));
-            loop {
-                tokio::time::sleep(check_interval).await;
-                let last_tick = dm_metrics.lock().last_tick_at;
-                if let Some(last) = last_tick
-                    && chrono::Utc::now() - last > timeout
-                {
-                    let alert = format!(
-                        "⚠️ Heartbeat dead-man's switch: no tick in {deadman_timeout} minutes"
-                    );
-                    let (channel, target) = if let Some(ch) = &dm_config.heartbeat.deadman_channel {
-                        let to = dm_config
-                            .heartbeat
-                            .deadman_to
-                            .as_deref()
-                            .or(dm_config.heartbeat.to.as_deref())
-                            .unwrap_or_default();
-                        (ch.clone(), to.to_string())
-                    } else if let Some((ch, to)) = &dm_delivery {
-                        (ch.clone(), to.clone())
-                    } else {
-                        continue;
-                    };
-                    let delivery_fut = crate::cron::scheduler::deliver_announcement(
-                        &dm_config, &channel, &target, &alert,
-                    );
-                    match tokio::time::timeout(Duration::from_secs(30), delivery_fut).await {
-                        Ok(Err(e)) => {
-                            tracing::warn!("Deadman alert delivery failed: {e}");
-                        }
-                        Err(_) => {
-                            tracing::warn!("Deadman alert delivery timed out (30s)");
-                        }
-                        Ok(Ok(())) => {}
-                    }
-                }
-            }
-        });
-    }
+    spawn_deadman_watcher(
+        config.heartbeat.deadman_timeout_minutes,
+        config.clone(),
+        delivery.clone(),
+        Arc::clone(&metrics),
+    );
 
     let base_interval = config.heartbeat.interval_minutes.max(1);
     let mut sleep_mins = base_interval;

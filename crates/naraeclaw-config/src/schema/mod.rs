@@ -879,12 +879,20 @@ impl Config {
     /// Called after TOML deserialization and env-override application to catch
     /// obviously invalid values early instead of failing at arbitrary runtime points.
     pub fn validate(&self) -> Result<()> {
-        // Tunnel — OpenVPN
+        self.validate_tunnel_config()?;
+        self.validate_gateway_config()?;
+        self.validate_security_config()?;
+        self.validate_routing_config()?;
+        self.validate_integration_config()?;
+        self.validate_agent_config()?;
+        Ok(())
+    }
+
+    fn validate_tunnel_config(&self) -> Result<()> {
         if self.tunnel.provider.trim() == "openvpn" {
             let openvpn = self.tunnel.openvpn.as_ref().ok_or_else(|| {
                 anyhow::anyhow!("tunnel.provider='openvpn' requires [tunnel.openvpn]")
             })?;
-
             if openvpn.config_file.trim().is_empty() {
                 anyhow::bail!("tunnel.openvpn.config_file must not be empty");
             }
@@ -893,13 +901,25 @@ impl Config {
             }
         }
 
-        // Gateway
+        if let Some(ref pinggy) = self.tunnel.pinggy
+            && let Some(ref region) = pinggy.region
+        {
+            let r = region.trim().to_ascii_lowercase();
+            if !r.is_empty() && !matches!(r.as_str(), "us" | "eu" | "ap" | "br" | "au") {
+                anyhow::bail!(
+                    "tunnel.pinggy.region must be one of: us, eu, ap, br, au (or omitted for auto)"
+                );
+            }
+        }
+
+        Ok(())
+    }
+
+    fn validate_gateway_config(&self) -> Result<()> {
         if self.gateway.host.trim().is_empty() {
             anyhow::bail!("gateway.host must not be empty");
         }
         if let Some(ref prefix) = self.gateway.path_prefix {
-            // Validate the raw value — no silent trimming so the stored
-            // value is exactly what was validated.
             if !prefix.is_empty() {
                 if !prefix.starts_with('/') {
                     anyhow::bail!("gateway.path_prefix must start with '/'");
@@ -922,8 +942,10 @@ impl Config {
                 }
             }
         }
+        Ok(())
+    }
 
-        // Autonomy
+    fn validate_security_config(&self) -> Result<()> {
         if self.autonomy.max_actions_per_hour == 0 {
             anyhow::bail!("autonomy.max_actions_per_hour must be greater than 0");
         }
@@ -935,7 +957,6 @@ impl Config {
             }
         }
 
-        // Security OTP / estop
         if self.security.otp.challenge_max_attempts == 0 {
             anyhow::bail!("security.otp.challenge_max_attempts must be greater than 0");
         }
@@ -949,9 +970,6 @@ impl Config {
             anyhow::bail!(
                 "security.otp.cache_valid_secs must be greater than or equal to security.otp.token_ttl_secs"
             );
-        }
-        if self.security.otp.challenge_max_attempts == 0 {
-            anyhow::bail!("security.otp.challenge_max_attempts must be greater than 0");
         }
         for (i, action) in self.security.otp.gated_actions.iter().enumerate() {
             let normalized = action.trim();
@@ -978,7 +996,14 @@ impl Config {
             anyhow::bail!("security.estop.state_file must not be empty");
         }
 
-        // Scheduler
+        if let Err(msg) = self.security.nevis.validate() {
+            anyhow::bail!("security.nevis: {msg}");
+        }
+
+        Ok(())
+    }
+
+    fn validate_routing_config(&self) -> Result<()> {
         if self.scheduler.max_concurrent == 0 {
             anyhow::bail!("scheduler.max_concurrent must be greater than 0");
         }
@@ -986,7 +1011,6 @@ impl Config {
             anyhow::bail!("scheduler.max_tasks must be greater than 0");
         }
 
-        // Model routes
         for (i, route) in self.model_routes.iter().enumerate() {
             if route.hint.trim().is_empty() {
                 anyhow::bail!("model_routes[{i}].hint must not be empty");
@@ -999,7 +1023,6 @@ impl Config {
             }
         }
 
-        // Embedding routes
         for (i, route) in self.embedding_routes.iter().enumerate() {
             if route.hint.trim().is_empty() {
                 anyhow::bail!("embedding_routes[{i}].hint must not be empty");
@@ -1017,7 +1040,6 @@ impl Config {
             if profile_name.is_empty() {
                 anyhow::bail!("model_providers contains an empty profile name");
             }
-
             let has_name = profile
                 .name
                 .as_deref()
@@ -1028,13 +1050,11 @@ impl Config {
                 .as_deref()
                 .map(str::trim)
                 .is_some_and(|value| !value.is_empty());
-
             if !has_name && !has_base_url {
                 anyhow::bail!(
                     "model_providers.{profile_name} must define at least one of `name` or `base_url`"
                 );
             }
-
             if let Some(base_url) = profile.base_url.as_deref().map(str::trim)
                 && !base_url.is_empty()
             {
@@ -1045,7 +1065,6 @@ impl Config {
                     anyhow::bail!("model_providers.{profile_name}.base_url must use http/https");
                 }
             }
-
             if let Some(wire_api) = profile.wire_api.as_deref().map(str::trim)
                 && !wire_api.is_empty()
                 && normalize_wire_api(wire_api).is_none()
@@ -1056,7 +1075,6 @@ impl Config {
             }
         }
 
-        // Ollama cloud-routing safety checks
         if self
             .default_provider
             .as_deref()
@@ -1071,7 +1089,6 @@ impl Config {
                     "default_model uses ':cloud' with provider 'ollama', but api_url is local or unset. Set api_url to a remote Ollama endpoint (for example https://ollama.com)."
                 );
             }
-
             if !has_ollama_cloud_credential(self.api_key.as_deref()) {
                 anyhow::bail!(
                     "default_model uses ':cloud' with provider 'ollama', but no API key is configured. Set api_key or OLLAMA_API_KEY."
@@ -1079,12 +1096,14 @@ impl Config {
             }
         }
 
-        // MCP
+        Ok(())
+    }
+
+    fn validate_integration_config(&self) -> Result<()> {
         if self.mcp.enabled {
             tools::validate_mcp_config(&self.mcp)?;
         }
 
-        // Knowledge graph
         if self.knowledge.enabled {
             if self.knowledge.max_nodes == 0 {
                 anyhow::bail!("knowledge.max_nodes must be greater than 0");
@@ -1094,154 +1113,11 @@ impl Config {
             }
         }
 
-        // Google Workspace allowed_services validation
-        let mut seen_gws_services = std::collections::HashSet::new();
-        for (i, service) in self.google_workspace.allowed_services.iter().enumerate() {
-            let normalized = service.trim();
-            if normalized.is_empty() {
-                anyhow::bail!("google_workspace.allowed_services[{i}] must not be empty");
-            }
-            if !normalized
-                .chars()
-                .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_' || c == '-')
-            {
-                anyhow::bail!(
-                    "google_workspace.allowed_services[{i}] contains invalid characters: {normalized}"
-                );
-            }
-            if !seen_gws_services.insert(normalized.to_string()) {
-                anyhow::bail!(
-                    "google_workspace.allowed_services contains duplicate entry: {normalized}"
-                );
-            }
-        }
+        self.validate_google_workspace_config()?;
 
-        // Build the effective allowed-services set for cross-validation.
-        // When the operator leaves allowed_services empty the tool falls back to
-        // DEFAULT_GWS_SERVICES; use the same constant here so validation is
-        // consistent in both cases.
-        let effective_services: std::collections::HashSet<&str> =
-            if self.google_workspace.allowed_services.is_empty() {
-                DEFAULT_GWS_SERVICES.iter().copied().collect()
-            } else {
-                self.google_workspace
-                    .allowed_services
-                    .iter()
-                    .map(|s| s.trim())
-                    .collect()
-            };
-
-        let mut seen_gws_operations = std::collections::HashSet::new();
-        for (i, operation) in self.google_workspace.allowed_operations.iter().enumerate() {
-            let service = operation.service.trim();
-            let resource = operation.resource.trim();
-
-            if service.is_empty() {
-                anyhow::bail!("google_workspace.allowed_operations[{i}].service must not be empty");
-            }
-            if resource.is_empty() {
-                anyhow::bail!(
-                    "google_workspace.allowed_operations[{i}].resource must not be empty"
-                );
-            }
-
-            if !effective_services.contains(service) {
-                anyhow::bail!(
-                    "google_workspace.allowed_operations[{i}].service '{service}' is not in the \
-                     effective allowed_services; this entry can never match at runtime"
-                );
-            }
-            if !service
-                .chars()
-                .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_' || c == '-')
-            {
-                anyhow::bail!(
-                    "google_workspace.allowed_operations[{i}].service contains invalid characters: {service}"
-                );
-            }
-            if !resource
-                .chars()
-                .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_' || c == '-')
-            {
-                anyhow::bail!(
-                    "google_workspace.allowed_operations[{i}].resource contains invalid characters: {resource}"
-                );
-            }
-
-            if let Some(ref sub_resource) = operation.sub_resource {
-                let sub = sub_resource.trim();
-                if sub.is_empty() {
-                    anyhow::bail!(
-                        "google_workspace.allowed_operations[{i}].sub_resource must not be empty when present"
-                    );
-                }
-                if !sub
-                    .chars()
-                    .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_' || c == '-')
-                {
-                    anyhow::bail!(
-                        "google_workspace.allowed_operations[{i}].sub_resource contains invalid characters: {sub}"
-                    );
-                }
-            }
-
-            if operation.methods.is_empty() {
-                anyhow::bail!("google_workspace.allowed_operations[{i}].methods must not be empty");
-            }
-
-            let mut seen_methods = std::collections::HashSet::new();
-            for (j, method) in operation.methods.iter().enumerate() {
-                let normalized = method.trim();
-                if normalized.is_empty() {
-                    anyhow::bail!(
-                        "google_workspace.allowed_operations[{i}].methods[{j}] must not be empty"
-                    );
-                }
-                if !normalized
-                    .chars()
-                    .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_' || c == '-')
-                {
-                    anyhow::bail!(
-                        "google_workspace.allowed_operations[{i}].methods[{j}] contains invalid characters: {normalized}"
-                    );
-                }
-                if !seen_methods.insert(normalized.to_string()) {
-                    anyhow::bail!(
-                        "google_workspace.allowed_operations[{i}].methods contains duplicate entry: {normalized}"
-                    );
-                }
-            }
-
-            let sub_key = operation
-                .sub_resource
-                .as_deref()
-                .map(str::trim)
-                .unwrap_or("");
-            let operation_key = format!("{service}:{resource}:{sub_key}");
-            if !seen_gws_operations.insert(operation_key.clone()) {
-                anyhow::bail!(
-                    "google_workspace.allowed_operations contains duplicate service/resource/sub_resource entry: {operation_key}"
-                );
-            }
-        }
-
-        // Proxy (delegate to existing validation)
         self.proxy.validate()?;
         self.cloud_ops.validate()?;
 
-        // Pinggy tunnel region — validate allowed values (case-insensitive, auto-lowercased at runtime).
-        if let Some(ref pinggy) = self.tunnel.pinggy
-            && let Some(ref region) = pinggy.region
-        {
-            let r = region.trim().to_ascii_lowercase();
-            if !r.is_empty() && !matches!(r.as_str(), "us" | "eu" | "ap" | "br" | "au") {
-                anyhow::bail!(
-                    "tunnel.pinggy.region must be one of: us, eu, ap, br, au (or omitted for auto)"
-                );
-            }
-        }
-
-        // Jira
         if self.jira.enabled {
             if self.jira.base_url.trim().is_empty() {
                 anyhow::bail!("jira.base_url must not be empty when jira.enabled = true");
@@ -1271,69 +1147,169 @@ impl Config {
             }
         }
 
-        // Nevis IAM — delegate to NevisConfig::validate() for field-level checks
-        if let Err(msg) = self.security.nevis.validate() {
-            anyhow::bail!("security.nevis: {msg}");
+        Ok(())
+    }
+
+    fn validate_google_workspace_config(&self) -> Result<()> {
+        let mut seen_services = std::collections::HashSet::new();
+        for (i, service) in self.google_workspace.allowed_services.iter().enumerate() {
+            let normalized = service.trim();
+            if normalized.is_empty() {
+                anyhow::bail!("google_workspace.allowed_services[{i}] must not be empty");
+            }
+            if !normalized
+                .chars()
+                .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_' || c == '-')
+            {
+                anyhow::bail!(
+                    "google_workspace.allowed_services[{i}] contains invalid characters: {normalized}"
+                );
+            }
+            if !seen_services.insert(normalized.to_string()) {
+                anyhow::bail!(
+                    "google_workspace.allowed_services contains duplicate entry: {normalized}"
+                );
+            }
         }
 
-        // Delegate agent timeouts
-        const MAX_DELEGATE_TIMEOUT_SECS: u64 = 3600;
+        // When allowed_services is empty the tool falls back to DEFAULT_GWS_SERVICES;
+        // use the same set here so validation is consistent at runtime.
+        let effective_services: std::collections::HashSet<&str> =
+            if self.google_workspace.allowed_services.is_empty() {
+                DEFAULT_GWS_SERVICES.iter().copied().collect()
+            } else {
+                self.google_workspace
+                    .allowed_services
+                    .iter()
+                    .map(|s| s.trim())
+                    .collect()
+            };
+
+        let mut seen_operations = std::collections::HashSet::new();
+        for (i, op) in self.google_workspace.allowed_operations.iter().enumerate() {
+            let service = op.service.trim();
+            let resource = op.resource.trim();
+
+            if service.is_empty() {
+                anyhow::bail!("google_workspace.allowed_operations[{i}].service must not be empty");
+            }
+            if resource.is_empty() {
+                anyhow::bail!(
+                    "google_workspace.allowed_operations[{i}].resource must not be empty"
+                );
+            }
+            if !effective_services.contains(service) {
+                anyhow::bail!(
+                    "google_workspace.allowed_operations[{i}].service '{service}' is not in the \
+                     effective allowed_services; this entry can never match at runtime"
+                );
+            }
+
+            for (field, value) in [("service", service), ("resource", resource)] {
+                if !value
+                    .chars()
+                    .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_' || c == '-')
+                {
+                    anyhow::bail!(
+                        "google_workspace.allowed_operations[{i}].{field} contains invalid characters: {value}"
+                    );
+                }
+            }
+
+            if let Some(ref sub_resource) = op.sub_resource {
+                let sub = sub_resource.trim();
+                if sub.is_empty() {
+                    anyhow::bail!(
+                        "google_workspace.allowed_operations[{i}].sub_resource must not be empty when present"
+                    );
+                }
+                if !sub
+                    .chars()
+                    .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_' || c == '-')
+                {
+                    anyhow::bail!(
+                        "google_workspace.allowed_operations[{i}].sub_resource contains invalid characters: {sub}"
+                    );
+                }
+            }
+
+            if op.methods.is_empty() {
+                anyhow::bail!("google_workspace.allowed_operations[{i}].methods must not be empty");
+            }
+            let mut seen_methods = std::collections::HashSet::new();
+            for (j, method) in op.methods.iter().enumerate() {
+                let normalized = method.trim();
+                if normalized.is_empty() {
+                    anyhow::bail!(
+                        "google_workspace.allowed_operations[{i}].methods[{j}] must not be empty"
+                    );
+                }
+                if !normalized
+                    .chars()
+                    .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_' || c == '-')
+                {
+                    anyhow::bail!(
+                        "google_workspace.allowed_operations[{i}].methods[{j}] contains invalid characters: {normalized}"
+                    );
+                }
+                if !seen_methods.insert(normalized.to_string()) {
+                    anyhow::bail!(
+                        "google_workspace.allowed_operations[{i}].methods contains duplicate entry: {normalized}"
+                    );
+                }
+            }
+
+            let sub_key = op.sub_resource.as_deref().map(str::trim).unwrap_or("");
+            let operation_key = format!("{service}:{resource}:{sub_key}");
+            if !seen_operations.insert(operation_key.clone()) {
+                anyhow::bail!(
+                    "google_workspace.allowed_operations contains duplicate service/resource/sub_resource entry: {operation_key}"
+                );
+            }
+        }
+
+        Ok(())
+    }
+
+    fn validate_agent_config(&self) -> Result<()> {
+        const MAX_TIMEOUT_SECS: u64 = 3600;
+
         for (name, agent) in &self.agents {
             if let Some(timeout) = agent.timeout_secs {
                 if timeout == 0 {
                     anyhow::bail!("agents.{name}.timeout_secs must be greater than 0");
                 }
-                if timeout > MAX_DELEGATE_TIMEOUT_SECS {
-                    anyhow::bail!(
-                        "agents.{name}.timeout_secs exceeds max {MAX_DELEGATE_TIMEOUT_SECS}"
-                    );
+                if timeout > MAX_TIMEOUT_SECS {
+                    anyhow::bail!("agents.{name}.timeout_secs exceeds max {MAX_TIMEOUT_SECS}");
                 }
             }
             if let Some(timeout) = agent.agentic_timeout_secs {
                 if timeout == 0 {
                     anyhow::bail!("agents.{name}.agentic_timeout_secs must be greater than 0");
                 }
-                if timeout > MAX_DELEGATE_TIMEOUT_SECS {
+                if timeout > MAX_TIMEOUT_SECS {
                     anyhow::bail!(
-                        "agents.{name}.agentic_timeout_secs exceeds max {MAX_DELEGATE_TIMEOUT_SECS}"
+                        "agents.{name}.agentic_timeout_secs exceeds max {MAX_TIMEOUT_SECS}"
                     );
                 }
             }
         }
 
-        // Transcription
-        {
-            let dp = self.transcription.default_provider.trim();
-            match dp {
-                "groq" | "openai" | "deepgram" | "assemblyai" | "google" | "local_whisper" => {}
-                other => {
-                    anyhow::bail!(
-                        "transcription.default_provider must be one of: groq, openai, deepgram, assemblyai, google, local_whisper (got '{other}')"
-                    );
-                }
+        let dp = self.transcription.default_provider.trim();
+        match dp {
+            "groq" | "openai" | "deepgram" | "assemblyai" | "google" | "local_whisper" => {}
+            other => {
+                anyhow::bail!(
+                    "transcription.default_provider must be one of: groq, openai, deepgram, assemblyai, google, local_whisper (got '{other}')"
+                );
             }
         }
 
-        // Delegate tool global defaults
         if self.delegate.timeout_secs == 0 {
             anyhow::bail!("delegate.timeout_secs must be greater than 0");
         }
         if self.delegate.agentic_timeout_secs == 0 {
             anyhow::bail!("delegate.agentic_timeout_secs must be greater than 0");
-        }
-
-        // Per-agent delegate timeout overrides
-        for (name, agent) in &self.agents {
-            if let Some(t) = agent.timeout_secs
-                && t == 0
-            {
-                anyhow::bail!("agents.{name}.timeout_secs must be greater than 0");
-            }
-            if let Some(t) = agent.agentic_timeout_secs
-                && t == 0
-            {
-                anyhow::bail!("agents.{name}.agentic_timeout_secs must be greater than 0");
-            }
         }
 
         Ok(())
