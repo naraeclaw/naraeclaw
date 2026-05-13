@@ -10542,23 +10542,16 @@ This is an example JSON object for profile settings."#;
 
     #[test]
     fn build_channel_system_prompt_includes_bot_self_id_when_provided() {
-        let prompt = build_channel_system_prompt(
-            "Base.",
-            "slack",
-            "C123",
-            "U_sender",
-            Some("U0AQD9PN746"),
-        );
+        let prompt =
+            build_channel_system_prompt("Base.", "slack", "C123", "U_sender", Some("U0AQD9PN746"));
         assert!(prompt.contains("U0AQD9PN746"));
         assert!(prompt.contains("refers to YOU"));
     }
 
     #[test]
     fn build_channel_system_prompt_omits_bot_self_id_when_none_or_empty() {
-        let p_none =
-            build_channel_system_prompt("Base.", "slack", "C123", "U_sender", None);
-        let p_empty =
-            build_channel_system_prompt("Base.", "slack", "C123", "U_sender", Some(""));
+        let p_none = build_channel_system_prompt("Base.", "slack", "C123", "U_sender", None);
+        let p_empty = build_channel_system_prompt("Base.", "slack", "C123", "U_sender", Some(""));
         assert!(!p_none.contains("refers to YOU"));
         assert!(!p_empty.contains("refers to YOU"));
     }

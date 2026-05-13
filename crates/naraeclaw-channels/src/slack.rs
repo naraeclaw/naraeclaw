@@ -430,12 +430,11 @@ fn extract_event_fields(event: &serde_json::Value) -> Option<SlackEventFields> {
 /// Build a ChannelMessage from validated event fields.
 /// CC=1 (no branches; all guards have already passed)
 fn build_channel_message(f: SlackEventFields) -> ChannelMessage {
-    let timestamp = f
-        .ts
-        .split('.')
-        .next()
-        .and_then(|s| s.parse::<u64>().ok())
-        .unwrap_or_default();
+    let timestamp =
+        f.ts.split('.')
+            .next()
+            .and_then(|s| s.parse::<u64>().ok())
+            .unwrap_or_default();
     ChannelMessage {
         id: format!("slack_{}_{}", f.channel, f.ts),
         sender: f.user,
@@ -632,7 +631,10 @@ mod tests {
         assert_eq!(msg.id, "slack_D9_1700000000.123456");
         assert_eq!(msg.timestamp, 1700000000);
         assert_eq!(msg.thread_ts.as_deref(), Some("1700000000.123456"));
-        assert_eq!(msg.interruption_scope_id.as_deref(), Some("1700000000.000000"));
+        assert_eq!(
+            msg.interruption_scope_id.as_deref(),
+            Some("1700000000.000000")
+        );
         assert!(msg.is_mention);
     }
 
