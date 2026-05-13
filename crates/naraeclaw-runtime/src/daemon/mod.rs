@@ -171,6 +171,24 @@ pub async fn run(
         tracing::info!("Cron disabled; scheduler supervisor not started");
     }
 
+    // ADR-005 M4: background SkillForge runs. Only spins up when both
+    // [skillforge] enabled and [skillforge.scheduler] enabled are true.
+    if config.skillforge.scheduler.enabled {
+        let forge_cfg = config.clone();
+        handles.push(spawn_component_supervisor(
+            "skillforge-scheduler",
+            initial_backoff,
+            max_backoff,
+            move || {
+                let cfg = forge_cfg.clone();
+                async move { Box::pin(crate::skillforge::scheduler::run(cfg)).await }
+            },
+        ));
+    } else {
+        crate::health::mark_component_ok("skillforge-scheduler");
+        tracing::info!("SkillForge scheduler disabled; supervisor not started");
+    }
+
     println!("🧠 NaraeClaw daemon started");
     println!("   Gateway:  http://{host}:{port}");
     println!("   Components: gateway, channels, heartbeat, scheduler");

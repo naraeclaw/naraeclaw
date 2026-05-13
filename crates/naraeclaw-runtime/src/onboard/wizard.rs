@@ -174,6 +174,7 @@ pub async fn run_wizard(force: bool, callbacks: WizardCallbacks) -> Result<Confi
         embedding_routes: Vec::new(),
         heartbeat: HeartbeatConfig::default(),
         cron: naraeclaw_config::schema::CronConfig::default(),
+        skillforge: naraeclaw_config::schema::SkillForgeConfig::default(),
         channels_config,
         memory: memory_config, // User-selected memory backend
         storage: StorageConfig::default(),
@@ -632,6 +633,7 @@ async fn run_quick_setup_with_home(
         embedding_routes: Vec::new(),
         heartbeat: HeartbeatConfig::default(),
         cron: naraeclaw_config::schema::CronConfig::default(),
+        skillforge: naraeclaw_config::schema::SkillForgeConfig::default(),
         channels_config: ChannelsConfig::default(),
         memory: memory_config,
         storage: StorageConfig::default(),
