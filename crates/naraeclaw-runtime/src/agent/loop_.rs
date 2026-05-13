@@ -583,6 +583,7 @@ pub async fn agent_turn(
         0,    // max_tool_result_chars: 0 = disabled (legacy callers)
         0,    // context_token_budget: 0 = disabled (legacy callers)
         None, // shared_budget: no shared budget for legacy callers
+        None, // skill_evolution: legacy callers opt out of ADR-005 M2 trigger
     )
     .await
 }
@@ -721,6 +722,7 @@ pub async fn run_tool_call_loop(
     max_tool_result_chars: usize,
     context_token_budget: usize,
     shared_budget: Option<Arc<std::sync::atomic::AtomicUsize>>,
+    skill_evolution: Option<Arc<crate::agent::skill_evolution::SkillEvolutionService>>,
 ) -> Result<String> {
     let max_iterations = if max_tool_iterations == 0 {
         DEFAULT_MAX_TOOL_ITERATIONS
@@ -1292,6 +1294,25 @@ pub async fn run_tool_call_loop(
                     "text": scrub_credentials(&display_text),
                 }),
             );
+            // ── ADR-005 M2: auto skill evolution trigger ──
+            // Cheap sync probe; heavy work moves to a detached task inside
+            // `try_trigger`. No-op when `skill_evolution.enabled` is false.
+            if let Some(ref evolution) = skill_evolution {
+                let user_msg = history
+                    .iter()
+                    .rev()
+                    .find(|m| m.role == "user")
+                    .map(|m| m.content.clone())
+                    .unwrap_or_default();
+                let calls = crate::skills::creator::extract_tool_calls_from_history(history);
+                let mut trace =
+                    crate::agent::execution_trace::ExecutionTrace::new(turn_id.clone(), user_msg);
+                for call in calls {
+                    trace.record_tool_call(call);
+                }
+                trace.finalize(display_text.clone());
+                let _ = evolution.try_trigger(trace, 1.0, None);
+            }
             // No tool calls — this is the final response.
             // If a streaming sender is provided, relay the text in small chunks
             // so the channel can progressively update the draft message.
@@ -2327,6 +2348,7 @@ pub async fn run(
                         config.agent.max_tool_result_chars,
                         config.agent.max_context_tokens,
                         None, // shared_budget
+                        None, // skill_evolution (ADR-005 M2 wiring is per-channel; not used here)
                     ),
                 )
                 .await
@@ -2634,6 +2656,7 @@ pub async fn run(
                             config.agent.max_tool_result_chars,
                             config.agent.max_context_tokens,
                             None, // shared_budget
+                            None, // skill_evolution
                         ),
                     )
                     .await
@@ -4119,6 +4142,7 @@ mod tests {
             0,
             0,
             None,
+            None,
         )
         .await
         .expect_err("provider without vision support should fail");
@@ -4174,6 +4198,7 @@ mod tests {
             0,
             0,
             None,
+            None,
         )
         .await
         .expect_err("oversized payload must fail");
@@ -4223,6 +4248,7 @@ mod tests {
             0,
             0,
             None,
+            None,
         )
         .await
         .expect("valid multimodal payload should pass");
@@ -4270,6 +4296,7 @@ mod tests {
             &naraeclaw_config::schema::PacingConfig::default(),
             0,
             0,
+            None,
             None,
         )
         .await
@@ -4326,6 +4353,7 @@ mod tests {
             0,
             0,
             None,
+            None,
         )
         .await
         .expect_err("should fail when vision provider cannot be created");
@@ -4380,6 +4408,7 @@ mod tests {
             &naraeclaw_config::schema::PacingConfig::default(),
             0,
             0,
+            None,
             None,
         )
         .await
@@ -4437,6 +4466,7 @@ mod tests {
             0,
             0,
             None,
+            None,
         )
         .await
         .expect_err("should fail due to nonexistent vision provider");
@@ -4491,6 +4521,7 @@ mod tests {
             0,
             0,
             None,
+            None,
         )
         .await
         .expect("empty image markers should not trigger vision routing");
@@ -4544,6 +4575,7 @@ mod tests {
             &naraeclaw_config::schema::PacingConfig::default(),
             0,
             0,
+            None,
             None,
         )
         .await
@@ -4682,6 +4714,7 @@ mod tests {
             0,
             0,
             None,
+            None,
         )
         .await
         .expect("parallel execution should complete");
@@ -4756,6 +4789,7 @@ mod tests {
             0,
             0,
             None,
+            None,
         )
         .await
         .expect("cron_add delivery defaults should be injected");
@@ -4822,6 +4856,7 @@ mod tests {
             0,
             0,
             None,
+            None,
         )
         .await
         .expect("explicit delivery mode should be preserved");
@@ -4882,6 +4917,7 @@ mod tests {
             &naraeclaw_config::schema::PacingConfig::default(),
             0,
             0,
+            None,
             None,
         )
         .await
@@ -4957,6 +4993,7 @@ mod tests {
             0,
             0,
             None,
+            None,
         )
         .await
         .expect("non-interactive shell should succeed for low-risk command");
@@ -5020,6 +5057,7 @@ mod tests {
             &naraeclaw_config::schema::PacingConfig::default(),
             0,
             0,
+            None,
             None,
         )
         .await
@@ -5105,6 +5143,7 @@ mod tests {
             0,
             0,
             None,
+            None,
         )
         .await
         .expect("loop should complete");
@@ -5165,6 +5204,7 @@ mod tests {
             &naraeclaw_config::schema::PacingConfig::default(),
             0,
             0,
+            None,
             None,
         )
         .await
@@ -5251,6 +5291,7 @@ mod tests {
             0,
             0,
             None,
+            None,
         )
         .await
         .expect("native tool-call text should be relayed through on_delta");
@@ -5319,6 +5360,7 @@ mod tests {
             &naraeclaw_config::schema::PacingConfig::default(),
             0,
             0,
+            None,
             None,
         )
         .await
@@ -5390,6 +5432,7 @@ mod tests {
             &naraeclaw_config::schema::PacingConfig::default(),
             0,
             0,
+            None,
             None,
         )
         .await
@@ -5465,6 +5508,7 @@ mod tests {
             &naraeclaw_config::schema::PacingConfig::default(),
             0,
             0,
+            None,
             None,
         )
         .await
@@ -5549,6 +5593,7 @@ mod tests {
             &naraeclaw_config::schema::PacingConfig::default(),
             0,
             0,
+            None,
             None,
         )
         .await
