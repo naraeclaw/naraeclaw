@@ -246,8 +246,8 @@ pub fn parse_steps(md: &str) -> Vec<SopStep> {
             let step_num = u32::try_from(steps.len())
                 .unwrap_or(u32::MAX)
                 .saturating_add(1);
-            let (title, body) = extract_bold_title(rest)
-                .unwrap_or_else(|| (rest.to_string(), String::new()));
+            let (title, body) =
+                extract_bold_title(rest).unwrap_or_else(|| (rest.to_string(), String::new()));
             acc.start(step_num, title, body);
             continue;
         }

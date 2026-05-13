@@ -297,9 +297,8 @@ fn spawn_deadman_watcher(
             if let Some(last) = last_tick
                 && chrono::Utc::now() - last > timeout
             {
-                let alert = format!(
-                    "⚠️ Heartbeat dead-man's switch: no tick in {timeout_minutes} minutes"
-                );
+                let alert =
+                    format!("⚠️ Heartbeat dead-man's switch: no tick in {timeout_minutes} minutes");
                 let (channel, target) = if let Some(ch) = &config.heartbeat.deadman_channel {
                     let to = config
                         .heartbeat
