@@ -1,8 +1,8 @@
 # ADR-005: Auto Skill Evolution Loop
 
-**Status:** Proposed
+**Status:** Accepted
 
-**Date:** 2026-05-13
+**Date:** 2026-05-13 (proposed), 2026-05-13 (accepted, decisions finalized)
 
 **Related modules:** `naraeclaw-runtime/src/{skills,skillforge}`, `naraeclaw-memory`, `naraeclaw-runtime/src/agent`
 
@@ -14,7 +14,20 @@ Hermes Agent가 강조하는 **자동 스킬 진화 루프**를 NaraeClaw에 도
 
 ## Decision
 
-7개 비트(B1~B7)로 구성된 자동 진화 루프를 4단계 마일스톤(M1~M4)으로 도입한다. 각 단계는 별도 worktree에서 진행하고, config 기본값은 off로 출시해 안정화 후 on. 상세는 아래 본문 참조.
+7개 비트(B1~B7)로 구성된 자동 진화 루프를 5단계 마일스톤(M1~M5)으로 도입한다. 각 단계는 별도 worktree에서 진행하고, config 기본값은 off로 출시해 안정화 후 on.
+
+**확정된 정책 결정** (구버전 Section 8 오픈 질문에서 전환):
+
+| # | 결정 | 비고 |
+|---|---|---|
+| D1 | 트리거 임계값 기본값 **0.6** | ValueSignal::score >= 0.6에서 자동 생성 |
+| D2 | 사용자 명시 신호 **키워드 + 도구 둘 다** | "기억해줘" 등 키워드는 consolidation LLM이 추출, `mark_skill_candidate` 도구도 별도 제공 |
+| D3 | 스킬 인덱스 카테고리 **`Custom("skill_index")` 신설** | 검색 시 카테고리 필터·decay 정책 독립 조절 |
+| D4 | 폐기 정책 **decay 기반 자연 폐기** | 별도 archive 명령 없음. 파일은 유지(복원 가능) |
+| D5 | 스킬 포맷 **양쪽 동시 지원 (변환 레이어)** | 내부 저장은 NaraeClaw 고유, 외부 익스포트/임포트 시 Hermes 포맷 변환. M5 신설 |
+| D6 | consolidation LLM 비용 **+10–15% 허용** | `skill_candidate` 필드를 기존 consolidation 추출에 통합 (별도 호출 분리 안 함) |
+
+상세 설계는 아래 본문 참조.
 
 ---
 
@@ -24,8 +37,7 @@ Hermes Agent가 강조하는 **자동 스킬 진화 루프**를 NaraeClaw에 도
 
 비목표(out of scope):
 - 새 채널 추가 (Telegram·Discord 등) — 별도 트랙
-- agentskills.io 호환성 — 후속 검토
-- 외부 스킬 마켓 통합 — skillforge가 이미 일부 처리
+- 외부 스킬 마켓 통합 (agentskills.io 디렉토리 업로드·검색) — 본 ADR은 *포맷 변환*까지만, 마켓 연동은 후속
 
 ---
 
@@ -89,7 +101,7 @@ Hermes 공식 문서가 강조하는 4가지 특성을 NaraeClaw 현재 상태�
 
 ---
 
-## 5. 설계 — 자동 진화 루프 6 비트
+## 5. 설계 — 자동 진화 루프 7 비트
 
 ### 5.1 전체 데이터 흐름
 
@@ -285,25 +297,40 @@ if config.skillforge.enabled {
 - `agent/value_signal.rs::{ValueSignal, score}`
 - `skills/registry.rs::SkillRegistry` (기존 `skills_to_prompt/tools`를 메서드화)
 - `skills/stats.rs::SkillStats`
+- `skills/format/{native.rs, hermes.rs, convert.rs, mod.rs}` — **D5 결정 반영**. 양쪽 포맷 동시 지원 변환 레이어. native(SKILL.toml/SKILL.md)는 1급 시민, hermes(SKILL.md 프론트매터)는 import/export 시 변환
+- `naraeclaw-tools/src/mark_skill_candidate.rs` — **D2 결정 반영**. 에이전트가 명시 신호를 보낼 수 있는 도구 (config로 자동 노출)
 
 기존 변경(최소):
 - `agent/loop_.rs` — 턴 종료 시점에 trace 캡처 + 게이트 호출 (≤30줄)
-- `memory/consolidation.rs` — 추출 프롬프트에 `skill_candidate` 필드 추가 (프롬프트 텍스트 + 파싱)
-- `skills/mod.rs` — `load_skills` 결과를 `SkillRegistry`로 감싸기
-- `skillforge/mod.rs` — cron 등록 1지점
+- `memory/consolidation.rs` — 추출 프롬프트에 `skill_candidate` 필드 추가 (프롬프트 텍스트 + 파싱) — **D6 결정에 따라 비용 +10–15% 허용**
+- `skills/mod.rs::load_skills` — `format::auto_detect()`로 위임, native/hermes 모두 인식 → `SkillRegistry`로 감싸기
+- `skillforge/mod.rs` — cron 등록 1지점, hermes 포맷 후보도 통합
 
 호환 fallback 없이 진행 가능 (config 기본값 off로 출시 → 안정 후 on).
 
 **Config 키 신설** (CLAUDE.md "Config 키는 공개 계약" 규칙에 따라 기본값·마이그레이션 문서화 필수):
 ```toml
+[agent.execution_trace]
+enabled = false                  # M1 기본 off — trace 캡처 자체 토글
+
 [skills.auto_evolution]
-enabled = false                  # M1 기본 off
-trigger_threshold = 0.6
-hot_reload = true
+enabled = false                  # M2 기본 off — 자동 생성 토글
+trigger_threshold = 0.6          # D1 — ValueSignal 임계
+hot_reload = true                # M3
+user_signal_keyword = true       # D2 — consolidation에서 키워드 추출
+user_signal_tool = true          # D2 — mark_skill_candidate 도구 노출
+
 [skills.auto_evolution.stats]
-decay_into_archive_at = 0.1
+# D4 — decay 자연 폐기. prompt 노출 임계만 둔다 (archive 명령 없음)
+prompt_exposure_min_score = 0.1
+
+[skills.format]
+# D5 — 양쪽 포맷 지원
+accept_hermes_md = true          # import 시 허용
+export_hermes_md = false         # 기본은 NaraeClaw 고유, 명시적으로 export
+
 [skillforge.scheduler]
-enabled = false
+enabled = false                  # M4 기본 off
 ```
 
 ---
@@ -314,40 +341,37 @@ enabled = false
 
 ### M1 — 추적 인프라 (저위험)
 - `ExecutionTrace` 캡처 + `agent/loop_.rs` 훅
-- `SkillStats` 메모리 적재
+- `SkillStats` 메모리 적재 (`Custom("skill_stat")` 카테고리)
 - **검증**: 단위 테스트 + live 한 세션 돌려 trace JSON 덤프 확인
-- **범위**: trace 캡처만, 자동 생성 OFF
+- **범위**: trace 캡처만, 자동 생성 OFF. `agent.execution_trace.enabled` flag로 보호
 
 ### M2 — 자동 트리거 (중위험)
-- `ValueSignal` + `score()` + 기본 임계값
-- `SkillCreator` 자동 호출 (config flag로 보호)
+- `ValueSignal` + `score()` + **D1 임계값 0.6** 기본
+- `SkillCreator` 자동 호출 (`skills.auto_evolution.enabled` flag로 보호)
 - **검증**: MockProvider로 멀티스텝 시나리오 통과, 무한 루프 가드(스킬 생성 동안 다시 트리거 차단)
 
 ### M3 — 핫 리로드 + Memory 브리지 (중위험)
 - `SkillRegistry` 도입, 기존 호출자 마이그레이션
-- `consolidation` 프롬프트에 `skill_candidate` 추가
-- **검증**: 같은 세션에서 생성→재사용 시나리오
+- `consolidation` 프롬프트에 `skill_candidate` 추가 — **D6 비용 +10–15% 수용**
+- **D2** `mark_skill_candidate` 도구 신설 (auto_approve 목록 검토)
+- **D3** 스킬 인덱스 메모리 적재 (`Custom("skill_index")`, importance 0.8)
+- **검증**: 같은 세션에서 생성→재사용 시나리오, consolidation 회귀 fixture replay
 
 ### M4 — SkillForge 스케줄러 (저위험, 보너스)
-- cron 1회 등록
+- cron 1회 등록 (`skillforge.scheduler.enabled` flag)
 - **검증**: 짧은 주기(테스트용)로 도는지 확인
 
----
-
-## 8. 오픈 질문
-
-이 문서를 합의하기 전에 사용자 결정이 필요한 항목:
-
-1. **트리거 임계값 기본값** — 0.6 보수적 / 0.5 공격적 / 0.7 매우 보수적 중 어디?
-2. **사용자 명시 신호 채널** — 채팅 키워드("기억해줘") / 도구 호출(`mark_skill_candidate`) / 둘 다?
-3. **Memory 카테고리 신설 vs 재사용** — `Custom("skill_index")` 신설 vs 기존 `Core`에 태그?
-4. **스킬 자동 폐기 정책** — decay만으로 자연 폐기 vs 명시적 archive 명령 (`improver`에 archive 모드 추가)?
-5. **agentskills.io 호환성** — Hermes 호환 SKILL.md 포맷을 따라갈지 / NaraeClaw 고유 SKILL.toml 유지?
-6. **백그라운드 LLM 비용** — consolidation에 `skill_candidate` 필드 추가 시 호출당 토큰 +10-15% 예상. 허용?
+### M5 — 포맷 호환 레이어 (저위험, D5 신규)
+- `skills/format/{native, hermes, convert, mod}.rs` 신설
+- `load_skills` → `format::auto_detect()` 위임 (SKILL.toml vs SKILL.md 프론트매터 자동 분기)
+- Hermes → NaraeClaw 변환: 프론트매터 → SKILL.toml, body → SKILL.md
+- NaraeClaw → Hermes export 커맨드 (`naraeclaw skills export --format hermes <slug>`)
+- **M1~M4와 파일 충돌 없음** — 병렬 worktree 가능. M3 머지 후 시작이 자연스럽지만 순서 강제 아님
+- **검증**: agentskills.io 샘플 스킬 import → load → export round-trip 테스트
 
 ---
 
-## 9. 리스크
+## 8. 리스크
 
 | 리스크 | 영향 | 완화 |
 |---|---|---|
@@ -359,7 +383,7 @@ enabled = false
 
 ---
 
-## 10. 참고 자료
+## 9. 참고 자료
 
 - Hermes Agent 공식: https://hermes-agent.org/
 - NousResearch 해설: https://discuss.pytorch.kr/t/hermes-agent-nousresearch-ai/9184
@@ -367,6 +391,7 @@ enabled = false
 
 ---
 
-**다음 액션 후보**:
-- 본 문서를 두고 사용자 합의 → 오픈 질문 8개 결정 → M1부터 worktree 분기
-- 또는 본 문서를 ADR-005로 승격
+## 변경 이력
+
+- **2026-05-13 (제안)** — 초기 작성, Status: Proposed, 오픈 질문 6개 (Q1~Q6)
+- **2026-05-13 (확정)** — Status: Accepted. D1~D6 결정 확정 (`Decision` 섹션 참조). M5 신설(포맷 호환 레이어). Section 8 오픈 질문 제거 → `Decision` 표로 흡수
