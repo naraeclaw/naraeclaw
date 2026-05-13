@@ -3570,6 +3570,19 @@ async fn scaffold_workspace(
     } else {
         &ctx.timezone
     };
+    let languages = match tz {
+        t if t.starts_with("Asia/Seoul") || t.starts_with("Asia/Pyongyang") => {
+            "Korean (primary), English"
+        }
+        t if t.starts_with("Asia/Tokyo") => "Japanese (primary), English",
+        t if t.starts_with("Asia/Shanghai")
+            || t.starts_with("Asia/Hong_Kong")
+            || t.starts_with("Asia/Taipei") =>
+        {
+            "Chinese (primary), English"
+        }
+        _ => "English",
+    };
     let comm_style = if ctx.communication_style.is_empty() {
         "Be warm, natural, and clear. Use occasional relevant emojis (1-2 max) and avoid robotic phrasing."
     } else {
@@ -3822,6 +3835,20 @@ async fn scaffold_workspace(
          - Prefer specific, grounded phrasing over generic filler.
 
 \
+         ## Channels (Slack etc.)
+
+\
+         When replying in chat channels (Slack, Matrix, etc.):
+\
+         - **3-4 lines max.** Chat is not a document.
+\
+         - Never use `###` headers — they don't render in Slack.
+\
+         - Don't volunteer feature lists. Answer what was asked.
+\
+         - Lead with the answer, elaborate only if asked.
+
+\
          ## Boundaries
 
 \
@@ -3860,7 +3887,7 @@ async fn scaffold_workspace(
 \
          - **Timezone:** {tz}
 \
-         - **Languages:** English
+         - **Languages:** {languages}
 
 \
          ## Communication Style
