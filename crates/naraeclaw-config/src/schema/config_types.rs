@@ -710,6 +710,44 @@ pub struct SkillsConfig {
     #[serde(default)]
     #[nested]
     pub skill_improvement: SkillImprovementConfig,
+    /// Auto-evolution trigger gate (ADR-005 M2).
+    #[serde(default)]
+    #[nested]
+    pub auto_evolution: SkillAutoEvolutionConfig,
+}
+
+/// Auto-evolution trigger configuration (`[skills.auto-evolution]` section).
+/// ADR-005 M2 — gates [`crate::skills::SkillCreator`] on a value-score threshold.
+#[derive(Debug, Clone, Serialize, Deserialize, Configurable)]
+#[cfg_attr(feature = "schema-export", derive(schemars::JsonSchema))]
+#[prefix = "skills.auto-evolution"]
+#[serde(default)]
+pub struct SkillAutoEvolutionConfig {
+    /// Enable the auto-evolution trigger. When `false`, no value scoring or
+    /// `SkillCreator` invocation happens regardless of other knobs.
+    /// Default: `false`.
+    pub enabled: bool,
+    /// Minimum `ValueSignal::score` required to fire `SkillCreator`. ADR-005
+    /// D1 chose `0.6` as the conservative default.
+    pub trigger_threshold: f64,
+    /// Accept keyword nudges ("기억해줘", "save this skill") extracted by the
+    /// consolidation LLM (ADR-005 D2). Has no effect until the M3 consolidation
+    /// bridge lands.
+    pub user_signal_keyword: bool,
+    /// Surface the `mark_skill_candidate` agent tool (ADR-005 D2). Has no
+    /// effect until the tool is registered in a later milestone.
+    pub user_signal_tool: bool,
+}
+
+impl Default for SkillAutoEvolutionConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            trigger_threshold: 0.6,
+            user_signal_keyword: true,
+            user_signal_tool: true,
+        }
+    }
 }
 
 /// Autonomous skill creation configuration (`[skills.skill_creation]` section).

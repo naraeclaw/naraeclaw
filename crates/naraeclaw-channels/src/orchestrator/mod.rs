@@ -2977,6 +2977,7 @@ async fn process_channel_message(
                         ctx.max_tool_result_chars,
                         ctx.context_token_budget,
                         None, // shared_budget
+                        None, // skill_evolution: M2 wiring planned for a follow-up
                     ),
                     ),
                     ),

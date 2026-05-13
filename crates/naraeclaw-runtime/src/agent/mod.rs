@@ -14,9 +14,11 @@ pub mod loop_detector;
 pub mod memory_loader;
 pub mod personality;
 pub mod prompt;
+pub mod skill_evolution;
 pub mod system_prompt;
 pub mod thinking;
 pub mod tool_execution;
+pub mod value_signal;
 
 #[cfg(test)]
 mod tests;
@@ -27,3 +29,7 @@ pub use agent::{Agent, AgentBuilder, TurnEvent};
 pub use execution_trace::ExecutionTrace;
 #[allow(unused_imports)]
 pub use loop_::{process_message, run};
+#[allow(unused_imports)]
+pub use skill_evolution::SkillEvolutionService;
+#[allow(unused_imports)]
+pub use value_signal::{UserSignal, ValueSignal};
