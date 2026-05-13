@@ -723,6 +723,28 @@ pub struct AgentConfig {
     /// behavior). Default: `2`.
     #[serde(default = "default_keep_tool_context_turns")]
     pub keep_tool_context_turns: usize,
+
+    /// Per-turn execution trace capture for ADR-005 auto skill evolution.
+    /// When enabled, the agent loop accumulates an [`ExecutionTrace`] for each
+    /// turn that downstream stages (`SkillCreator`, `ValueSignal`, etc.) can
+    /// consume. M1 introduces the type and gate only; loop wiring lands in
+    /// a follow-up.
+    #[nested]
+    #[serde(default)]
+    pub execution_trace: ExecutionTraceConfig,
+}
+
+/// Execution trace capture configuration (`[agent.execution-trace]` section).
+/// ADR-005 M1.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, Configurable)]
+#[cfg_attr(feature = "schema-export", derive(schemars::JsonSchema))]
+#[prefix = "agent.execution-trace"]
+pub struct ExecutionTraceConfig {
+    /// Capture per-turn [`ExecutionTrace`] objects in the agent loop.
+    /// Default: `false` (off). Turning this on has no behavioural effect on
+    /// its own — it only enables downstream consumers introduced in M2+.
+    #[serde(default)]
+    pub enabled: bool,
 }
 
 pub fn default_max_tool_result_chars() -> usize {
@@ -773,6 +795,7 @@ impl Default for AgentConfig {
             context_compression: crate::scattered_types::ContextCompressionConfig::default(),
             max_tool_result_chars: default_max_tool_result_chars(),
             keep_tool_context_turns: default_keep_tool_context_turns(),
+            execution_trace: ExecutionTraceConfig::default(),
         }
     }
 }

@@ -6,6 +6,7 @@ pub mod context_compressor;
 pub mod cost;
 pub mod dispatcher;
 pub mod eval;
+pub mod execution_trace;
 pub mod history;
 pub mod history_pruner;
 pub mod loop_;
@@ -22,5 +23,7 @@ mod tests;
 
 #[allow(unused_imports)]
 pub use agent::{Agent, AgentBuilder, TurnEvent};
+#[allow(unused_imports)]
+pub use execution_trace::ExecutionTrace;
 #[allow(unused_imports)]
 pub use loop_::{process_message, run};
