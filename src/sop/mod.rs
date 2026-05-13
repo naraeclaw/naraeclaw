@@ -590,7 +590,9 @@ type = "manual"
         let tmp = TempDir::new().unwrap();
         let config = test_sop_config(&tmp);
         let result = handle_command(
-            crate::SopCommands::Validate { name: Some("nonexistent".into()) },
+            crate::SopCommands::Validate {
+                name: Some("nonexistent".into()),
+            },
             &config,
         );
         assert!(result.is_err());
@@ -601,7 +603,9 @@ type = "manual"
         let tmp = TempDir::new().unwrap();
         let config = test_sop_config(&tmp);
         let result = handle_command(
-            crate::SopCommands::Show { name: "nonexistent".into() },
+            crate::SopCommands::Show {
+                name: "nonexistent".into(),
+            },
             &config,
         );
         assert!(result.is_err());
@@ -613,18 +617,38 @@ type = "manual"
         let config = test_sop_config(&tmp);
         let sops_dir = config.workspace_dir.join("sops").join("my-sop");
         fs::create_dir_all(&sops_dir).unwrap();
-        fs::write(sops_dir.join("SOP.toml"), r#"
+        fs::write(
+            sops_dir.join("SOP.toml"),
+            r#"
 [sop]
 name = "my-sop"
 description = "Test SOP"
 
 [[triggers]]
 type = "manual"
-"#).unwrap();
+"#,
+        )
+        .unwrap();
 
         assert!(handle_command(crate::SopCommands::List, &config).is_ok());
         assert!(handle_command(crate::SopCommands::Validate { name: None }, &config).is_ok());
-        assert!(handle_command(crate::SopCommands::Validate { name: Some("my-sop".into()) }, &config).is_ok());
-        assert!(handle_command(crate::SopCommands::Show { name: "my-sop".into() }, &config).is_ok());
+        assert!(
+            handle_command(
+                crate::SopCommands::Validate {
+                    name: Some("my-sop".into())
+                },
+                &config
+            )
+            .is_ok()
+        );
+        assert!(
+            handle_command(
+                crate::SopCommands::Show {
+                    name: "my-sop".into()
+                },
+                &config
+            )
+            .is_ok()
+        );
     }
 }

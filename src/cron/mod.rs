@@ -293,7 +293,10 @@ mod tests {
 
     #[test]
     fn to_optional_tools_non_empty_returns_some() {
-        assert_eq!(to_optional_tools(vec!["shell".into()]), Some(vec!["shell".into()]));
+        assert_eq!(
+            to_optional_tools(vec!["shell".into()]),
+            Some(vec!["shell".into()])
+        );
     }
 
     // bail_if_tools_without_agent 테스트
@@ -411,7 +414,9 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         let config = test_config(&tmp);
         let result = handle_command(
-            crate::CronCommands::Remove { id: "nonexistent-id".into() },
+            crate::CronCommands::Remove {
+                id: "nonexistent-id".into(),
+            },
             &config,
         );
         assert!(result.is_err());
@@ -431,7 +436,8 @@ mod tests {
                 command: "echo hi".into(),
             },
             &config,
-        ).unwrap();
+        )
+        .unwrap();
         let jobs = list_jobs(&config).unwrap();
         assert_eq!(jobs.len(), 1);
     }
@@ -441,13 +447,29 @@ mod tests {
     fn pause_nonexistent_errors() {
         let tmp = TempDir::new().unwrap();
         let config = test_config(&tmp);
-        assert!(handle_command(crate::CronCommands::Pause { id: "bad-id".into() }, &config).is_err());
+        assert!(
+            handle_command(
+                crate::CronCommands::Pause {
+                    id: "bad-id".into()
+                },
+                &config
+            )
+            .is_err()
+        );
     }
 
     #[test]
     fn resume_nonexistent_errors() {
         let tmp = TempDir::new().unwrap();
         let config = test_config(&tmp);
-        assert!(handle_command(crate::CronCommands::Resume { id: "bad-id".into() }, &config).is_err());
+        assert!(
+            handle_command(
+                crate::CronCommands::Resume {
+                    id: "bad-id".into()
+                },
+                &config
+            )
+            .is_err()
+        );
     }
 }
