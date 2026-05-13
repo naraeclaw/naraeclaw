@@ -3,6 +3,14 @@ pub use naraeclaw_runtime::sop::*;
 
 use anyhow::Result;
 
+/// `name`이 `Some(n)`이면 이름으로 필터링, `None`이면 전체 반환
+fn filter_sops_by_name<'a>(sops: &'a [Sop], name: Option<&str>) -> Vec<&'a Sop> {
+    match name {
+        Some(n) => sops.iter().filter(|s| s.name == n).collect(),
+        None => sops.iter().collect(),
+    }
+}
+
 pub fn handle_command(command: crate::SopCommands, config: &crate::config::Config) -> Result<()> {
     let workspace_dir = &config.workspace_dir;
     let default_mode = parse_execution_mode(&config.sop.default_execution_mode);
@@ -42,10 +50,7 @@ pub fn handle_command(command: crate::SopCommands, config: &crate::config::Confi
             Ok(())
         }
         crate::SopCommands::Validate { name } => {
-            let targets: Vec<_> = match &name {
-                Some(n) => sops.iter().filter(|s| s.name == *n).collect(),
-                None => sops.iter().collect(),
-            };
+            let targets = filter_sops_by_name(&sops, name.as_deref());
 
             if targets.is_empty() {
                 if let Some(n) = &name {
@@ -136,6 +141,7 @@ mod tests {
     use crate::sop::types::SopManifest;
     use std::fs;
     use std::path::{Path, PathBuf};
+    use tempfile::TempDir;
 
     #[test]
     fn parse_steps_basic() {
@@ -511,5 +517,114 @@ type = "manual"
         assert_eq!(steps[1].kind, SopStepKind::Checkpoint);
         // Default kind should be Execute
         assert_eq!(steps[2].kind, SopStepKind::Execute);
+    }
+
+    // ── filter_sops_by_name 테스트 ──────────────────────────────
+
+    fn make_sop(name: &str) -> Sop {
+        Sop {
+            name: name.into(),
+            description: "desc".into(),
+            version: "1.0.0".into(),
+            priority: SopPriority::Normal,
+            execution_mode: SopExecutionMode::Supervised,
+            triggers: vec![SopTrigger::Manual],
+            steps: vec![],
+            cooldown_secs: 0,
+            max_concurrent: 1,
+            location: None,
+            deterministic: false,
+        }
+    }
+
+    #[test]
+    fn filter_sops_none_returns_all() {
+        let sops = vec![make_sop("a"), make_sop("b")];
+        let result = filter_sops_by_name(&sops, None);
+        assert_eq!(result.len(), 2);
+    }
+
+    #[test]
+    fn filter_sops_some_name_filters() {
+        let sops = vec![make_sop("a"), make_sop("b")];
+        let result = filter_sops_by_name(&sops, Some("a"));
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].name, "a");
+    }
+
+    #[test]
+    fn filter_sops_no_match_returns_empty() {
+        let sops = vec![make_sop("a")];
+        let result = filter_sops_by_name(&sops, Some("z"));
+        assert!(result.is_empty());
+    }
+
+    // ── handle_command 통합 테스트 ─────────────────────────────
+
+    fn test_sop_config(tmp: &TempDir) -> crate::config::Config {
+        let mut config = crate::config::Config::default();
+        config.workspace_dir = tmp.path().join("workspace");
+        config.config_path = tmp.path().join("config.toml");
+        std::fs::create_dir_all(&config.workspace_dir).unwrap();
+        config
+    }
+
+    #[test]
+    fn list_empty_workspace() {
+        let tmp = TempDir::new().unwrap();
+        let config = test_sop_config(&tmp);
+        let result = handle_command(crate::SopCommands::List, &config);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn validate_empty_workspace() {
+        let tmp = TempDir::new().unwrap();
+        let config = test_sop_config(&tmp);
+        let result = handle_command(crate::SopCommands::Validate { name: None }, &config);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn validate_nonexistent_name_errors() {
+        let tmp = TempDir::new().unwrap();
+        let config = test_sop_config(&tmp);
+        let result = handle_command(
+            crate::SopCommands::Validate { name: Some("nonexistent".into()) },
+            &config,
+        );
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn show_nonexistent_sop_errors() {
+        let tmp = TempDir::new().unwrap();
+        let config = test_sop_config(&tmp);
+        let result = handle_command(
+            crate::SopCommands::Show { name: "nonexistent".into() },
+            &config,
+        );
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn list_and_validate_with_real_sop() {
+        let tmp = TempDir::new().unwrap();
+        let config = test_sop_config(&tmp);
+        let sops_dir = config.workspace_dir.join("sops").join("my-sop");
+        fs::create_dir_all(&sops_dir).unwrap();
+        fs::write(sops_dir.join("SOP.toml"), r#"
+[sop]
+name = "my-sop"
+description = "Test SOP"
+
+[[triggers]]
+type = "manual"
+"#).unwrap();
+
+        assert!(handle_command(crate::SopCommands::List, &config).is_ok());
+        assert!(handle_command(crate::SopCommands::Validate { name: None }, &config).is_ok());
+        assert!(handle_command(crate::SopCommands::Validate { name: Some("my-sop".into()) }, &config).is_ok());
+        assert!(handle_command(crate::SopCommands::Show { name: "my-sop".into() }, &config).is_ok());
     }
 }
