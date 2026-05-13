@@ -11,7 +11,7 @@ use naraeclaw_memory::vector::cosine_similarity;
 use std::path::PathBuf;
 
 /// A record of a single tool call executed during a task.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ToolCallRecord {
     pub name: String,
     pub args: serde_json::Value,
