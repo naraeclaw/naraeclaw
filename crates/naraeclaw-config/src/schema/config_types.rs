@@ -725,7 +725,10 @@ pub struct SkillsConfig {
 pub struct SkillAutoEvolutionConfig {
     /// Enable the auto-evolution trigger. When `false`, no value scoring or
     /// `SkillCreator` invocation happens regardless of other knobs.
-    /// Default: `false`.
+    /// Default: `true` — the gate is on by default, but the downstream
+    /// `[skills.skill_creation]` knob (also gated by `enabled`) still
+    /// short-circuits when off, so flipping just this one knob has no
+    /// observable effect until skill creation itself is enabled.
     pub enabled: bool,
     /// Minimum `ValueSignal::score` required to fire `SkillCreator`. ADR-005
     /// D1 chose `0.6` as the conservative default.
@@ -742,7 +745,7 @@ pub struct SkillAutoEvolutionConfig {
 impl Default for SkillAutoEvolutionConfig {
     fn default() -> Self {
         Self {
-            enabled: false,
+            enabled: true,
             trigger_threshold: 0.6,
             user_signal_keyword: true,
             user_signal_tool: true,
@@ -757,7 +760,10 @@ impl Default for SkillAutoEvolutionConfig {
 #[serde(default)]
 pub struct SkillCreationConfig {
     /// Enable automatic skill creation after successful multi-step tasks.
-    /// Default: `false`.
+    /// Default: `true` — together with `[skills.auto_evolution].enabled`,
+    /// this opts users into the ADR-005 auto-evolution loop out of the box.
+    /// Existing dedup (embedding similarity), LRU eviction, and audit guards
+    /// keep the surface bounded.
     pub enabled: bool,
     /// Maximum number of auto-generated skills to keep.
     /// When exceeded, the oldest auto-generated skill is removed (LRU eviction).
@@ -770,7 +776,7 @@ pub struct SkillCreationConfig {
 impl Default for SkillCreationConfig {
     fn default() -> Self {
         Self {
-            enabled: false,
+            enabled: true,
             max_skills: 500,
             similarity_threshold: 0.85,
         }
