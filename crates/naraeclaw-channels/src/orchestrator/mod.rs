@@ -324,6 +324,9 @@ struct ChannelRuntimeContext {
     max_tool_result_chars: usize,
     context_token_budget: usize,
     debouncer: Arc<naraeclaw_infra::debounce::MessageDebouncer>,
+    /// ADR-005 M2 auto-evolution trigger; `None` when the gate is disabled in
+    /// config.
+    skill_evolution: Option<Arc<naraeclaw_runtime::agent::SkillEvolutionService>>,
 }
 
 #[derive(Clone)]
@@ -2977,7 +2980,7 @@ async fn process_channel_message(
                         ctx.max_tool_result_chars,
                         ctx.context_token_budget,
                         None, // shared_budget
-                        None, // skill_evolution: M2 wiring planned for a follow-up
+                        ctx.skill_evolution.clone(),
                     ),
                     ),
                     ),
@@ -4285,6 +4288,10 @@ pub async fn start_channels(config: Config) -> Result<()> {
         debouncer: Arc::new(naraeclaw_infra::debounce::MessageDebouncer::new(
             Duration::from_millis(config.channels_config.debounce_ms),
         )),
+        skill_evolution: naraeclaw_runtime::agent::SkillEvolutionService::from_config(
+            &config,
+            &config.workspace_dir,
+        ),
     });
 
     // Hydrate in-memory conversation histories from persisted JSONL session files.
@@ -4736,6 +4743,7 @@ mod tests {
             debouncer: Arc::new(naraeclaw_infra::debounce::MessageDebouncer::new(
                 Duration::ZERO,
             )),
+            skill_evolution: None,
         };
 
         assert!(compact_sender_history(&ctx, &sender));
@@ -4862,6 +4870,7 @@ mod tests {
             debouncer: Arc::new(naraeclaw_infra::debounce::MessageDebouncer::new(
                 Duration::ZERO,
             )),
+            skill_evolution: None,
         };
 
         append_sender_turn(&ctx, &sender, ChatMessage::user("hello"));
@@ -4945,6 +4954,7 @@ mod tests {
             debouncer: Arc::new(naraeclaw_infra::debounce::MessageDebouncer::new(
                 Duration::ZERO,
             )),
+            skill_evolution: None,
         };
 
         assert!(rollback_orphan_user_turn(&ctx, &sender, "pending"));
@@ -5046,6 +5056,7 @@ mod tests {
             debouncer: Arc::new(naraeclaw_infra::debounce::MessageDebouncer::new(
                 Duration::ZERO,
             )),
+            skill_evolution: None,
         };
 
         assert!(rollback_orphan_user_turn(
@@ -5647,6 +5658,7 @@ BTC is currently around $65,000 based on latest tool output."#
             debouncer: Arc::new(naraeclaw_infra::debounce::MessageDebouncer::new(
                 Duration::ZERO,
             )),
+            skill_evolution: None,
         });
 
         process_channel_message(
@@ -5740,6 +5752,7 @@ BTC is currently around $65,000 based on latest tool output."#
             debouncer: Arc::new(naraeclaw_infra::debounce::MessageDebouncer::new(
                 Duration::ZERO,
             )),
+            skill_evolution: None,
         });
 
         process_channel_message(
@@ -5847,6 +5860,7 @@ BTC is currently around $65,000 based on latest tool output."#
             debouncer: Arc::new(naraeclaw_infra::debounce::MessageDebouncer::new(
                 Duration::ZERO,
             )),
+            skill_evolution: None,
         });
 
         process_channel_message(
@@ -5939,6 +5953,7 @@ BTC is currently around $65,000 based on latest tool output."#
             debouncer: Arc::new(naraeclaw_infra::debounce::MessageDebouncer::new(
                 Duration::ZERO,
             )),
+            skill_evolution: None,
         });
 
         process_channel_message(
@@ -6041,6 +6056,7 @@ BTC is currently around $65,000 based on latest tool output."#
             debouncer: Arc::new(naraeclaw_infra::debounce::MessageDebouncer::new(
                 Duration::ZERO,
             )),
+            skill_evolution: None,
         });
 
         process_channel_message(
@@ -6164,6 +6180,7 @@ BTC is currently around $65,000 based on latest tool output."#
             debouncer: Arc::new(naraeclaw_infra::debounce::MessageDebouncer::new(
                 Duration::ZERO,
             )),
+            skill_evolution: None,
         });
 
         process_channel_message(
@@ -6268,6 +6285,7 @@ BTC is currently around $65,000 based on latest tool output."#
             debouncer: Arc::new(naraeclaw_infra::debounce::MessageDebouncer::new(
                 Duration::ZERO,
             )),
+            skill_evolution: None,
         });
 
         process_channel_message(
@@ -6387,6 +6405,7 @@ BTC is currently around $65,000 based on latest tool output."#
             debouncer: Arc::new(naraeclaw_infra::debounce::MessageDebouncer::new(
                 Duration::ZERO,
             )),
+            skill_evolution: None,
         });
 
         process_channel_message(
@@ -6494,6 +6513,7 @@ BTC is currently around $65,000 based on latest tool output."#
             debouncer: Arc::new(naraeclaw_infra::debounce::MessageDebouncer::new(
                 Duration::ZERO,
             )),
+            skill_evolution: None,
         });
 
         process_channel_message(
@@ -6591,6 +6611,7 @@ BTC is currently around $65,000 based on latest tool output."#
             debouncer: Arc::new(naraeclaw_infra::debounce::MessageDebouncer::new(
                 Duration::ZERO,
             )),
+            skill_evolution: None,
         });
 
         process_channel_message(
@@ -6811,6 +6832,7 @@ BTC is currently around $65,000 based on latest tool output."#
             debouncer: Arc::new(naraeclaw_infra::debounce::MessageDebouncer::new(
                 Duration::ZERO,
             )),
+            skill_evolution: None,
         });
 
         let (tx, rx) = tokio::sync::mpsc::channel::<naraeclaw_api::channel::ChannelMessage>(4);
@@ -6927,6 +6949,7 @@ BTC is currently around $65,000 based on latest tool output."#
             debouncer: Arc::new(naraeclaw_infra::debounce::MessageDebouncer::new(
                 Duration::ZERO,
             )),
+            skill_evolution: None,
         });
 
         let (tx, rx) = tokio::sync::mpsc::channel::<naraeclaw_api::channel::ChannelMessage>(8);
@@ -7062,6 +7085,7 @@ BTC is currently around $65,000 based on latest tool output."#
             debouncer: Arc::new(naraeclaw_infra::debounce::MessageDebouncer::new(
                 Duration::ZERO,
             )),
+            skill_evolution: None,
         });
 
         let (tx, rx) = tokio::sync::mpsc::channel::<naraeclaw_api::channel::ChannelMessage>(8);
@@ -7194,6 +7218,7 @@ BTC is currently around $65,000 based on latest tool output."#
             debouncer: Arc::new(naraeclaw_infra::debounce::MessageDebouncer::new(
                 Duration::ZERO,
             )),
+            skill_evolution: None,
         });
 
         let (tx, rx) = tokio::sync::mpsc::channel::<naraeclaw_api::channel::ChannelMessage>(8);
@@ -7304,6 +7329,7 @@ BTC is currently around $65,000 based on latest tool output."#
             debouncer: Arc::new(naraeclaw_infra::debounce::MessageDebouncer::new(
                 Duration::ZERO,
             )),
+            skill_evolution: None,
         });
 
         process_channel_message(
@@ -7394,6 +7420,7 @@ BTC is currently around $65,000 based on latest tool output."#
             debouncer: Arc::new(naraeclaw_infra::debounce::MessageDebouncer::new(
                 Duration::ZERO,
             )),
+            skill_evolution: None,
         });
 
         process_channel_message(
@@ -7484,6 +7511,7 @@ BTC is currently around $65,000 based on latest tool output."#
             debouncer: Arc::new(naraeclaw_infra::debounce::MessageDebouncer::new(
                 Duration::ZERO,
             )),
+            skill_evolution: None,
         });
 
         process_channel_message(
@@ -8286,6 +8314,7 @@ BTC is currently around $65,000 based on latest tool output."#
             debouncer: Arc::new(naraeclaw_infra::debounce::MessageDebouncer::new(
                 Duration::ZERO,
             )),
+            skill_evolution: None,
         });
 
         process_channel_message(
@@ -8432,6 +8461,7 @@ BTC is currently around $65,000 based on latest tool output."#
             debouncer: Arc::new(naraeclaw_infra::debounce::MessageDebouncer::new(
                 Duration::ZERO,
             )),
+            skill_evolution: None,
         });
 
         process_channel_message(
@@ -8622,6 +8652,7 @@ BTC is currently around $65,000 based on latest tool output."#
             debouncer: Arc::new(naraeclaw_infra::debounce::MessageDebouncer::new(
                 Duration::ZERO,
             )),
+            skill_evolution: None,
         });
 
         process_channel_message(
@@ -8741,6 +8772,7 @@ BTC is currently around $65,000 based on latest tool output."#
             debouncer: Arc::new(naraeclaw_infra::debounce::MessageDebouncer::new(
                 Duration::ZERO,
             )),
+            skill_evolution: None,
         });
 
         process_channel_message(
@@ -9285,6 +9317,7 @@ This is an example JSON object for profile settings."#;
             debouncer: Arc::new(naraeclaw_infra::debounce::MessageDebouncer::new(
                 Duration::ZERO,
             )),
+            skill_evolution: None,
         });
 
         // Simulate a photo attachment message with [IMAGE:] marker.
@@ -9384,6 +9417,7 @@ This is an example JSON object for profile settings."#;
             debouncer: Arc::new(naraeclaw_infra::debounce::MessageDebouncer::new(
                 Duration::ZERO,
             )),
+            skill_evolution: None,
         });
 
         process_channel_message(
@@ -9518,6 +9552,7 @@ This is an example JSON object for profile settings."#;
             )),
             media_pipeline: naraeclaw_config::schema::MediaPipelineConfig::default(),
             transcription_config: naraeclaw_config::schema::TranscriptionConfig::default(),
+            skill_evolution: None,
         });
 
         process_channel_message(
@@ -9696,6 +9731,7 @@ This is an example JSON object for profile settings."#;
             debouncer: Arc::new(naraeclaw_infra::debounce::MessageDebouncer::new(
                 Duration::ZERO,
             )),
+            skill_evolution: None,
         });
 
         process_channel_message(
@@ -9819,6 +9855,7 @@ This is an example JSON object for profile settings."#;
             debouncer: Arc::new(naraeclaw_infra::debounce::MessageDebouncer::new(
                 Duration::ZERO,
             )),
+            skill_evolution: None,
         });
 
         process_channel_message(
@@ -9934,6 +9971,7 @@ This is an example JSON object for profile settings."#;
             debouncer: Arc::new(naraeclaw_infra::debounce::MessageDebouncer::new(
                 Duration::ZERO,
             )),
+            skill_evolution: None,
         });
 
         process_channel_message(
@@ -10069,6 +10107,7 @@ This is an example JSON object for profile settings."#;
             debouncer: Arc::new(naraeclaw_infra::debounce::MessageDebouncer::new(
                 Duration::ZERO,
             )),
+            skill_evolution: None,
         });
 
         process_channel_message(
@@ -10314,6 +10353,7 @@ This is an example JSON object for profile settings."#;
             debouncer: Arc::new(naraeclaw_infra::debounce::MessageDebouncer::new(
                 Duration::ZERO,
             )),
+            skill_evolution: None,
         });
 
         let (tx, rx) = tokio::sync::mpsc::channel::<naraeclaw_api::channel::ChannelMessage>(8);

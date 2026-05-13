@@ -12,9 +12,10 @@
 //! single-step trace) before doing any I/O, so it is safe to call from the
 //! request path; heavy work is moved to a detached task via `tokio::spawn`.
 
+use std::path::Path;
 use std::sync::Arc;
 
-use naraeclaw_config::schema::SkillAutoEvolutionConfig;
+use naraeclaw_config::schema::{Config, SkillAutoEvolutionConfig};
 use naraeclaw_memory::embeddings::EmbeddingProvider;
 
 use crate::agent::execution_trace::ExecutionTrace;
@@ -54,6 +55,31 @@ impl SkillEvolutionService {
             embedding,
             config,
         }
+    }
+
+    /// Build a service from the runtime config if (and only if) the
+    /// auto-evolution gate is enabled. Returns `None` otherwise so callers
+    /// can drop the value straight into `run_tool_call_loop`'s
+    /// `skill_evolution: Option<Arc<_>>` slot.
+    ///
+    /// The embedding provider is intentionally left as `None` for now —
+    /// hooking it up to the same provider the memory layer uses requires
+    /// exposing more of `naraeclaw-memory`'s internal resolution, and the
+    /// `SkillCreator` dedup path treats `None` as "skip the similarity
+    /// check", which is the safer initial behaviour.
+    pub fn from_config(config: &Config, workspace_dir: &Path) -> Option<Arc<Self>> {
+        if !config.skills.auto_evolution.enabled {
+            return None;
+        }
+        let creator = Arc::new(SkillCreator::new(
+            workspace_dir.to_path_buf(),
+            config.skills.skill_creation.clone(),
+        ));
+        Some(Arc::new(Self::new(
+            creator,
+            None,
+            config.skills.auto_evolution.clone(),
+        )))
     }
 
     /// Evaluate the trace and, if the gate passes, spawn a background task
@@ -197,5 +223,36 @@ mod tests {
         t.finalize("done");
         let decision = svc.try_trigger(t, 1.0, None);
         assert_eq!(decision, TriggerDecision::BelowThreshold);
+    }
+
+    fn config_with_evolution(enabled: bool) -> Config {
+        let mut config = Config::default();
+        config.skills.auto_evolution.enabled = enabled;
+        // Ensure the inner SkillCreator is also enabled — `from_config`
+        // wires it through unchanged.
+        config.skills.skill_creation.enabled = true;
+        config
+    }
+
+    #[test]
+    fn from_config_returns_none_when_gate_disabled() {
+        let config = config_with_evolution(false);
+        let tmp = tempfile::tempdir().unwrap();
+        assert!(SkillEvolutionService::from_config(&config, tmp.path()).is_none());
+    }
+
+    #[tokio::test]
+    async fn from_config_returns_some_when_gate_enabled() {
+        let config = config_with_evolution(true);
+        let tmp = tempfile::tempdir().unwrap();
+        let svc = SkillEvolutionService::from_config(&config, tmp.path())
+            .expect("expected a service when gate is enabled");
+        // Reaching the spawn branch from inside the service confirms the
+        // gate config plumbed through — we don't need to assert on disk
+        // writes here. `try_trigger` calls `tokio::spawn`, so the test must
+        // run on a Tokio runtime.
+        let decision = svc.try_trigger(baseline_trace(), 1.0, None);
+        assert_eq!(decision, TriggerDecision::Spawned);
+        tokio::task::yield_now().await;
     }
 }

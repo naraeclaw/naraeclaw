@@ -2095,6 +2095,12 @@ pub async fn run(
     // so the LLM can invoke them via native function calling, not just XML prompts.
     tools::register_skill_tools(&mut tools_registry, &skills, security.clone());
 
+    // ADR-005 M2.5: bootstrap the auto-evolution trigger. `None` when the
+    // `skills.auto_evolution.enabled` gate is off, which keeps the existing
+    // behaviour for every user that hasn't opted in.
+    let skill_evolution =
+        crate::agent::SkillEvolutionService::from_config(&config, &config.workspace_dir);
+
     let mut tool_descs: Vec<(&str, &str)> = vec![
         (
             "shell",
@@ -2348,7 +2354,7 @@ pub async fn run(
                         config.agent.max_tool_result_chars,
                         config.agent.max_context_tokens,
                         None, // shared_budget
-                        None, // skill_evolution (ADR-005 M2 wiring is per-channel; not used here)
+                        skill_evolution.clone(),
                     ),
                 )
                 .await
@@ -2656,7 +2662,7 @@ pub async fn run(
                             config.agent.max_tool_result_chars,
                             config.agent.max_context_tokens,
                             None, // shared_budget
-                            None, // skill_evolution
+                            skill_evolution.clone(),
                         ),
                     )
                     .await
