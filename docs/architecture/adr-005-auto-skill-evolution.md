@@ -314,7 +314,9 @@ if config.skillforge.enabled {
 enabled = false                  # M1 기본 off — trace 캡처 자체 토글
 
 [skills.auto_evolution]
-enabled = false                  # M2 기본 off — 자동 생성 토글
+enabled = true                   # 기본 on — 게이트만 통과. 실제 SkillCreator
+                                 # 동작은 [skills.skill_creation].enabled에 의존
+                                 # (그쪽은 여전히 기본 false라 신규 동작 없음)
 trigger_threshold = 0.6          # D1 — ValueSignal 임계
 hot_reload = true                # M3
 user_signal_keyword = true       # D2 — consolidation에서 키워드 추출
