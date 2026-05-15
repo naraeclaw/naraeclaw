@@ -628,6 +628,16 @@ pub struct ProviderRuntimeOptions {
     /// When true, system messages are merged into the first user message before
     /// sending. Propagated from `ModelProviderConfig::merge_system_into_user`.
     pub merge_system_into_user: bool,
+    /// Azure OpenAI resource name from the active `[model_providers.<name>]`
+    /// profile. Used by the Azure provider factory when `AZURE_OPENAI_RESOURCE`
+    /// is not set in the environment.
+    pub azure_openai_resource: Option<String>,
+    /// Azure OpenAI deployment name from the active profile. Used when
+    /// `AZURE_OPENAI_DEPLOYMENT` is not set.
+    pub azure_openai_deployment: Option<String>,
+    /// Azure OpenAI API version from the active profile. Used when
+    /// `AZURE_OPENAI_API_VERSION` is not set.
+    pub azure_openai_api_version: Option<String>,
 }
 
 impl Default for ProviderRuntimeOptions {
@@ -644,6 +654,9 @@ impl Default for ProviderRuntimeOptions {
             api_path: None,
             provider_max_tokens: None,
             merge_system_into_user: false,
+            azure_openai_resource: None,
+            azure_openai_deployment: None,
+            azure_openai_api_version: None,
         }
     }
 }
@@ -672,6 +685,30 @@ pub fn provider_runtime_options_from_config(
         .map(|p| p.merge_system_into_user)
         .unwrap_or(false);
 
+    // Azure OpenAI fields cannot be matched by api_url (the endpoint is
+    // constructed from resource+deployment), so look up the active profile by
+    // the resolved provider name instead.
+    let azure_profile = config
+        .default_provider
+        .as_deref()
+        .map(str::trim)
+        .filter(|name| !name.is_empty())
+        .and_then(|name| {
+            config
+                .model_providers
+                .iter()
+                .find(|(key, _)| key.eq_ignore_ascii_case(name))
+                .map(|(_, profile)| profile)
+        });
+
+    let trim_opt = |value: &Option<String>| {
+        value
+            .as_deref()
+            .map(str::trim)
+            .filter(|v| !v.is_empty())
+            .map(ToString::to_string)
+    };
+
     ProviderRuntimeOptions {
         auth_profile_override: None,
         provider_api_url: config.api_url.clone(),
@@ -684,6 +721,9 @@ pub fn provider_runtime_options_from_config(
         api_path: config.api_path.clone(),
         provider_max_tokens: config.provider_max_tokens,
         merge_system_into_user,
+        azure_openai_resource: azure_profile.and_then(|p| trim_opt(&p.azure_openai_resource)),
+        azure_openai_deployment: azure_profile.and_then(|p| trim_opt(&p.azure_openai_deployment)),
+        azure_openai_api_version: azure_profile.and_then(|p| trim_opt(&p.azure_openai_api_version)),
     }
 }
 
@@ -1228,11 +1268,21 @@ fn create_provider_with_url_and_options(
             ),
         )),
         "azure_openai" | "azure-openai" | "azure" => {
+            // Precedence: env var > config profile ([model_providers.azure_openai]) > placeholder default.
             let resource = std::env::var("AZURE_OPENAI_RESOURCE")
-                .unwrap_or_else(|_| "my-resource".to_string());
-            let deployment =
-                std::env::var("AZURE_OPENAI_DEPLOYMENT").unwrap_or_else(|_| "gpt-4o".to_string());
-            let api_version = std::env::var("AZURE_OPENAI_API_VERSION").ok();
+                .ok()
+                .filter(|v| !v.trim().is_empty())
+                .or_else(|| options.azure_openai_resource.clone())
+                .unwrap_or_else(|| "my-resource".to_string());
+            let deployment = std::env::var("AZURE_OPENAI_DEPLOYMENT")
+                .ok()
+                .filter(|v| !v.trim().is_empty())
+                .or_else(|| options.azure_openai_deployment.clone())
+                .unwrap_or_else(|| "gpt-4o".to_string());
+            let api_version = std::env::var("AZURE_OPENAI_API_VERSION")
+                .ok()
+                .filter(|v| !v.trim().is_empty())
+                .or_else(|| options.azure_openai_api_version.clone());
             Ok(Box::new(azure_openai::AzureOpenAiProvider::new(
                 key,
                 &resource,
@@ -3590,6 +3640,49 @@ mod tests {
         };
         assert_eq!(options.extra_headers.len(), 1);
         assert_eq!(options.extra_headers.get("X-Title").unwrap(), "zeroclaw");
+    }
+
+    #[test]
+    fn provider_runtime_options_pulls_azure_fields_from_active_profile() {
+        use naraeclaw_config::schema::{Config, ModelProviderConfig};
+
+        let mut config = Config::default();
+        config.default_provider = Some("azure_openai".to_string());
+
+        let mut profile = ModelProviderConfig::default();
+        profile.azure_openai_resource = Some("my-resource".to_string());
+        profile.azure_openai_deployment = Some("gpt-5.4".to_string());
+        profile.azure_openai_api_version = Some("2024-10-21".to_string());
+        config
+            .model_providers
+            .insert("azure_openai".to_string(), profile);
+
+        // Unrelated profile should not bleed through.
+        let mut other = ModelProviderConfig::default();
+        other.azure_openai_resource = Some("other-resource".to_string());
+        config.model_providers.insert("openai".to_string(), other);
+
+        let opts = provider_runtime_options_from_config(&config);
+        assert_eq!(opts.azure_openai_resource.as_deref(), Some("my-resource"));
+        assert_eq!(opts.azure_openai_deployment.as_deref(), Some("gpt-5.4"));
+        assert_eq!(
+            opts.azure_openai_api_version.as_deref(),
+            Some("2024-10-21")
+        );
+    }
+
+    #[test]
+    fn provider_runtime_options_returns_none_when_no_matching_profile() {
+        use naraeclaw_config::schema::Config;
+
+        let mut config = Config::default();
+        config.default_provider = Some("azure_openai".to_string());
+        // No matching profile in model_providers map.
+
+        let opts = provider_runtime_options_from_config(&config);
+        assert!(opts.azure_openai_resource.is_none());
+        assert!(opts.azure_openai_deployment.is_none());
+        assert!(opts.azure_openai_api_version.is_none());
     }
 
     #[test]
