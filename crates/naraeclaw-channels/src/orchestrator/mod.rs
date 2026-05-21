@@ -4273,6 +4273,13 @@ pub async fn start_channels(config: Config) -> Result<()> {
                     naraeclaw_runtime::hooks::builtin::CommandLoggerHook::new(),
                 ));
             }
+            if config.hooks.builtin.reflection {
+                runner.register(Box::new(
+                    naraeclaw_runtime::hooks::builtin::ReflectionHook::new(
+                        &config.workspace_dir,
+                    ),
+                ));
+            }
             if config.hooks.builtin.webhook_audit.enabled {
                 runner.register(Box::new(
                     naraeclaw_runtime::hooks::builtin::WebhookAuditHook::new(
