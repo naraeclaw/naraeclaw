@@ -270,66 +270,92 @@ impl Channel for SlackChannel {
             naraeclaw_runtime::health::mark_component_ok("slack");
 
             let (mut write, mut read) = ws_stream.split();
+            // Send a WebSocket ping every 30 s so we detect silent TCP death
+            // (e.g. after macOS sleep) without relying on Slack's server-sent
+            // disconnect events, which stop arriving when the connection is dead.
+            let mut ping_tick =
+                tokio::time::interval(std::time::Duration::from_secs(30));
+            ping_tick.tick().await; // consume the immediate first tick
+            let mut awaiting_pong = false;
 
-            while let Some(msg) = read.next().await {
-                match msg {
-                    Ok(Message::Text(text)) => {
-                        debug!("Slack WS recv: {text}");
+            'inner: loop {
+                tokio::select! {
+                    maybe_msg = read.next() => {
+                        match maybe_msg {
+                            Some(Ok(Message::Text(text))) => {
+                                debug!("Slack WS recv: {text}");
 
-                        let envelope: SocketEnvelope = match serde_json::from_str(&text) {
-                            Ok(e) => e,
-                            Err(e) => {
-                                warn!("Slack Socket Mode: failed to parse envelope: {e}");
-                                continue;
-                            }
-                        };
+                                let envelope: SocketEnvelope = match serde_json::from_str(&text) {
+                                    Ok(e) => e,
+                                    Err(e) => {
+                                        warn!("Slack Socket Mode: failed to parse envelope: {e}");
+                                        continue 'inner;
+                                    }
+                                };
 
-                        // ACK immediately
-                        if let Some(ref id) = envelope.envelope_id {
-                            let ack = serde_json::to_string(&AckPayload { envelope_id: id })
-                                .unwrap_or_default();
-                            if let Err(e) = write.send(Message::Text(ack.into())).await {
-                                warn!("Slack Socket Mode: failed to send ACK: {e}");
-                            }
-                        }
+                                // ACK immediately
+                                if let Some(ref id) = envelope.envelope_id {
+                                    let ack = serde_json::to_string(&AckPayload { envelope_id: id })
+                                        .unwrap_or_default();
+                                    if let Err(e) = write.send(Message::Text(ack.into())).await {
+                                        warn!("Slack Socket Mode: failed to send ACK: {e}");
+                                    }
+                                }
 
-                        match envelope.event_type.as_str() {
-                            "hello" => {
-                                info!("Slack Socket Mode: handshake complete");
-                            }
-                            "disconnect" => {
-                                info!(
-                                    "Slack Socket Mode: server requested disconnect, reconnecting..."
-                                );
-                                break;
-                            }
-                            "events_api" => {
-                                if let Some(payload) = envelope.payload
-                                    && let Some(channel_msg) = parse_events_api(&payload)
-                                    && tx.send(channel_msg).await.is_err()
-                                {
-                                    return Ok(());
+                                match envelope.event_type.as_str() {
+                                    "hello" => {
+                                        info!("Slack Socket Mode: handshake complete");
+                                    }
+                                    "disconnect" => {
+                                        info!(
+                                            "Slack Socket Mode: server requested disconnect, reconnecting..."
+                                        );
+                                        break 'inner;
+                                    }
+                                    "events_api" => {
+                                        if let Some(payload) = envelope.payload
+                                            && let Some(channel_msg) = parse_events_api(&payload)
+                                            && tx.send(channel_msg).await.is_err()
+                                        {
+                                            return Ok(());
+                                        }
+                                    }
+                                    other => {
+                                        debug!("Slack Socket Mode: unhandled envelope type '{other}'");
+                                    }
                                 }
                             }
-                            other => {
-                                debug!("Slack Socket Mode: unhandled envelope type '{other}'");
+                            Some(Ok(Message::Close(_))) => {
+                                info!("Slack Socket Mode: WebSocket closed, reconnecting...");
+                                break 'inner;
                             }
+                            Some(Ok(Message::Ping(data))) => {
+                                if let Err(e) = write.send(Message::Pong(data)).await {
+                                    warn!("Slack Socket Mode: pong failed: {e}");
+                                }
+                            }
+                            Some(Ok(Message::Pong(_))) => {
+                                awaiting_pong = false;
+                            }
+                            Some(Ok(_)) => {}
+                            Some(Err(e)) => {
+                                naraeclaw_runtime::health::mark_component_error("slack", e.to_string());
+                                warn!("Slack Socket Mode: WebSocket error: {e}");
+                                break 'inner;
+                            }
+                            None => break 'inner,
                         }
                     }
-                    Ok(Message::Close(_)) => {
-                        info!("Slack Socket Mode: WebSocket closed, reconnecting...");
-                        break;
-                    }
-                    Ok(Message::Ping(data)) => {
-                        if let Err(e) = write.send(Message::Pong(data)).await {
-                            warn!("Slack Socket Mode: pong failed: {e}");
+                    _ = ping_tick.tick() => {
+                        if awaiting_pong {
+                            warn!("Slack Socket Mode: pong timeout, reconnecting...");
+                            break 'inner;
                         }
-                    }
-                    Ok(_) => {}
-                    Err(e) => {
-                        naraeclaw_runtime::health::mark_component_error("slack", e.to_string());
-                        warn!("Slack Socket Mode: WebSocket error: {e}");
-                        break;
+                        awaiting_pong = true;
+                        if let Err(e) = write.send(Message::Ping(vec![].into())).await {
+                            warn!("Slack Socket Mode: heartbeat ping failed: {e}");
+                            break 'inner;
+                        }
                     }
                 }
             }
