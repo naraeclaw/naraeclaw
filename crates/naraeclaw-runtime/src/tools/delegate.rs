@@ -1176,6 +1176,7 @@ impl DelegateTool {
                 0,    // context_token_budget: 0 = disabled for subagents
                 None, // shared_budget: TODO thread from parent in future
                 None, // skill_evolution: delegate sub-agents opt out of M2 trigger
+                None, // override_registry: delegate sub-agents use no overrides
             ),
         )
         .await;

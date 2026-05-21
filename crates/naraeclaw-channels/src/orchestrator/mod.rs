@@ -304,6 +304,7 @@ struct ChannelRuntimeContext {
     media_pipeline: naraeclaw_config::schema::MediaPipelineConfig,
     transcription_config: naraeclaw_config::schema::TranscriptionConfig,
     hooks: Option<Arc<naraeclaw_runtime::hooks::HookRunner>>,
+    override_registry: naraeclaw_runtime::tools::override_registry::SharedOverrideRegistry,
     non_cli_excluded_tools: Arc<Vec<String>>,
     autonomy_level: AutonomyLevel,
     tool_call_dedup_exempt: Arc<Vec<String>>,
@@ -3013,6 +3014,7 @@ async fn process_channel_message(
                         ctx.context_token_budget,
                         None, // shared_budget
                         ctx.skill_evolution.clone(),
+                        Some(&ctx.override_registry),
                     ),
                     ),
                     ),
@@ -3916,6 +3918,12 @@ pub async fn start_channels(config: Config) -> Result<()> {
         &config.workspace_dir,
         config.api_key.as_deref(),
     )?);
+    // Build the tool-override registry once and share it with the context
+    // and the tools registry builder so ToolSwapTool can mutate overrides
+    // that the execution loop also consults.
+    let override_registry =
+        naraeclaw_runtime::tools::override_registry::new_shared_registry(&config.workspace_dir);
+
     // Build system prompt from workspace identity files + skills
     let workspace = config.workspace_dir.clone();
     let (
@@ -3938,6 +3946,7 @@ pub async fn start_channels(config: Config) -> Result<()> {
         config.api_key.as_deref(),
         &config,
         None,
+        Some(Arc::clone(&override_registry)),
     );
 
     // Wire MCP tools into the registry before freezing — non-fatal.
@@ -4302,6 +4311,7 @@ pub async fn start_channels(config: Config) -> Result<()> {
         } else {
             None
         },
+        override_registry: Arc::clone(&override_registry),
         non_cli_excluded_tools: Arc::new(config.autonomy.non_cli_excluded_tools.clone()),
         autonomy_level: config.autonomy.level,
         tool_call_dedup_exempt: Arc::new(config.agent.tool_call_dedup_exempt.clone()),
