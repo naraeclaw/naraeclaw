@@ -52,6 +52,7 @@ pub mod poll;
 pub mod proxy_config;
 pub mod pushover;
 pub mod reaction;
+pub mod redash;
 pub mod screenshot;
 pub mod sessions;
 pub mod swarm;

@@ -68,6 +68,7 @@ pub use naraeclaw_tools::image_gen::ImageGenTool;
 pub use naraeclaw_tools::image_info::ImageInfoTool;
 pub use naraeclaw_tools::jira_tool::JiraTool;
 pub use naraeclaw_tools::knowledge_tool::KnowledgeTool;
+pub use naraeclaw_tools::redash::RedashTool;
 pub use naraeclaw_tools::linkedin::LinkedInTool;
 pub use naraeclaw_tools::llm_task::LlmTaskTool;
 pub use naraeclaw_tools::mcp_client::McpRegistry;
@@ -516,6 +517,29 @@ pub fn all_tools_with_runtime(
                 root_config.jira.allowed_actions.clone(),
                 security.clone(),
                 root_config.jira.timeout_secs,
+            )));
+        }
+    }
+
+    // Redash integration (config-gated)
+    if root_config.redash.enabled {
+        let api_key = if root_config.redash.api_key.trim().is_empty() {
+            std::env::var("REDASH_API_KEY").unwrap_or_default()
+        } else {
+            root_config.redash.api_key.trim().to_string()
+        };
+        if api_key.trim().is_empty() {
+            tracing::warn!(
+                "Redash tool enabled but no API key found (set redash.api_key or REDASH_API_KEY env var)"
+            );
+        } else if root_config.redash.base_url.trim().is_empty() {
+            tracing::warn!("Redash tool enabled but redash.base_url is empty — skipping registration");
+        } else {
+            tool_arcs.push(Arc::new(RedashTool::new(
+                root_config.redash.base_url.trim().to_string(),
+                api_key,
+                root_config.redash.max_rows,
+                root_config.redash.timeout_secs,
             )));
         }
     }

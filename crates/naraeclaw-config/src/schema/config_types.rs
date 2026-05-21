@@ -344,6 +344,11 @@ pub struct Config {
     #[nested]
     pub jira: JiraConfig,
 
+    /// Redash integration configuration (`[redash]`).
+    #[serde(default)]
+    #[nested]
+    pub redash: RedashConfig,
+
     /// Secure inter-node transport configuration (`[node_transport]`).
     #[serde(default)]
     #[nested]
@@ -2339,6 +2344,52 @@ impl Default for JiraConfig {
             api_token: String::new(),
             allowed_actions: default_jira_allowed_actions(),
             timeout_secs: default_jira_timeout_secs(),
+        }
+    }
+}
+
+/// Redash integration — query execution, dashboard fetch, ad-hoc SQL.
+///
+/// Set `enabled = true` and fill in `base_url` / `api_key` to activate the
+/// `redash` tool. The API key is stored encrypted at rest.
+#[derive(Debug, Clone, Serialize, Deserialize, Configurable)]
+#[cfg_attr(feature = "schema-export", derive(schemars::JsonSchema))]
+#[prefix = "redash"]
+pub struct RedashConfig {
+    /// Enable the `redash` tool. Default: `false`.
+    #[serde(default)]
+    pub enabled: bool,
+    /// Redash instance base URL, e.g. `https://redash.example.com`.
+    #[serde(default)]
+    pub base_url: String,
+    /// Redash API key. Encrypted at rest. Falls back to `REDASH_API_KEY` env var.
+    #[serde(default)]
+    #[secret]
+    pub api_key: String,
+    /// Maximum rows returned per query result. Default: `200`.
+    #[serde(default = "default_redash_max_rows")]
+    pub max_rows: usize,
+    /// Query execution timeout in seconds. Default: `60`.
+    #[serde(default = "default_redash_timeout_secs")]
+    pub timeout_secs: u64,
+}
+
+pub fn default_redash_max_rows() -> usize {
+    200
+}
+
+pub fn default_redash_timeout_secs() -> u64 {
+    60
+}
+
+impl Default for RedashConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            base_url: String::new(),
+            api_key: String::new(),
+            max_rows: default_redash_max_rows(),
+            timeout_secs: default_redash_timeout_secs(),
         }
     }
 }
