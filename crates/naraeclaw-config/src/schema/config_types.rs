@@ -1956,6 +1956,11 @@ impl Default for HooksConfig {
 pub struct BuiltinHooksConfig {
     /// Enable the command-logger hook (logs tool calls for auditing).
     pub command_logger: bool,
+    /// Enable the reflection hook — automatically records failed tool calls as
+    /// lessons and injects them into the system prompt on the next session.
+    /// Default: `true`.
+    #[serde(default = "default_true")]
+    pub reflection: bool,
     /// Configuration for the webhook-audit hook.
     ///
     /// When enabled, POSTs a JSON payload to `url` for every tool invocation

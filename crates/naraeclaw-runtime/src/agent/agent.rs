@@ -556,6 +556,11 @@ impl Agent {
                 if config.hooks.builtin.command_logger {
                     runner.register(Box::new(crate::hooks::builtin::CommandLoggerHook::new()));
                 }
+                if config.hooks.builtin.reflection {
+                    runner.register(Box::new(
+                        crate::hooks::builtin::ReflectionHook::new(&config.workspace_dir),
+                    ));
+                }
                 if config.hooks.builtin.webhook_audit.enabled {
                     runner.register(Box::new(crate::hooks::builtin::WebhookAuditHook::new(
                         config.hooks.builtin.webhook_audit.clone(),

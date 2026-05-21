@@ -69,6 +69,7 @@ pub use naraeclaw_tools::image_info::ImageInfoTool;
 pub use naraeclaw_tools::jira_tool::JiraTool;
 pub use naraeclaw_tools::knowledge_tool::KnowledgeTool;
 pub use naraeclaw_tools::redash::RedashTool;
+pub use naraeclaw_tools::reflect::ReflectTool;
 pub use naraeclaw_tools::linkedin::LinkedInTool;
 pub use naraeclaw_tools::llm_task::LlmTaskTool;
 pub use naraeclaw_tools::mcp_client::McpRegistry;
@@ -362,6 +363,7 @@ pub fn all_tools_with_runtime(
         Arc::new(CalculatorTool::new()),
         Arc::new(WeatherTool::new()),
         Arc::new(CanvasTool::new(canvas_store.unwrap_or_default())),
+        Arc::new(ReflectTool::new(workspace_dir)),
     ];
 
     // discord_search tool is disabled (discord_history channel removed)
