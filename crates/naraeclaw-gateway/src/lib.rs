@@ -432,6 +432,7 @@ pub async fn run_gateway(
         config.api_key.as_deref(),
         &config,
         Some(canvas_store.clone()),
+        None, // override_registry
     );
 
     // ── Wire MCP tools into the gateway tool registry (non-fatal) ───
