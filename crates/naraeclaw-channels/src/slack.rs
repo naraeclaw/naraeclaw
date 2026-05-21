@@ -428,11 +428,22 @@ fn is_passive_message(event: &serde_json::Value) -> bool {
 }
 
 /// Returns true when this message should be passed to the agent.
-/// All non-passive channel messages are routed; the orchestrator's reply-intent
-/// classifier decides whether to actually respond to non-mention messages.
-/// CC=1
-fn is_routable(_event_type: &str, _channel: &str) -> bool {
-    true
+///
+/// Slack fires TWO events for a channel @mention: `app_mention` + `message`.
+/// To avoid double-processing, `message` events in public channels that contain
+/// a `<@...>` mention pattern are dropped here — `app_mention` handles those.
+/// Plain channel messages (no mention) are routed so the reply-intent classifier
+/// can decide based on conversation context.
+/// CC=3 (base + 2 branches)
+fn is_routable(event_type: &str, channel: &str, text: &str) -> bool {
+    match event_type {
+        "app_mention" => true,
+        "message" if channel.starts_with('D') => true,
+        // Public channel: only route if there is no @mention in the text.
+        // Messages with <@...> will also arrive as app_mention events.
+        "message" => !text.contains("<@"),
+        _ => false,
+    }
 }
 
 /// Returns true when the bot was directly addressed (@mention or DM).
@@ -447,7 +458,7 @@ fn guard_event(event_type: &str, event: &serde_json::Value, f: &SlackEventFields
     (is_supported_event(event_type)
         && !is_passive_message(event)
         && !f.text.is_empty()
-        && is_routable(event_type, &f.channel))
+        && is_routable(event_type, &f.channel, &f.text))
     .then_some(())
 }
 
@@ -566,22 +577,28 @@ mod tests {
         assert!(!is_passive_message(&event));
     }
 
-    // ── is_routable (CC=2) ────────────────────────────────────────
+    // ── is_routable (CC=3) ────────────────────────────────────────
 
     #[test]
     fn is_routable_app_mention_in_public_channel() {
-        assert!(is_routable("app_mention", "C123"));
+        assert!(is_routable("app_mention", "C123", "hey"));
     }
 
     #[test]
     fn is_routable_dm_message() {
-        assert!(is_routable("message", "D123"));
+        assert!(is_routable("message", "D123", "hello"));
     }
 
     #[test]
     fn is_routable_channel_message_without_mention() {
-        // All non-passive messages are now routed; reply-intent classifier decides later.
-        assert!(is_routable("message", "C123"));
+        // Plain channel chat (no @) is routed; reply-intent classifier decides.
+        assert!(is_routable("message", "C123", "hey team"));
+    }
+
+    #[test]
+    fn is_routable_channel_message_with_mention_dropped() {
+        // Slack fires app_mention + message for @mentions — drop the message duplicate.
+        assert!(!is_routable("message", "C123", "<@U0B17RD9MN3> 살아나라"));
     }
 
     // ── guard_event (CC=4) ────────────────────────────────────────
