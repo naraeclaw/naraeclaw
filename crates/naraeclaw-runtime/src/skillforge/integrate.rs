@@ -5,8 +5,9 @@ use std::path::PathBuf;
 
 use anyhow::{Context, Result, bail};
 use chrono::Utc;
-use tracing::info;
+use tracing::{info, warn};
 
+use super::injection_guard;
 use super::scout::ScoutResult;
 
 // ---------------------------------------------------------------------------
@@ -25,8 +26,31 @@ impl Integrator {
     }
 
     /// Write SKILL.toml and SKILL.md for the given candidate.
+    ///
+    /// As a last-resort defence-in-depth measure, external text fields are run
+    /// through the injection guard before being written to disk, even though
+    /// the evaluator should have already rejected any candidate with injection
+    /// patterns.
     pub fn integrate(&self, candidate: &ScoutResult) -> Result<PathBuf> {
-        let safe_name = sanitize_path_component(&candidate.name)?;
+        // Defence-in-depth: sanitize all external text fields before writing.
+        let clean = ScoutResult {
+            name: candidate.name.clone(),
+            description: {
+                let s = injection_guard::sanitize(&candidate.description);
+                if s != candidate.description {
+                    warn!(
+                        name = candidate.name.as_str(),
+                        "SkillForge integrator: sanitized injection pattern in description"
+                    );
+                }
+                s
+            },
+            url: candidate.url.clone(),
+            owner: injection_guard::sanitize(&candidate.owner),
+            ..candidate.clone()
+        };
+
+        let safe_name = sanitize_path_component(&clean.name)?;
         let skill_dir = self.output_dir.join(&safe_name);
         fs::create_dir_all(&skill_dir)
             .with_context(|| format!("Failed to create dir: {}", skill_dir.display()))?;
@@ -34,8 +58,8 @@ impl Integrator {
         let toml_path = skill_dir.join("SKILL.toml");
         let md_path = skill_dir.join("SKILL.md");
 
-        let toml_content = self.generate_toml(candidate);
-        let md_content = self.generate_md(candidate);
+        let toml_content = self.generate_toml(&clean);
+        let md_content = self.generate_md(&clean);
 
         fs::write(&toml_path, &toml_content)
             .with_context(|| format!("Failed to write {}", toml_path.display()))?;

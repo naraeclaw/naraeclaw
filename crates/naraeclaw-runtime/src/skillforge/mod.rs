@@ -5,6 +5,7 @@
 //! NaraeClaw-compatible manifests for qualified candidates.
 
 pub mod evaluate;
+pub mod injection_guard;
 pub mod integrate;
 pub mod scheduler;
 pub mod scout;

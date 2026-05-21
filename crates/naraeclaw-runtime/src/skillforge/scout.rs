@@ -6,6 +6,8 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use tracing::{debug, warn};
 
+use super::injection_guard;
+
 // ---------------------------------------------------------------------------
 // ScoutSource
 // ---------------------------------------------------------------------------
@@ -202,6 +204,20 @@ impl Scout for GitHubScout {
             };
 
             let mut items = Self::parse_items(&body);
+            // Layer 1 injection guard: drop any result whose externally-sourced
+            // name or description contains known injection patterns.
+            items.retain(|r| {
+                let suspicious = injection_guard::contains_injection(&r.name)
+                    || injection_guard::contains_injection(&r.description);
+                if suspicious {
+                    warn!(
+                        name = r.name.as_str(),
+                        url  = r.url.as_str(),
+                        "SkillForge scout: injection pattern detected — result dropped"
+                    );
+                }
+                !suspicious
+            });
             debug!(count = items.len(), query = query.as_str(), "Parsed items");
             all.append(&mut items);
         }
