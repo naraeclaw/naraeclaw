@@ -1965,13 +1965,28 @@ async fn classify_channel_reply_intent(
     model: &str,
     temperature: f64,
 ) -> anyhow::Result<AssistantChannelOutcome> {
-    let mut convo = String::from(
+    let bot_has_replied_before = history
+        .iter()
+        .any(|m| m.role == "assistant" && !m.content.starts_with("[NO_REPLY"));
+
+    let prior_context_hint = if bot_has_replied_before {
+        "- The assistant has already replied in this conversation thread. \
+         If the latest message is a natural continuation (follow-up, reaction, or \
+         related question), prefer `REPLY`.\n"
+    } else {
+        "- This is the first message in a new conversation. Only reply if the message \
+         is clearly addressed to the assistant.\n"
+    };
+
+    let mut convo = format!(
         "Decide whether the assistant should send any visible reply to the latest inbound \
          channel message.\n\nReturn exactly one of:\n- `REPLY`\n- `NO_REPLY: <short reason>`\n\n\
-         Rules:\n- Follow the workspace and channel instructions in the system prompt.\n- If the \
-         latest message is not clearly addressed to the assistant, prefer `NO_REPLY`.\n- In DMs \
-         or direct conversations, prefer `REPLY` unless the instructions explicitly say \
-         otherwise.\n- Do not answer the user. Only classify.\n\nConversation:\n",
+         Rules:\n\
+         - Follow the workspace and channel instructions in the system prompt.\n\
+         - If the latest message is not clearly addressed to the assistant, prefer `NO_REPLY`.\n\
+         - In DMs or direct conversations, prefer `REPLY` unless the instructions say otherwise.\n\
+         {prior_context_hint}\
+         - Do not answer the user. Only classify.\n\nConversation:\n",
     );
 
     for msg in history.iter().filter(|m| m.role != "system") {
@@ -2720,46 +2735,52 @@ async fn process_channel_message(
     }
 
     // ── Reply-intent precheck ────────────────────────────────────────
-    let reply_intent = classify_channel_reply_intent(
-        active_provider.as_ref(),
-        history[0].content.as_str(),
-        &history,
-        route.model.as_str(),
-        runtime_defaults.temperature,
-    )
-    .await
-    .unwrap_or(AssistantChannelOutcome::Reply(String::new()));
+    // Direct @mentions and DMs always get a reply — skip the LLM classifier.
+    // General channel messages go through the classifier so the bot only
+    // responds when the message is clearly addressed to it or is a natural
+    // continuation of an existing conversation.
+    if !msg.is_mention {
+        let reply_intent = classify_channel_reply_intent(
+            active_provider.as_ref(),
+            history[0].content.as_str(),
+            &history,
+            route.model.as_str(),
+            runtime_defaults.temperature,
+        )
+        .await
+        .unwrap_or(AssistantChannelOutcome::Reply(String::new()));
 
-    if let AssistantChannelOutcome::NoReply { reason } = reply_intent {
-        let history_response = AssistantChannelOutcome::NoReply {
-            reason: reason.clone(),
+        if let AssistantChannelOutcome::NoReply { reason } = reply_intent {
+            let history_response = AssistantChannelOutcome::NoReply {
+                reason: reason.clone(),
+            }
+            .history_marker();
+            append_sender_turn(
+                ctx.as_ref(),
+                &history_key,
+                ChatMessage::assistant(&history_response),
+            );
+            runtime_trace::record_event(
+                "channel_message_no_reply",
+                Some(msg.channel.as_str()),
+                Some(route.provider.as_str()),
+                Some(route.model.as_str()),
+                None,
+                Some(true),
+                reason.as_deref(),
+                serde_json::json!({
+                    "sender": msg.sender,
+                    "elapsed_ms": started_at.elapsed().as_millis(),
+                    "phase": "precheck",
+                }),
+            );
+            println!(
+                "  🤖 No reply ({}ms): {}",
+                started_at.elapsed().as_millis(),
+                reason.as_deref().unwrap_or("no reason provided")
+            );
+            return;
         }
-        .history_marker();
-        append_sender_turn(
-            ctx.as_ref(),
-            &history_key,
-            ChatMessage::assistant(&history_response),
-        );
-        runtime_trace::record_event(
-            "channel_message_no_reply",
-            Some(msg.channel.as_str()),
-            Some(route.provider.as_str()),
-            Some(route.model.as_str()),
-            None,
-            Some(true),
-            reason.as_deref(),
-            serde_json::json!({
-                "sender": msg.sender,
-                "elapsed_ms": started_at.elapsed().as_millis(),
-                "phase": "precheck",
-            }),
-        );
-        println!(
-            "  🤖 No reply ({}ms): {}",
-            started_at.elapsed().as_millis(),
-            reason.as_deref().unwrap_or("no reason provided")
-        );
-        return;
     }
 
     let use_draft_streaming = target_channel
@@ -3655,14 +3676,9 @@ async fn run_message_dispatch_loop(
             continue;
         }
 
-        if !msg.is_mention {
-            tracing::debug!(
-                channel = %msg.channel,
-                sender = %msg.sender,
-                "Skipping non-mention channel message"
-            );
-            continue;
-        }
+        // Non-mention channel messages pass through here.
+        // The reply-intent classifier in process_channel_message decides
+        // whether to respond based on conversation context.
 
         let outcome = apply_debounce(
             msg,

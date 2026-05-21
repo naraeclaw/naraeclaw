@@ -402,6 +402,9 @@ struct SlackEventFields {
     text: String,
     ts: String,
     thread_ts: Option<String>,
+    /// True when the bot was directly @mentioned (`app_mention`) or the channel is a DM.
+    /// False for plain channel messages — reply intent is decided by the orchestrator.
+    is_direct_mention: bool,
 }
 
 /// Extract the `event` object and its `type` string from an `events_api` payload.
@@ -424,10 +427,17 @@ fn is_passive_message(event: &serde_json::Value) -> bool {
     event.get("subtype").is_some() || event.get("bot_id").is_some()
 }
 
-/// Returns true if this message should be routed to the agent.
-/// app_mention = always; plain message = only in DMs (channel starts with 'D').
+/// Returns true when this message should be passed to the agent.
+/// All non-passive channel messages are routed; the orchestrator's reply-intent
+/// classifier decides whether to actually respond to non-mention messages.
+/// CC=1
+fn is_routable(_event_type: &str, _channel: &str) -> bool {
+    true
+}
+
+/// Returns true when the bot was directly addressed (@mention or DM).
 /// CC=2 (base + 1×||)
-fn is_routable(event_type: &str, channel: &str) -> bool {
+fn is_direct_mention(event_type: &str, channel: &str) -> bool {
     event_type == "app_mention" || channel.starts_with('D')
 }
 
@@ -443,13 +453,16 @@ fn guard_event(event_type: &str, event: &serde_json::Value, f: &SlackEventFields
 
 /// Extract required message fields from an event object.
 /// CC=4 (base + 3×?)
-fn extract_event_fields(event: &serde_json::Value) -> Option<SlackEventFields> {
+fn extract_event_fields(event: &serde_json::Value, event_type: &str) -> Option<SlackEventFields> {
+    let channel = event["channel"].as_str()?.to_string();
+    let direct = is_direct_mention(event_type, &channel);
     Some(SlackEventFields {
         user: event["user"].as_str()?.to_string(),
-        channel: event["channel"].as_str()?.to_string(),
         ts: event["ts"].as_str()?.to_string(),
         text: event["text"].as_str().unwrap_or("").to_string(),
         thread_ts: event["thread_ts"].as_str().map(str::to_string),
+        channel,
+        is_direct_mention: direct,
     })
 }
 
@@ -471,7 +484,9 @@ fn build_channel_message(f: SlackEventFields) -> ChannelMessage {
         thread_ts: Some(f.ts),
         interruption_scope_id: f.thread_ts,
         attachments: vec![],
-        is_mention: true, // guard_event already confirmed app_mention or DM
+        // true  → bot was @mentioned or this is a DM; skip reply-intent classifier
+        // false → general channel message; orchestrator LLM decides whether to reply
+        is_mention: f.is_direct_mention,
     }
 }
 
@@ -479,7 +494,7 @@ fn build_channel_message(f: SlackEventFields) -> ChannelMessage {
 /// CC=4 (base + 3×?) — delegates all decisions to focused helpers.
 fn parse_events_api(payload: &serde_json::Value) -> Option<ChannelMessage> {
     let (event, event_type) = get_event_type(payload)?;
-    let f = extract_event_fields(event)?;
+    let f = extract_event_fields(event, event_type)?;
     guard_event(event_type, event, &f)?;
     Some(build_channel_message(f))
 }
@@ -565,7 +580,8 @@ mod tests {
 
     #[test]
     fn is_routable_channel_message_without_mention() {
-        assert!(!is_routable("message", "C123"));
+        // All non-passive messages are now routed; reply-intent classifier decides later.
+        assert!(is_routable("message", "C123"));
     }
 
     // ── guard_event (CC=4) ────────────────────────────────────────
@@ -577,6 +593,7 @@ mod tests {
             text: "hello".into(),
             ts: "1.0".into(),
             thread_ts: None,
+            is_direct_mention: true,
         }
     }
 
@@ -613,30 +630,49 @@ mod tests {
         let event = serde_json::json!({
             "user": "U1", "channel": "D1", "ts": "1.0", "text": "hi", "thread_ts": "0.0"
         });
-        let f = extract_event_fields(&event).unwrap();
+        let f = extract_event_fields(&event, "message").unwrap();
         assert_eq!(f.user, "U1");
         assert_eq!(f.channel, "D1");
         assert_eq!(f.ts, "1.0");
         assert_eq!(f.text, "hi");
         assert_eq!(f.thread_ts.as_deref(), Some("0.0"));
+        assert!(f.is_direct_mention); // D1 is a DM channel
     }
 
     #[test]
     fn extract_event_fields_missing_user_returns_none() {
         let event = serde_json::json!({ "channel": "D1", "ts": "1.0", "text": "hi" });
-        assert!(extract_event_fields(&event).is_none());
+        assert!(extract_event_fields(&event, "message").is_none());
     }
 
     #[test]
     fn extract_event_fields_missing_channel_returns_none() {
         let event = serde_json::json!({ "user": "U1", "ts": "1.0", "text": "hi" });
-        assert!(extract_event_fields(&event).is_none());
+        assert!(extract_event_fields(&event, "message").is_none());
     }
 
     #[test]
     fn extract_event_fields_missing_ts_returns_none() {
         let event = serde_json::json!({ "user": "U1", "channel": "D1", "text": "hi" });
-        assert!(extract_event_fields(&event).is_none());
+        assert!(extract_event_fields(&event, "message").is_none());
+    }
+
+    #[test]
+    fn extract_event_fields_app_mention_sets_direct_mention() {
+        let event = serde_json::json!({
+            "user": "U1", "channel": "C123", "ts": "1.0", "text": "@bot hi"
+        });
+        let f = extract_event_fields(&event, "app_mention").unwrap();
+        assert!(f.is_direct_mention);
+    }
+
+    #[test]
+    fn extract_event_fields_channel_message_not_direct_mention() {
+        let event = serde_json::json!({
+            "user": "U1", "channel": "C123", "ts": "1.0", "text": "hey everyone"
+        });
+        let f = extract_event_fields(&event, "message").unwrap();
+        assert!(!f.is_direct_mention);
     }
 
     // ── build_channel_message (CC=1) ─────────────────────────────
@@ -649,6 +685,7 @@ mod tests {
             text: "hello".into(),
             ts: "1700000000.123456".into(),
             thread_ts: Some("1700000000.000000".into()),
+            is_direct_mention: true,
         };
         let msg = build_channel_message(f);
         assert_eq!(msg.sender, "U1");
@@ -690,11 +727,13 @@ mod tests {
     }
 
     #[test]
-    fn channel_message_without_mention_ignored() {
+    fn channel_message_without_mention_is_routed_with_is_mention_false() {
+        // Non-mention channel messages are now routed; reply-intent classifier decides.
         let payload = serde_json::json!({
             "event": { "type": "message", "user": "U123", "channel": "C456", "text": "hi", "ts": "1.0" }
         });
-        assert!(parse_events_api(&payload).is_none());
+        let msg = parse_events_api(&payload).unwrap();
+        assert!(!msg.is_mention);
     }
 
     #[test]
