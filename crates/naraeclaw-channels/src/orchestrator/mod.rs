@@ -2699,6 +2699,17 @@ async fn process_channel_message(
     if !memory_context.is_empty() {
         let _ = write!(system_prompt, "\n\n{memory_context}");
     }
+
+    // ── Hook: before_prompt_build — inject lessons, custom prefixes, etc. ──
+    let system_prompt = if let Some(hooks) = &ctx.hooks {
+        match hooks.run_before_prompt_build(system_prompt).await {
+            naraeclaw_runtime::hooks::HookResult::Continue(modified) => modified,
+            naraeclaw_runtime::hooks::HookResult::Cancel(_) => base_system_prompt.clone(),
+        }
+    } else {
+        system_prompt
+    };
+
     let mut history = vec![ChatMessage::system(system_prompt)];
     history.extend(prior_turns);
 
