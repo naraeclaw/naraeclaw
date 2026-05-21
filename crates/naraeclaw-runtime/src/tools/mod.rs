@@ -24,7 +24,9 @@ pub mod cron_update;
 pub mod delegate;
 pub mod file_read;
 pub mod model_switch;
+pub mod override_registry;
 pub mod read_skill;
+pub mod tool_swap;
 pub mod schedule;
 pub mod security_ops;
 pub mod shell;
@@ -70,6 +72,7 @@ pub use naraeclaw_tools::jira_tool::JiraTool;
 pub use naraeclaw_tools::knowledge_tool::KnowledgeTool;
 pub use naraeclaw_tools::redash::RedashTool;
 pub use naraeclaw_tools::reflect::ReflectTool;
+pub use tool_swap::ToolSwapTool;
 pub use naraeclaw_tools::linkedin::LinkedInTool;
 pub use naraeclaw_tools::llm_task::LlmTaskTool;
 pub use naraeclaw_tools::mcp_client::McpRegistry;
@@ -288,6 +291,7 @@ pub fn all_tools(
         fallback_api_key,
         root_config,
         canvas_store,
+            None, // override_registry
     )
 }
 
@@ -310,6 +314,7 @@ pub fn all_tools_with_runtime(
     fallback_api_key: Option<&str>,
     root_config: &naraeclaw_config::schema::Config,
     canvas_store: Option<CanvasStore>,
+    override_registry: Option<override_registry::SharedOverrideRegistry>,
 ) -> (
     Vec<Box<dyn Tool>>,
     Option<DelegateParentToolsHandle>,
@@ -364,6 +369,9 @@ pub fn all_tools_with_runtime(
         Arc::new(WeatherTool::new()),
         Arc::new(CanvasTool::new(canvas_store.unwrap_or_default())),
         Arc::new(ReflectTool::new(workspace_dir)),
+        Arc::new(ToolSwapTool::new(
+            override_registry.unwrap_or_else(|| override_registry::new_shared_registry(workspace_dir)),
+        )),
     ];
 
     // discord_search tool is disabled (discord_history channel removed)

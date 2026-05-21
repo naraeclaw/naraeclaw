@@ -42,6 +42,29 @@ pub async fn execute_one_tool(
     observer: &dyn Observer,
     cancellation_token: Option<&CancellationToken>,
 ) -> Result<ToolExecutionOutcome> {
+    execute_one_tool_with_overrides(
+        call_name,
+        call_arguments,
+        tools_registry,
+        activated_tools,
+        observer,
+        cancellation_token,
+        None,
+    )
+    .await
+}
+
+/// Internal implementation that also accepts an optional override registry.
+/// Priority: override_registry → static tools → activated MCP tools.
+pub async fn execute_one_tool_with_overrides(
+    call_name: &str,
+    call_arguments: serde_json::Value,
+    tools_registry: &[Box<dyn Tool>],
+    activated_tools: Option<&std::sync::Arc<std::sync::Mutex<crate::tools::ActivatedToolSet>>>,
+    observer: &dyn Observer,
+    cancellation_token: Option<&CancellationToken>,
+    override_registry: Option<&crate::tools::override_registry::SharedOverrideRegistry>,
+) -> Result<ToolExecutionOutcome> {
     let args_summary = truncate_with_ellipsis(&call_arguments.to_string(), 300);
     observer.record_event(&ObserverEvent::ToolCallStart {
         tool: call_name.to_string(),
@@ -49,7 +72,46 @@ pub async fn execute_one_tool(
     });
     let start = Instant::now();
 
+    // ── Priority 1: ToolOverrideRegistry ──────────────────────────────────
+    // Checked BEFORE static tools so the agent can replace any built-in.
+    // Clone the OverrideKind to release the lock before any async operation.
+    if let Some(reg) = override_registry {
+        use crate::tools::override_registry::{OverrideKind, call_http_delegate};
+        let override_kind: Option<OverrideKind> = {
+            reg.lock().unwrap().get(call_name).map(|o| o.kind.clone())
+        }; // lock released here, before any await
+        if let Some(kind) = override_kind {
+            let tool_result = match kind {
+                OverrideKind::Disabled { reason } => naraeclaw_api::tool::ToolResult {
+                    success: false,
+                    output: String::new(),
+                    error: Some(format!(
+                        "도구 '{call_name}'이 비활성화됨: {reason}. 다른 방법을 사용하세요."
+                    )),
+                },
+                OverrideKind::HttpDelegate { url, headers, timeout_secs } => {
+                    call_http_delegate(call_name, call_arguments.clone(), &url, &headers, timeout_secs).await
+                }
+            };
+            let duration = start.elapsed();
+            observer.record_event(&ObserverEvent::ToolCall {
+                tool: call_name.to_string(),
+                duration,
+                success: tool_result.success,
+            });
+            let (success, output, error_reason) = if tool_result.success {
+                (true, scrub_credentials(&tool_result.output), None)
+            } else {
+                let reason = tool_result.error.clone().unwrap_or(tool_result.output.clone());
+                (false, format!("Error: {reason}"), Some(scrub_credentials(&reason)))
+            };
+            return Ok(ToolExecutionOutcome { output, success, error_reason, duration });
+        }
+    }
+
+    // ── Priority 2: static tools ───────────────────────────────────────────
     let static_tool = find_tool(tools_registry, call_name);
+    // ── Priority 3: activated MCP tools ───────────────────────────────────
     let activated_arc = if static_tool.is_none() {
         activated_tools.and_then(|at| at.lock().unwrap().get_resolved(call_name))
     } else {
@@ -161,17 +223,19 @@ pub async fn execute_tools_parallel(
     activated_tools: Option<&std::sync::Arc<std::sync::Mutex<crate::tools::ActivatedToolSet>>>,
     observer: &dyn Observer,
     cancellation_token: Option<&CancellationToken>,
+    override_registry: Option<&crate::tools::override_registry::SharedOverrideRegistry>,
 ) -> Result<Vec<ToolExecutionOutcome>> {
     let futures: Vec<_> = tool_calls
         .iter()
         .map(|call| {
-            execute_one_tool(
+            execute_one_tool_with_overrides(
                 &call.name,
                 call.arguments.clone(),
                 tools_registry,
                 activated_tools,
                 observer,
                 cancellation_token,
+                override_registry,
             )
         })
         .collect();
@@ -188,18 +252,20 @@ pub async fn execute_tools_sequential(
     activated_tools: Option<&std::sync::Arc<std::sync::Mutex<crate::tools::ActivatedToolSet>>>,
     observer: &dyn Observer,
     cancellation_token: Option<&CancellationToken>,
+    override_registry: Option<&crate::tools::override_registry::SharedOverrideRegistry>,
 ) -> Result<Vec<ToolExecutionOutcome>> {
     let mut outcomes = Vec::with_capacity(tool_calls.len());
 
     for call in tool_calls {
         outcomes.push(
-            execute_one_tool(
+            execute_one_tool_with_overrides(
                 &call.name,
                 call.arguments.clone(),
                 tools_registry,
                 activated_tools,
                 observer,
                 cancellation_token,
+                override_registry,
             )
             .await?,
         );

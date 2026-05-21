@@ -410,6 +410,7 @@ impl Agent {
             config.api_key.as_deref(),
             config,
             None,
+            None, // override_registry
         );
 
         // ── Wire MCP tools (non-fatal) ─────────────────────────────
