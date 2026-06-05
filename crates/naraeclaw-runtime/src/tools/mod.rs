@@ -371,9 +371,13 @@ pub fn all_tools_with_runtime(
         Arc::new(CanvasTool::new(canvas_store.unwrap_or_default())),
         Arc::new(ReflectTool::new(workspace_dir)),
         Arc::new(MarkSkillCandidateTool::new()),
-        Arc::new(ToolSwapTool::new(override_registry.unwrap_or_else(|| {
-            override_registry::new_shared_registry(workspace_dir)
-        }))),
+        Arc::new(
+            ToolSwapTool::new(
+                override_registry
+                    .unwrap_or_else(|| override_registry::new_shared_registry(workspace_dir)),
+            )
+            .with_autonomy(security.autonomy),
+        ),
     ];
 
     // discord_search tool is disabled (discord_history channel removed)

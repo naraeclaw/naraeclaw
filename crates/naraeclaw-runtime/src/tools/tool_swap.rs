@@ -11,11 +11,22 @@ use super::override_registry::{OverrideKind, SharedOverrideRegistry, ToolOverrid
 
 pub struct ToolSwapTool {
     registry: SharedOverrideRegistry,
+    /// Autonomy gate: mutating actions (disable/http_delegate/restore) are
+    /// rejected under `ReadOnly`. Defaults to `Supervised` for back-compat.
+    autonomy: crate::security::AutonomyLevel,
 }
 
 impl ToolSwapTool {
     pub fn new(registry: SharedOverrideRegistry) -> Self {
-        Self { registry }
+        Self {
+            registry,
+            autonomy: crate::security::AutonomyLevel::Supervised,
+        }
+    }
+
+    pub fn with_autonomy(mut self, autonomy: crate::security::AutonomyLevel) -> Self {
+        self.autonomy = autonomy;
+        self
     }
 }
 
@@ -75,6 +86,27 @@ impl Tool for ToolSwapTool {
                 });
             }
         };
+        // Security gate: mutating actions change tool wiring at runtime and are
+        // forbidden under ReadOnly. `list` (inspection) is always allowed.
+        let mutating = matches!(action, "disable" | "http_delegate" | "restore");
+        if mutating && self.autonomy == crate::security::AutonomyLevel::ReadOnly {
+            return Ok(ToolResult {
+                success: false,
+                output: String::new(),
+                error: Some(
+                    "ReadOnly 자율성에서는 tool_swap의 도구 교체/비활성화가 허용되지 않습니다."
+                        .into(),
+                ),
+            });
+        }
+        if mutating {
+            // Audit: runtime override changes are security-relevant.
+            tracing::info!(
+                action,
+                tool = args["tool_name"].as_str().unwrap_or("-"),
+                "tool_swap: runtime override change requested"
+            );
+        }
         match action {
             "disable" => self.do_disable(&args),
             "http_delegate" => self.do_http_delegate(&args),
@@ -270,5 +302,20 @@ mod tests {
             .await
             .unwrap();
         assert!(!r.success);
+    }
+
+    #[tokio::test]
+    async fn readonly_rejects_mutating_but_allows_list() {
+        let t = ToolSwapTool::new(Arc::new(Mutex::new(ToolOverrideRegistry::default())))
+            .with_autonomy(crate::security::AutonomyLevel::ReadOnly);
+        // Mutating action (disable) is rejected under ReadOnly autonomy.
+        let disabled = t
+            .execute(json!({"action":"disable","tool_name":"jira"}))
+            .await
+            .unwrap();
+        assert!(!disabled.success);
+        // Inspection (list) remains allowed.
+        let list = t.execute(json!({"action":"list"})).await.unwrap();
+        assert!(list.success);
     }
 }

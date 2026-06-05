@@ -14,8 +14,7 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use async_trait::async_trait;
-use naraeclaw_api::tool::{Tool, ToolResult};
+use naraeclaw_api::tool::ToolResult;
 use serde::{Deserialize, Serialize};
 use tracing::{info, warn};
 
@@ -204,65 +203,6 @@ pub fn new_shared_registry(workspace_dir: &std::path::Path) -> SharedOverrideReg
     let mut reg = ToolOverrideRegistry::new(workspace_dir);
     reg.load();
     Arc::new(Mutex::new(reg))
-}
-
-// ── Wrapper Tool — makes an override entry callable as a Tool trait object ───
-
-/// Wraps an HTTP-delegate override so it can be placed in the tools registry.
-pub struct OverriddenTool {
-    name: String,
-    registry: SharedOverrideRegistry,
-}
-
-impl OverriddenTool {
-    pub fn new(name: String, registry: SharedOverrideRegistry) -> Self {
-        Self { name, registry }
-    }
-}
-
-#[async_trait]
-impl Tool for OverriddenTool {
-    fn name(&self) -> &str {
-        &self.name
-    }
-
-    fn description(&self) -> &str {
-        "Overridden tool — delegates to the registered override."
-    }
-
-    fn parameters_schema(&self) -> serde_json::Value {
-        serde_json::json!({ "type": "object", "properties": {}, "additionalProperties": true })
-    }
-
-    async fn execute(&self, args: serde_json::Value) -> anyhow::Result<ToolResult> {
-        // Clone the kind before releasing the lock so we don't hold MutexGuard across await.
-        let kind_opt: Option<OverrideKind> = self
-            .registry
-            .lock()
-            .unwrap()
-            .get(&self.name)
-            .map(|o| o.kind.clone());
-        match kind_opt {
-            Some(OverrideKind::Disabled { reason }) => Ok(ToolResult {
-                success: false,
-                output: String::new(),
-                error: Some(format!(
-                    "도구 '{}'이 비활성화됨: {}. 다른 방법을 사용하세요.",
-                    self.name, reason
-                )),
-            }),
-            Some(OverrideKind::HttpDelegate {
-                url,
-                headers,
-                timeout_secs,
-            }) => Ok(call_http_delegate(&self.name, args, &url, &headers, timeout_secs).await),
-            None => Ok(ToolResult {
-                success: false,
-                output: String::new(),
-                error: Some(format!("Override for '{}' was removed", self.name)),
-            }),
-        }
-    }
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────

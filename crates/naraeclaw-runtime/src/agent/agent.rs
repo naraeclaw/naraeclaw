@@ -60,6 +60,10 @@ pub struct Agent {
     /// Hook runner for tool-call auditing and lifecycle side effects.
     /// See issue #5462.
     hook_runner: Option<Arc<crate::hooks::HookRunner>>,
+    /// Runtime tool-override registry (ADR-004 Level 2). When set,
+    /// `execute_tool_call` consults it before static/MCP tools so the agent can
+    /// disable or HTTP-delegate any built-in at runtime via `tool_swap`.
+    override_registry: Option<crate::tools::override_registry::SharedOverrideRegistry>,
 }
 
 pub struct AgentBuilder {
@@ -89,6 +93,7 @@ pub struct AgentBuilder {
     autonomy_level: Option<crate::security::AutonomyLevel>,
     activated_tools: Option<Arc<std::sync::Mutex<crate::tools::ActivatedToolSet>>>,
     hook_runner: Option<Arc<crate::hooks::HookRunner>>,
+    override_registry: Option<crate::tools::override_registry::SharedOverrideRegistry>,
 }
 
 impl Default for AgentBuilder {
@@ -126,6 +131,7 @@ impl AgentBuilder {
             autonomy_level: None,
             activated_tools: None,
             hook_runner: None,
+            override_registry: None,
         }
     }
 
@@ -274,6 +280,14 @@ impl AgentBuilder {
         self
     }
 
+    pub fn override_registry(
+        mut self,
+        registry: Option<crate::tools::override_registry::SharedOverrideRegistry>,
+    ) -> Self {
+        self.override_registry = registry;
+        self
+    }
+
     pub fn build(self) -> Result<Agent> {
         let mut tools = self
             .tools
@@ -331,6 +345,7 @@ impl AgentBuilder {
                 .unwrap_or(crate::security::AutonomyLevel::Supervised),
             activated_tools: self.activated_tools,
             hook_runner: self.hook_runner,
+            override_registry: self.override_registry,
         })
     }
 }
@@ -390,6 +405,13 @@ impl Agent {
                 config.api_key.as_deref(),
             )?);
 
+        // ADR-004 Level 2: a runtime override registry wired into both the tool
+        // set (so `ToolSwapTool` mutates it) and the Agent (so `execute_tool_call`
+        // consults it). This brings runtime tool-swap to the gateway WS path,
+        // which previously bypassed overrides entirely.
+        let override_registry =
+            tools::override_registry::new_shared_registry(&config.workspace_dir);
+
         let (
             mut tools,
             delegate_handle,
@@ -410,7 +432,7 @@ impl Agent {
             config.api_key.as_deref(),
             config,
             None,
-            None, // override_registry
+            Some(std::sync::Arc::clone(&override_registry)),
         );
 
         // ── Wire MCP tools (non-fatal) ─────────────────────────────
@@ -571,6 +593,7 @@ impl Agent {
             } else {
                 None
             })
+            .override_registry(Some(override_registry))
             .build()
     }
 
@@ -664,6 +687,80 @@ impl Agent {
                         tool_call_id: call.tool_call_id.clone(),
                     };
                 }
+            }
+        }
+
+        // ── Priority 1: ToolOverrideRegistry (ADR-004 Level 2 runtime swap) ──
+        // Consulted before static/MCP tools so the agent can disable or
+        // HTTP-delegate any built-in at runtime. Mirrors tool_execution.rs;
+        // the OverrideKind is cloned so the lock is released before any await.
+        if let Some(ref reg) = self.override_registry {
+            use crate::tools::override_registry::{OverrideKind, call_http_delegate};
+            let override_kind: Option<OverrideKind> =
+                { reg.lock().unwrap().get(&tool_name).map(|o| o.kind.clone()) };
+            if let Some(kind) = override_kind {
+                let tool_result = match kind {
+                    OverrideKind::Disabled { reason } => crate::tools::ToolResult {
+                        success: false,
+                        output: String::new(),
+                        error: Some(format!(
+                            "도구 '{tool_name}'이 비활성화됨: {reason}. 다른 방법을 사용하세요."
+                        )),
+                    },
+                    OverrideKind::HttpDelegate {
+                        url,
+                        headers,
+                        timeout_secs,
+                    } => {
+                        call_http_delegate(
+                            &tool_name,
+                            tool_args.clone(),
+                            &url,
+                            &headers,
+                            timeout_secs,
+                        )
+                        .await
+                    }
+                };
+                let duration = start.elapsed();
+                self.observer.record_event(&ObserverEvent::ToolCall {
+                    tool: tool_name.clone(),
+                    duration,
+                    success: tool_result.success,
+                });
+                tracing::info!(
+                    tool = %tool_name,
+                    success = tool_result.success,
+                    "ADR-004 Level 2: tool override applied"
+                );
+                let (output, success) = if tool_result.success {
+                    (tool_result.output, true)
+                } else {
+                    (
+                        format!(
+                            "Error: {}",
+                            tool_result
+                                .error
+                                .clone()
+                                .unwrap_or_else(|| tool_result.output.clone())
+                        ),
+                        false,
+                    )
+                };
+                if let Some(ref hooks) = self.hook_runner {
+                    let obj = crate::tools::ToolResult {
+                        success,
+                        output: output.clone(),
+                        error: if success { None } else { Some(output.clone()) },
+                    };
+                    hooks.fire_after_tool_call(&tool_name, &obj, duration).await;
+                }
+                return ToolExecutionResult {
+                    name: tool_name,
+                    output,
+                    success,
+                    tool_call_id: call.tool_call_id.clone(),
+                };
             }
         }
 
