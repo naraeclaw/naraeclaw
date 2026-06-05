@@ -212,7 +212,7 @@ impl Scout for GitHubScout {
                 if suspicious {
                     warn!(
                         name = r.name.as_str(),
-                        url  = r.url.as_str(),
+                        url = r.url.as_str(),
                         "SkillForge scout: injection pattern detected — result dropped"
                     );
                 }

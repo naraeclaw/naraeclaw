@@ -112,11 +112,7 @@ impl RedashTool {
         let data = &query_result["query_result"]["data"];
         let columns: Vec<&str> = data["columns"]
             .as_array()
-            .map(|cols| {
-                cols.iter()
-                    .filter_map(|c| c["name"].as_str())
-                    .collect()
-            })
+            .map(|cols| cols.iter().filter_map(|c| c["name"].as_str()).collect())
             .unwrap_or_default();
         let rows = data["rows"].as_array().map(|r| r.as_slice()).unwrap_or(&[]);
 
@@ -129,7 +125,14 @@ impl RedashTool {
 
         // Markdown table header
         let header = format!("| {} |", columns.join(" | "));
-        let sep = format!("| {} |", columns.iter().map(|_| "---").collect::<Vec<_>>().join(" | "));
+        let sep = format!(
+            "| {} |",
+            columns
+                .iter()
+                .map(|_| "---")
+                .collect::<Vec<_>>()
+                .join(" | ")
+        );
 
         let mut lines = vec![header, sep];
         for row in display_rows {
@@ -238,17 +241,20 @@ impl RedashTool {
                     .and_then(|q| q["name"].as_str())
                     .unwrap_or("?");
                 lines.push(format!("- **{title}** (query: _{query_name}_)"));
-            } else if let Some(text) = widget["text"].as_str() {
-                if !text.trim().is_empty() {
-                    lines.push(format!("  > {text}"));
-                }
+            } else if let Some(text) = widget["text"].as_str()
+                && !text.trim().is_empty()
+            {
+                lines.push(format!("  > {text}"));
             }
         }
 
         if widgets.is_empty() {
             lines.push("_(no widgets found)_".into());
         } else {
-            lines.push(format!("\n_{} widget(s). Use `run_query` with the query name/ID to fetch live data._", widgets.len()));
+            lines.push(format!(
+                "\n_{} widget(s). Use `run_query` with the query name/ID to fetch live data._",
+                widgets.len()
+            ));
         }
 
         Ok(lines.join("\n"))
@@ -259,7 +265,10 @@ impl RedashTool {
         let path = if search.is_empty() {
             "/api/queries?page_size=50".to_string()
         } else {
-            format!("/api/queries?q={}&page_size=50", urlencoding::encode(search))
+            format!(
+                "/api/queries?q={}&page_size=50",
+                urlencoding::encode(search)
+            )
         };
 
         let resp = self.get_json(&path).await?;
@@ -269,7 +278,10 @@ impl RedashTool {
             return Ok("No queries found.".into());
         }
 
-        let mut lines = vec!["| ID | Name | Data Source | Updated |".into(), "| --- | --- | --- | --- |".into()];
+        let mut lines = vec![
+            "| ID | Name | Data Source | Updated |".into(),
+            "| --- | --- | --- | --- |".into(),
+        ];
         for q in results.iter().take(50) {
             let id = q["id"].as_u64().unwrap_or(0);
             let name = q["name"].as_str().unwrap_or("?");
@@ -426,7 +438,12 @@ mod tests {
     use super::*;
 
     fn tool() -> RedashTool {
-        RedashTool::new("https://redash.example.com".into(), "testkey".into(), 200, 60)
+        RedashTool::new(
+            "https://redash.example.com".into(),
+            "testkey".into(),
+            200,
+            60,
+        )
     }
 
     #[test]

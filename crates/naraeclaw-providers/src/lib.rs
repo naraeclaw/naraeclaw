@@ -3665,10 +3665,7 @@ mod tests {
         let opts = provider_runtime_options_from_config(&config);
         assert_eq!(opts.azure_openai_resource.as_deref(), Some("my-resource"));
         assert_eq!(opts.azure_openai_deployment.as_deref(), Some("gpt-5.4"));
-        assert_eq!(
-            opts.azure_openai_api_version.as_deref(),
-            Some("2024-10-21")
-        );
+        assert_eq!(opts.azure_openai_api_version.as_deref(), Some("2024-10-21"));
     }
 
     #[test]

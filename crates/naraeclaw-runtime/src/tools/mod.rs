@@ -26,7 +26,6 @@ pub mod file_read;
 pub mod model_switch;
 pub mod override_registry;
 pub mod read_skill;
-pub mod tool_swap;
 pub mod schedule;
 pub mod security_ops;
 pub mod shell;
@@ -37,6 +36,7 @@ pub mod sop_approve;
 pub mod sop_execute;
 pub mod sop_list;
 pub mod sop_status;
+pub mod tool_swap;
 pub mod verifiable_intent;
 
 // Tool types from naraeclaw-tools (direct imports, no shims)
@@ -70,9 +70,6 @@ pub use naraeclaw_tools::image_gen::ImageGenTool;
 pub use naraeclaw_tools::image_info::ImageInfoTool;
 pub use naraeclaw_tools::jira_tool::JiraTool;
 pub use naraeclaw_tools::knowledge_tool::KnowledgeTool;
-pub use naraeclaw_tools::redash::RedashTool;
-pub use naraeclaw_tools::reflect::ReflectTool;
-pub use tool_swap::ToolSwapTool;
 pub use naraeclaw_tools::linkedin::LinkedInTool;
 pub use naraeclaw_tools::llm_task::LlmTaskTool;
 pub use naraeclaw_tools::mcp_client::McpRegistry;
@@ -94,6 +91,8 @@ pub use naraeclaw_tools::poll::PollTool;
 pub use naraeclaw_tools::proxy_config::ProxyConfigTool;
 pub use naraeclaw_tools::pushover::PushoverTool;
 pub use naraeclaw_tools::reaction::ReactionTool;
+pub use naraeclaw_tools::redash::RedashTool;
+pub use naraeclaw_tools::reflect::ReflectTool;
 pub use naraeclaw_tools::screenshot::ScreenshotTool;
 pub use naraeclaw_tools::sessions::{SessionsHistoryTool, SessionsListTool, SessionsSendTool};
 pub use naraeclaw_tools::swarm::SwarmTool;
@@ -104,6 +103,7 @@ pub use naraeclaw_tools::web_fetch::WebFetchTool;
 pub use naraeclaw_tools::web_search_tool::WebSearchTool;
 pub use naraeclaw_tools::workspace_tool::WorkspaceTool;
 pub use naraeclaw_tools::wrappers::{PathGuardedTool, RateLimitedTool};
+pub use tool_swap::ToolSwapTool;
 
 // Traits from naraeclaw-api
 pub use naraeclaw_api::schema::{CleaningStrategy, SchemaCleanr};
@@ -291,7 +291,7 @@ pub fn all_tools(
         fallback_api_key,
         root_config,
         canvas_store,
-            None, // override_registry
+        None, // override_registry
     )
 }
 
@@ -369,9 +369,9 @@ pub fn all_tools_with_runtime(
         Arc::new(WeatherTool::new()),
         Arc::new(CanvasTool::new(canvas_store.unwrap_or_default())),
         Arc::new(ReflectTool::new(workspace_dir)),
-        Arc::new(ToolSwapTool::new(
-            override_registry.unwrap_or_else(|| override_registry::new_shared_registry(workspace_dir)),
-        )),
+        Arc::new(ToolSwapTool::new(override_registry.unwrap_or_else(|| {
+            override_registry::new_shared_registry(workspace_dir)
+        }))),
     ];
 
     // discord_search tool is disabled (discord_history channel removed)
@@ -543,7 +543,9 @@ pub fn all_tools_with_runtime(
                 "Redash tool enabled but no API key found (set redash.api_key or REDASH_API_KEY env var)"
             );
         } else if root_config.redash.base_url.trim().is_empty() {
-            tracing::warn!("Redash tool enabled but redash.base_url is empty — skipping registration");
+            tracing::warn!(
+                "Redash tool enabled but redash.base_url is empty — skipping registration"
+            );
         } else {
             tool_arcs.push(Arc::new(RedashTool::new(
                 root_config.redash.base_url.trim().to_string(),

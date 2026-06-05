@@ -14,7 +14,6 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use anyhow::Result;
 use async_trait::async_trait;
 use naraeclaw_api::tool::{Tool, ToolResult};
 use serde::{Deserialize, Serialize};
@@ -26,9 +25,7 @@ use tracing::{info, warn};
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum OverrideKind {
     /// Return a fixed error so the LLM knows to find another approach.
-    Disabled {
-        reason: String,
-    },
+    Disabled { reason: String },
     /// Forward the tool call as a JSON POST to an HTTP endpoint.
     /// Request body: `{"tool": "<name>", "args": {...}}`
     /// Expected response body: `{"success": bool, "output": "...", "error": "..."}`
@@ -133,11 +130,7 @@ impl ToolOverrideRegistry {
 
     /// Resolve a tool call through the override registry.
     /// Returns `Some(result)` if an override handled it, `None` to fall through.
-    pub async fn resolve(
-        &self,
-        tool_name: &str,
-        args: serde_json::Value,
-    ) -> Option<ToolResult> {
+    pub async fn resolve(&self, tool_name: &str, args: serde_json::Value) -> Option<ToolResult> {
         let entry = self.overrides.get(tool_name)?;
         let result = match &entry.kind {
             OverrideKind::Disabled { reason } => ToolResult {
@@ -178,20 +171,18 @@ pub async fn call_http_delegate(
     }
 
     match builder.send().await {
-        Ok(resp) if resp.status().is_success() => {
-            match resp.json::<serde_json::Value>().await {
-                Ok(v) => ToolResult {
-                    success: v["success"].as_bool().unwrap_or(true),
-                    output: v["output"].as_str().unwrap_or("").to_string(),
-                    error: v["error"].as_str().map(str::to_string),
-                },
-                Err(e) => ToolResult {
-                    success: false,
-                    output: String::new(),
-                    error: Some(format!("HTTP delegate parse error: {e}")),
-                },
-            }
-        }
+        Ok(resp) if resp.status().is_success() => match resp.json::<serde_json::Value>().await {
+            Ok(v) => ToolResult {
+                success: v["success"].as_bool().unwrap_or(true),
+                output: v["output"].as_str().unwrap_or("").to_string(),
+                error: v["error"].as_str().map(str::to_string),
+            },
+            Err(e) => ToolResult {
+                success: false,
+                output: String::new(),
+                error: Some(format!("HTTP delegate parse error: {e}")),
+            },
+        },
         Ok(resp) => ToolResult {
             success: false,
             output: String::new(),
@@ -260,9 +251,11 @@ impl Tool for OverriddenTool {
                     self.name, reason
                 )),
             }),
-            Some(OverrideKind::HttpDelegate { url, headers, timeout_secs }) => {
-                Ok(call_http_delegate(&self.name, args, &url, &headers, timeout_secs).await)
-            }
+            Some(OverrideKind::HttpDelegate {
+                url,
+                headers,
+                timeout_secs,
+            }) => Ok(call_http_delegate(&self.name, args, &url, &headers, timeout_secs).await),
             None => Ok(ToolResult {
                 success: false,
                 output: String::new(),
@@ -320,10 +313,7 @@ mod tests {
             },
             reason: None,
         });
-        let result = reg
-            .resolve("jira", serde_json::json!({}))
-            .await
-            .unwrap();
+        let result = reg.resolve("jira", serde_json::json!({})).await.unwrap();
         assert!(!result.success);
         assert!(result.error.as_deref().unwrap().contains("비활성화됨"));
     }
@@ -331,7 +321,11 @@ mod tests {
     #[tokio::test]
     async fn unknown_tool_resolve_returns_none() {
         let reg = make_reg();
-        assert!(reg.resolve("unknown_tool", serde_json::json!({})).await.is_none());
+        assert!(
+            reg.resolve("unknown_tool", serde_json::json!({}))
+                .await
+                .is_none()
+        );
     }
 
     #[test]

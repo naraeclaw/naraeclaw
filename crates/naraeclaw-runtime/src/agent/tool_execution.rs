@@ -77,9 +77,8 @@ pub async fn execute_one_tool_with_overrides(
     // Clone the OverrideKind to release the lock before any async operation.
     if let Some(reg) = override_registry {
         use crate::tools::override_registry::{OverrideKind, call_http_delegate};
-        let override_kind: Option<OverrideKind> = {
-            reg.lock().unwrap().get(call_name).map(|o| o.kind.clone())
-        }; // lock released here, before any await
+        let override_kind: Option<OverrideKind> =
+            { reg.lock().unwrap().get(call_name).map(|o| o.kind.clone()) }; // lock released here, before any await
         if let Some(kind) = override_kind {
             let tool_result = match kind {
                 OverrideKind::Disabled { reason } => naraeclaw_api::tool::ToolResult {
@@ -89,8 +88,19 @@ pub async fn execute_one_tool_with_overrides(
                         "도구 '{call_name}'이 비활성화됨: {reason}. 다른 방법을 사용하세요."
                     )),
                 },
-                OverrideKind::HttpDelegate { url, headers, timeout_secs } => {
-                    call_http_delegate(call_name, call_arguments.clone(), &url, &headers, timeout_secs).await
+                OverrideKind::HttpDelegate {
+                    url,
+                    headers,
+                    timeout_secs,
+                } => {
+                    call_http_delegate(
+                        call_name,
+                        call_arguments.clone(),
+                        &url,
+                        &headers,
+                        timeout_secs,
+                    )
+                    .await
                 }
             };
             let duration = start.elapsed();
@@ -102,10 +112,22 @@ pub async fn execute_one_tool_with_overrides(
             let (success, output, error_reason) = if tool_result.success {
                 (true, scrub_credentials(&tool_result.output), None)
             } else {
-                let reason = tool_result.error.clone().unwrap_or(tool_result.output.clone());
-                (false, format!("Error: {reason}"), Some(scrub_credentials(&reason)))
+                let reason = tool_result
+                    .error
+                    .clone()
+                    .unwrap_or(tool_result.output.clone());
+                (
+                    false,
+                    format!("Error: {reason}"),
+                    Some(scrub_credentials(&reason)),
+                )
             };
-            return Ok(ToolExecutionOutcome { output, success, error_reason, duration });
+            return Ok(ToolExecutionOutcome {
+                output,
+                success,
+                error_reason,
+                duration,
+            });
         }
     }
 

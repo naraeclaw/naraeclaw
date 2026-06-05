@@ -112,7 +112,9 @@ impl ToolSwapTool {
             .to_string();
         self.registry.lock().unwrap().set(ToolOverride {
             tool_name: tool_name.clone(),
-            kind: OverrideKind::Disabled { reason: reason.clone() },
+            kind: OverrideKind::Disabled {
+                reason: reason.clone(),
+            },
             reason: Some(reason.clone()),
         });
         Ok(ToolResult {
@@ -152,7 +154,11 @@ impl ToolSwapTool {
             .unwrap_or_default();
         self.registry.lock().unwrap().set(ToolOverride {
             tool_name: tool_name.clone(),
-            kind: OverrideKind::HttpDelegate { url: url.clone(), headers, timeout_secs: 30 },
+            kind: OverrideKind::HttpDelegate {
+                url: url.clone(),
+                headers,
+                timeout_secs: 30,
+            },
             reason: args["reason"].as_str().map(str::to_string),
         });
         Ok(ToolResult {
@@ -198,12 +204,18 @@ impl ToolSwapTool {
                 OverrideKind::Disabled { reason } => format!("🚫 비활성화 — {reason}"),
                 OverrideKind::HttpDelegate { url, .. } => format!("🔀 HTTP 위임 → {url}"),
             };
-            let note = ov.reason.as_deref()
+            let note = ov
+                .reason
+                .as_deref()
                 .map(|r| format!(" _(이유: {r})_"))
                 .unwrap_or_default();
             lines.push(format!("- **{}**: {}{}", ov.tool_name, kind_str, note));
         }
-        Ok(ToolResult { success: true, output: lines.join("\n"), error: None })
+        Ok(ToolResult {
+            success: true,
+            output: lines.join("\n"),
+            error: None,
+        })
     }
 }
 
@@ -222,7 +234,9 @@ mod tests {
     #[tokio::test]
     async fn disable_and_list() {
         let t = make_tool();
-        t.execute(json!({"action":"disable","tool_name":"jira","reason":"test"})).await.unwrap();
+        t.execute(json!({"action":"disable","tool_name":"jira","reason":"test"}))
+            .await
+            .unwrap();
         let r = t.execute(json!({"action":"list"})).await.unwrap();
         assert!(r.success);
         assert!(r.output.contains("jira"));
@@ -231,8 +245,13 @@ mod tests {
     #[tokio::test]
     async fn restore_removes_override() {
         let t = make_tool();
-        t.execute(json!({"action":"disable","tool_name":"jira","reason":"x"})).await.unwrap();
-        let r = t.execute(json!({"action":"restore","tool_name":"jira"})).await.unwrap();
+        t.execute(json!({"action":"disable","tool_name":"jira","reason":"x"}))
+            .await
+            .unwrap();
+        let r = t
+            .execute(json!({"action":"restore","tool_name":"jira"}))
+            .await
+            .unwrap();
         assert!(r.success);
         let list = t.execute(json!({"action":"list"})).await.unwrap();
         assert!(list.output.contains("없음"));
@@ -246,7 +265,10 @@ mod tests {
 
     #[tokio::test]
     async fn http_delegate_requires_url() {
-        let r = make_tool().execute(json!({"action":"http_delegate","tool_name":"jira"})).await.unwrap();
+        let r = make_tool()
+            .execute(json!({"action":"http_delegate","tool_name":"jira"}))
+            .await
+            .unwrap();
         assert!(!r.success);
     }
 }

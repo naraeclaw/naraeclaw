@@ -273,8 +273,7 @@ impl Channel for SlackChannel {
             // Send a WebSocket ping every 30 s so we detect silent TCP death
             // (e.g. after macOS sleep) without relying on Slack's server-sent
             // disconnect events, which stop arriving when the connection is dead.
-            let mut ping_tick =
-                tokio::time::interval(std::time::Duration::from_secs(30));
+            let mut ping_tick = tokio::time::interval(std::time::Duration::from_secs(30));
             ping_tick.tick().await; // consume the immediate first tick
             let mut awaiting_pong = false;
 

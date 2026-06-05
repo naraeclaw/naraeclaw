@@ -104,7 +104,10 @@ impl HookHandler for ReflectionHook {
         if result.success {
             return;
         }
-        let error = result.error.clone().unwrap_or_else(|| "unknown error".into());
+        let error = result
+            .error
+            .clone()
+            .unwrap_or_else(|| "unknown error".into());
         let lesson = format!(
             "도구 '{tool}' 실패: {error}. \
              원인을 파악하고 같은 방식으로 재시도하지 않는다.",
@@ -126,10 +129,7 @@ impl HookHandler for ReflectionHook {
             return HookResult::Continue(prompt);
         }
 
-        let mut lines = vec![
-            "## 이전 실수 — 반복하지 말 것".to_string(),
-            String::new(),
-        ];
+        let mut lines = vec!["## 이전 실수 — 반복하지 말 것".to_string(), String::new()];
         for (i, l) in lessons.iter().enumerate() {
             let tool_tag = l
                 .tool
@@ -226,12 +226,8 @@ mod tests {
             max_inject: 2,
         };
         for i in 0..5 {
-            hook.on_after_tool_call(
-                &format!("tool{i}"),
-                &failed_result("err"),
-                Duration::ZERO,
-            )
-            .await;
+            hook.on_after_tool_call(&format!("tool{i}"), &failed_result("err"), Duration::ZERO)
+                .await;
         }
         let lessons = hook.read_recent().await;
         assert_eq!(lessons.len(), 2);
