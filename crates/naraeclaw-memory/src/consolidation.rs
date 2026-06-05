@@ -26,13 +26,19 @@ pub struct ConsolidationResult {
     /// Observed trend or pattern (when consolidation_extract_facts is enabled).
     #[serde(default)]
     pub trend: Option<String>,
+    /// A reusable multi-step *procedure* worth saving as a skill — a short
+    /// slug or summary, or `None` when the turn isn't procedural (ADR-005 M3b,
+    /// D6 bridge). `#[serde(default)]` keeps older responses (no field) valid.
+    #[serde(default)]
+    pub skill_candidate: Option<String>,
 }
 
 const CONSOLIDATION_SYSTEM_PROMPT: &str = r#"You are a memory consolidation engine. Given a conversation turn, extract:
 1. "history_entry": A brief summary of what happened in this turn (1-2 sentences). Include the key topic or action.
 2. "memory_update": Any NEW facts, preferences, decisions, or commitments worth remembering long-term. Return null if nothing new was learned.
+3. "skill_candidate": If the turn demonstrates a REUSABLE multi-step PROCEDURE worth saving as a skill (e.g. a deploy flow, a setup sequence), a short kebab-case slug or one-line summary of it. Return null for ordinary chat or one-off facts.
 
-Respond ONLY with valid JSON: {"history_entry": "...", "memory_update": "..." or null}
+Respond ONLY with valid JSON: {"history_entry": "...", "memory_update": "..." or null, "skill_candidate": "..." or null}
 Do not include any text outside the JSON object."#;
 
 /// Run two-phase LLM-driven consolidation on a conversation turn.
@@ -132,6 +138,26 @@ pub async fn consolidate_turn(
             .await?;
     }
 
+    // Phase 3: flag a reusable-procedure candidate (ADR-005 M3b, D6 bridge).
+    // Stored under a dedicated `skill_candidate` category so a later trigger
+    // pass can pick it up; this does NOT itself create a skill. Kept distinct
+    // from Core so it doesn't pollute long-term fact recall.
+    if let Some(ref cand) = result.skill_candidate
+        && !cand.trim().is_empty()
+    {
+        let cand_key = format!("skill_candidate_{}", uuid::Uuid::new_v4());
+        memory
+            .store_with_metadata(
+                &cand_key,
+                cand.trim(),
+                MemoryCategory::Custom("skill_candidate".to_string()),
+                None,
+                None,
+                Some(0.5),
+            )
+            .await?;
+    }
+
     Ok(())
 }
 
@@ -164,6 +190,7 @@ fn parse_consolidation_response(raw: &str, fallback_text: &str) -> Consolidation
             memory_update: None,
             facts: Vec::new(),
             trend: None,
+            skill_candidate: None,
         }
     })
 }
@@ -227,5 +254,27 @@ mod tests {
                 .is_char_boundary(result.history_entry.len())
         );
         assert!(result.history_entry.ends_with('…'));
+    }
+
+    #[test]
+    fn parse_extracts_skill_candidate() {
+        let raw = r#"{"history_entry": "Deployed to prod", "memory_update": null, "skill_candidate": "deploy-to-prod"}"#;
+        let result = parse_consolidation_response(raw, "fallback");
+        assert_eq!(result.history_entry, "Deployed to prod");
+        assert_eq!(result.skill_candidate.as_deref(), Some("deploy-to-prod"));
+    }
+
+    #[test]
+    fn parse_legacy_response_without_skill_candidate_stays_unchanged() {
+        // Pre-M3b response shape (no skill_candidate field) must still parse and
+        // extract history_entry/memory_update exactly as before — regression guard.
+        let raw = r#"{"history_entry": "User asked about Rust.", "memory_update": "Prefers Rust over Go."}"#;
+        let result = parse_consolidation_response(raw, "fallback");
+        assert_eq!(result.history_entry, "User asked about Rust.");
+        assert_eq!(
+            result.memory_update.as_deref(),
+            Some("Prefers Rust over Go.")
+        );
+        assert!(result.skill_candidate.is_none());
     }
 }
