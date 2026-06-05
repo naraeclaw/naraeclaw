@@ -238,11 +238,12 @@ P0–P1 핵심 작업은 모두 완료되었다. 남은 작업:
 
 ### ADR-005 자동 스킬 진화 루프 (`docs/architecture/adr-005-auto-skill-evolution.md`)
 
-M1·M2·M2.5·M4 완료. M3a 핫 리로드 완료(2026-06-05). 남은 작업:
+M1·M2·M2.5·M4 완료. M3a 핫 리로드 완료(2026-06-05). M3b Memory 브리지 완료(2026-06-05). 남은 작업:
 
-3. **M3b Memory 브리지** — consolidation `skill_candidate` 추출 + `skill_index` 적재 + `mark_skill_candidate` 도구. consolidation 회귀 위험으로 fixture replay 회귀 테스트 선행 (중위험)
+3. **M3b 실시간 trigger 연결** — consolidation의 `skill_candidate` 마킹을 다음 턴 `try_trigger`의 `user_signal`로 잇기. `consolidate_turn`이 fire-and-forget이라 타이밍 설계(마킹 소비 규칙) 필요 (중위험)
 4. **Level 2 도구 교체 완성** — Agent 경로(gateway ws)에 `override_registry` 지원 추가 + ToolSwapTool SecurityPolicy 권한 통합 + audit 로그 (고위험: gateway/security)
 5. **M5 포맷 호환 레이어** — Hermes import/export (보류, 외부 마켓 연동 후속)
+6. **naraeclaw-channels clippy 부채** — `DebounceOutcome::Ready(ChannelMessage)` large_enum_variant (e01cf9a7 clippy 정리에서 channels 누락분, 저위험)
 
 ---
 
