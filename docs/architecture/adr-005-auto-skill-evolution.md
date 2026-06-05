@@ -339,7 +339,7 @@ enabled = false                  # M4 기본 off
 
 ## 7. 마일스톤
 
-각 마일스톤은 별도 `claude/<작업명>` worktree에서 진행, 작업 파일이 겹치지 않게 분할.
+각 마일스톤은 별도 브랜치에서 진행, 작업 파일이 겹치지 않게 분할.
 
 ### M1 — 추적 인프라 (저위험)
 - `ExecutionTrace` 캡처 + `agent/loop_.rs` 훅
