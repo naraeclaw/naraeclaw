@@ -92,6 +92,8 @@ pub fn default_auto_approve() -> Vec<String> {
         "weather".into(),
         "browser".into(),
         "browser_open".into(),
+        // ADR-005 M3b D2: explicit skill-candidate signal is a near no-op.
+        "mark_skill_candidate".into(),
     ]
 }
 

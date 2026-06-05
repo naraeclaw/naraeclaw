@@ -41,6 +41,9 @@ pub enum TriggerDecision {
 pub struct SkillEvolutionService {
     creator: Arc<SkillCreator>,
     embedding: Option<Arc<dyn EmbeddingProvider>>,
+    /// Optional memory backend for the M3b skill index (Bit 5 reverse bridge).
+    /// `None` disables index writes (creation still works).
+    memory: Option<Arc<dyn naraeclaw_memory::Memory>>,
     config: SkillAutoEvolutionConfig,
 }
 
@@ -48,11 +51,13 @@ impl SkillEvolutionService {
     pub fn new(
         creator: Arc<SkillCreator>,
         embedding: Option<Arc<dyn EmbeddingProvider>>,
+        memory: Option<Arc<dyn naraeclaw_memory::Memory>>,
         config: SkillAutoEvolutionConfig,
     ) -> Self {
         Self {
             creator,
             embedding,
+            memory,
             config,
         }
     }
@@ -67,7 +72,11 @@ impl SkillEvolutionService {
     /// exposing more of `naraeclaw-memory`'s internal resolution, and the
     /// `SkillCreator` dedup path treats `None` as "skip the similarity
     /// check", which is the safer initial behaviour.
-    pub fn from_config(config: &Config, workspace_dir: &Path) -> Option<Arc<Self>> {
+    pub fn from_config(
+        config: &Config,
+        workspace_dir: &Path,
+        memory: Option<Arc<dyn naraeclaw_memory::Memory>>,
+    ) -> Option<Arc<Self>> {
         if !config.skills.auto_evolution.enabled {
             return None;
         }
@@ -78,6 +87,7 @@ impl SkillEvolutionService {
         Some(Arc::new(Self::new(
             creator,
             None,
+            memory,
             config.skills.auto_evolution.clone(),
         )))
     }
@@ -102,6 +112,11 @@ impl SkillEvolutionService {
         if matches!(user_signal, Some(UserSignal::Suppress)) {
             return TriggerDecision::Suppressed;
         }
+        // ADR-005 D2: the explicit tool-signal path can be turned off via config.
+        let user_signal = match user_signal {
+            Some(UserSignal::Tool) if !self.config.user_signal_tool => None,
+            other => other,
+        };
 
         let signal = value_signal::evaluate(&trace, novelty_hint, user_signal);
         let score = value_signal::score(&signal);
@@ -112,17 +127,37 @@ impl SkillEvolutionService {
         // Heavy I/O — embedding similarity probe, fs write — moves off task.
         let creator = self.creator.clone();
         let embedding = self.embedding.clone();
+        let memory = self.memory.clone();
+        let summary = trace.user_message.clone();
         tokio::spawn(async move {
             let embedding_ref = embedding.as_deref();
-            if let Err(err) = creator
+            match creator
                 .create_from_execution(&trace.user_message, &trace.tool_calls, embedding_ref)
                 .await
             {
-                tracing::warn!(
-                    turn_id = %trace.turn_id,
-                    error = %err,
-                    "skill auto-evolution: create_from_execution failed"
-                );
+                // A new skill was written — index it for natural-language recall
+                // (ADR-005 M3b, Bit 5). Index failures are non-fatal.
+                Ok(Some(slug)) => {
+                    if let Some(mem) = memory.as_deref()
+                        && let Err(err) =
+                            crate::skills::stats::store_skill_index(mem, &slug, &summary).await
+                    {
+                        tracing::warn!(
+                            turn_id = %trace.turn_id,
+                            error = %err,
+                            "skill auto-evolution: skill_index store failed"
+                        );
+                    }
+                }
+                // Skipped (disabled, duplicate, too few steps) — nothing to index.
+                Ok(None) => {}
+                Err(err) => {
+                    tracing::warn!(
+                        turn_id = %trace.turn_id,
+                        error = %err,
+                        "skill auto-evolution: create_from_execution failed"
+                    );
+                }
             }
         });
 
@@ -173,7 +208,7 @@ mod tests {
         // anything (we don't await the spawn), but the SkillCreator stores
         // the path.
         std::mem::forget(tmp);
-        SkillEvolutionService::new(creator, None, config)
+        SkillEvolutionService::new(creator, None, None, config)
     }
 
     #[tokio::test]
@@ -239,14 +274,14 @@ mod tests {
     fn from_config_returns_none_when_gate_disabled() {
         let config = config_with_evolution(false);
         let tmp = tempfile::tempdir().unwrap();
-        assert!(SkillEvolutionService::from_config(&config, tmp.path()).is_none());
+        assert!(SkillEvolutionService::from_config(&config, tmp.path(), None).is_none());
     }
 
     #[tokio::test]
     async fn from_config_returns_some_when_gate_enabled() {
         let config = config_with_evolution(true);
         let tmp = tempfile::tempdir().unwrap();
-        let svc = SkillEvolutionService::from_config(&config, tmp.path())
+        let svc = SkillEvolutionService::from_config(&config, tmp.path(), None)
             .expect("expected a service when gate is enabled");
         // Reaching the spawn branch from inside the service confirms the
         // gate config plumbed through — we don't need to assert on disk

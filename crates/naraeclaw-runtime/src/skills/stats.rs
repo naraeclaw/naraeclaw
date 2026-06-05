@@ -117,6 +117,45 @@ pub async fn record_invocation_at(
     Ok(next)
 }
 
+// ── Skill semantic index (ADR-005 M3b, Bit 5 reverse bridge, D3) ────────────
+
+/// Memory category bucket for the skill semantic index. Kept separate from
+/// `skill_stat` so recall filters and decay tuning stay independent (D3).
+pub fn skill_index_category() -> MemoryCategory {
+    MemoryCategory::Custom("skill_index".to_string())
+}
+
+/// Stable memory key for a given skill slug's index entry.
+pub fn skill_index_key(slug: &str) -> String {
+    format!("skill_index::{slug}")
+}
+
+/// Higher than `skill_stat` (0.4) so a freshly created skill surfaces in
+/// natural-language recall (ADR-005 D3 chose importance 0.8).
+const SKILL_INDEX_IMPORTANCE: f64 = 0.8;
+
+/// Persist a semantic index entry for a newly created skill so that a user's
+/// natural-language query can surface the skill via `recall` (ADR-005 M3b,
+/// Bit 5 reverse bridge). Idempotent per slug (stable key overwrites).
+///
+/// `summary` is rendered into natural-language content so the memory layer's
+/// FTS/vector retrieval can match it; the slug is included for traceability.
+pub async fn store_skill_index(memory: &dyn Memory, slug: &str, summary: &str) -> Result<()> {
+    let key = skill_index_key(slug);
+    let content = format!("Skill `{slug}`: {}", summary.trim());
+    memory
+        .store_with_metadata(
+            &key,
+            &content,
+            skill_index_category(),
+            None,
+            None,
+            Some(SKILL_INDEX_IMPORTANCE),
+        )
+        .await?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -299,5 +338,37 @@ mod tests {
         assert_eq!(r2.invocations, 2);
         assert_eq!(r2.successes, 1);
         assert_eq!(r2.failures, 1);
+    }
+
+    #[test]
+    fn skill_index_key_and_category_distinct_from_stat() {
+        assert_eq!(skill_index_key("deploy"), "skill_index::deploy");
+        assert_eq!(
+            skill_index_category(),
+            MemoryCategory::Custom("skill_index".to_string())
+        );
+        assert_ne!(skill_index_category(), skill_stat_category());
+    }
+
+    #[tokio::test]
+    async fn store_skill_index_persists_with_category_and_importance() {
+        let mem = InMemory::new();
+        store_skill_index(
+            &mem,
+            "deploy-prod",
+            "Deploy the app to production via terraform",
+        )
+        .await
+        .unwrap();
+
+        let stored = mem
+            .get(&skill_index_key("deploy-prod"))
+            .await
+            .unwrap()
+            .expect("skill_index entry must exist after store");
+        assert_eq!(stored.category, skill_index_category());
+        assert_eq!(stored.importance, Some(SKILL_INDEX_IMPORTANCE));
+        assert!(stored.content.contains("deploy-prod"), "slug in content");
+        assert!(stored.content.contains("terraform"), "summary in content");
     }
 }

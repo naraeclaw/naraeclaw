@@ -33,6 +33,7 @@ pub mod knowledge_tool;
 pub mod linkedin;
 pub mod linkedin_client;
 pub mod llm_task;
+pub mod mark_skill_candidate;
 pub mod mcp_client;
 pub mod mcp_deferred;
 pub mod mcp_protocol;

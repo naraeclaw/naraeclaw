@@ -4350,6 +4350,7 @@ pub async fn start_channels(config: Config) -> Result<()> {
         skill_evolution: naraeclaw_runtime::agent::SkillEvolutionService::from_config(
             &config,
             &config.workspace_dir,
+            Some(mem.clone()),
         ),
     });
 

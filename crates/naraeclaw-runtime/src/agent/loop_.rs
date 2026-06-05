@@ -1313,7 +1313,20 @@ pub async fn run_tool_call_loop(
                     trace.record_tool_call(call);
                 }
                 trace.finalize(display_text.clone());
-                let _ = evolution.try_trigger(trace, 1.0, None);
+                // ADR-005 M3b (D2): if the agent explicitly called
+                // `mark_skill_candidate` this turn, feed UserSignal::Tool so the
+                // trigger bypasses the value threshold. The `user_signal_tool`
+                // config gate is enforced inside `try_trigger`.
+                let user_signal = if trace
+                    .tool_calls
+                    .iter()
+                    .any(|c| c.name == "mark_skill_candidate")
+                {
+                    Some(crate::agent::value_signal::UserSignal::Tool)
+                } else {
+                    None
+                };
+                let _ = evolution.try_trigger(trace, 1.0, user_signal);
             }
             // No tool calls — this is the final response.
             // If a streaming sender is provided, relay the text in small chunks
@@ -2104,8 +2117,11 @@ pub async fn run(
     // ADR-005 M2.5: bootstrap the auto-evolution trigger. `None` when the
     // `skills.auto_evolution.enabled` gate is off, which keeps the existing
     // behaviour for every user that hasn't opted in.
-    let skill_evolution =
-        crate::agent::SkillEvolutionService::from_config(&config, &config.workspace_dir);
+    let skill_evolution = crate::agent::SkillEvolutionService::from_config(
+        &config,
+        &config.workspace_dir,
+        Some(mem.clone()),
+    );
 
     let mut tool_descs: Vec<(&str, &str)> = vec![
         (

@@ -72,6 +72,7 @@ pub use naraeclaw_tools::jira_tool::JiraTool;
 pub use naraeclaw_tools::knowledge_tool::KnowledgeTool;
 pub use naraeclaw_tools::linkedin::LinkedInTool;
 pub use naraeclaw_tools::llm_task::LlmTaskTool;
+pub use naraeclaw_tools::mark_skill_candidate::MarkSkillCandidateTool;
 pub use naraeclaw_tools::mcp_client::McpRegistry;
 pub use naraeclaw_tools::mcp_deferred::{
     ActivatedToolSet, DeferredMcpToolSet, build_deferred_tools_section,
@@ -369,6 +370,7 @@ pub fn all_tools_with_runtime(
         Arc::new(WeatherTool::new()),
         Arc::new(CanvasTool::new(canvas_store.unwrap_or_default())),
         Arc::new(ReflectTool::new(workspace_dir)),
+        Arc::new(MarkSkillCandidateTool::new()),
         Arc::new(ToolSwapTool::new(override_registry.unwrap_or_else(|| {
             override_registry::new_shared_registry(workspace_dir)
         }))),
