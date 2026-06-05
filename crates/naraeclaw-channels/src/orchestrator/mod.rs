@@ -3576,7 +3576,9 @@ type InFlightMap = Arc<tokio::sync::Mutex<HashMap<String, InFlightSenderTaskStat
 
 enum DebounceOutcome {
     Spawned,
-    Ready(ChannelMessage),
+    // Boxed: ChannelMessage is large, so an unboxed variant makes the enum
+    // size-dominated by Ready (clippy::large_enum_variant).
+    Ready(Box<ChannelMessage>),
 }
 
 /// Handle a /stop command. Returns `true` if the message was a stop command and
@@ -3640,7 +3642,7 @@ async fn apply_debounce(
     workers: &mut tokio::task::JoinSet<()>,
 ) -> DebounceOutcome {
     if msg.channel == "cli" || !ctx.debouncer.enabled() {
-        return DebounceOutcome::Ready(msg);
+        return DebounceOutcome::Ready(Box::new(msg));
     }
 
     let debounce_key = conversation_history_key(&msg);
@@ -3669,7 +3671,7 @@ async fn apply_debounce(
         naraeclaw_infra::debounce::DebounceResult::Passthrough(content) => {
             let mut m = msg;
             m.content = content;
-            DebounceOutcome::Ready(m)
+            DebounceOutcome::Ready(Box::new(m))
         }
     }
 }
@@ -3705,7 +3707,7 @@ async fn run_message_dispatch_loop(
 
         let msg = match outcome {
             DebounceOutcome::Spawned => continue,
-            DebounceOutcome::Ready(m) => m,
+            DebounceOutcome::Ready(m) => *m,
         };
 
         let permit = match Arc::clone(&semaphore).acquire_owned().await {
