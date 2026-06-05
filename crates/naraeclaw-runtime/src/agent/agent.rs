@@ -731,7 +731,9 @@ impl Agent {
             let tool_result_obj = crate::tools::ToolResult {
                 success,
                 output: result.clone(),
-                error: None,
+                // 실패 시 `result`에 이미 "Error: ..." 형태로 실제 메시지가 담겨 있으므로
+                // error 필드에도 전달해 ReflectionHook이 "unknown error" 대신 원인을 기록하게 한다.
+                error: if success { None } else { Some(result.clone()) },
             };
             hooks
                 .fire_after_tool_call(&tool_name, &tool_result_obj, duration)
