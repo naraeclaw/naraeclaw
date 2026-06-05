@@ -2094,7 +2094,8 @@ pub async fn run(
     let i18n_descs = crate::i18n::ToolDescriptions::load(&i18n_locale, &i18n_search_dirs);
 
     // ── Build system prompt from workspace MD files (OpenClaw framework) ──
-    let skills = crate::skills::load_skills_with_config(&config.workspace_dir, &config);
+    // `mut` so the interactive loop can hot-reload skills mid-session (ADR-005 M3).
+    let mut skills = crate::skills::load_skills_with_config(&config.workspace_dir, &config);
 
     // Register skill-defined tools as callable tool specs in the tool registry
     // so the LLM can invoke them via native function calling, not just XML prompts.
@@ -2249,7 +2250,8 @@ pub async fn run(
 
     // Save the base system prompt before any thinking modifications so
     // the interactive loop can restore it between turns.
-    let base_system_prompt = system_prompt.clone();
+    // `mut` so hot-reloaded skills (ADR-005 M3) refresh the restored prompt too.
+    let mut base_system_prompt = system_prompt.clone();
 
     if let Some(msg) = message {
         // ── Parse thinking directive from user message ─────────
@@ -2524,6 +2526,42 @@ pub async fn run(
                     continue;
                 }
                 _ => {}
+            }
+
+            // ── ADR-005 M3: hot-reload skills created on a previous turn ──
+            // Auto-evolution writes new SKILL.toml files via a detached task; pick
+            // them up at the turn boundary so a skill made on one turn is usable on
+            // the next without restarting the session. `register_skill_tools` is
+            // idempotent (existing names are skipped), so only new tools are added.
+            if config.skills.auto_evolution.hot_reload {
+                let latest = crate::skills::load_skills_with_config(&config.workspace_dir, &config);
+                let current: std::collections::HashSet<&str> =
+                    skills.iter().map(|s| s.name.as_str()).collect();
+                let latest_set: std::collections::HashSet<&str> =
+                    latest.iter().map(|s| s.name.as_str()).collect();
+                if current != latest_set {
+                    let added = latest_set.difference(&current).count();
+                    tracing::info!(
+                        added,
+                        total = latest.len(),
+                        "ADR-005 M3: hot-reloading skills"
+                    );
+                    tools::register_skill_tools(&mut tools_registry, &latest, security.clone());
+                    let section = crate::skills::skills_to_prompt_with_mode(
+                        &latest,
+                        &config.workspace_dir,
+                        config.skills.prompt_injection_mode,
+                    );
+                    system_prompt = crate::skills::replace_skills_section(&system_prompt, &section);
+                    base_system_prompt =
+                        crate::skills::replace_skills_section(&base_system_prompt, &section);
+                    if let Some(sys) = history.first_mut()
+                        && sys.role == "system"
+                    {
+                        sys.content.clone_from(&base_system_prompt);
+                    }
+                    skills = latest;
+                }
             }
 
             // ── Parse thinking directive from interactive input ───
@@ -4157,7 +4195,7 @@ mod tests {
             0,
             None,
             None,
-        None, // override_registry
+            None, // override_registry
         )
         .await
         .expect_err("provider without vision support should fail");
@@ -4214,7 +4252,7 @@ mod tests {
             0,
             None,
             None,
-        None, // override_registry
+            None, // override_registry
         )
         .await
         .expect_err("oversized payload must fail");
@@ -4265,7 +4303,7 @@ mod tests {
             0,
             None,
             None,
-        None, // override_registry
+            None, // override_registry
         )
         .await
         .expect("valid multimodal payload should pass");
@@ -4315,7 +4353,7 @@ mod tests {
             0,
             None,
             None,
-        None, // override_registry
+            None, // override_registry
         )
         .await
         .expect_err("should fail without vision_provider config");
@@ -4372,7 +4410,7 @@ mod tests {
             0,
             None,
             None,
-        None, // override_registry
+            None, // override_registry
         )
         .await
         .expect_err("should fail when vision provider cannot be created");
@@ -4429,7 +4467,7 @@ mod tests {
             0,
             None,
             None,
-        None, // override_registry
+            None, // override_registry
         )
         .await
         .expect("text-only messages should succeed with default provider");
@@ -4487,7 +4525,7 @@ mod tests {
             0,
             None,
             None,
-        None, // override_registry
+            None, // override_registry
         )
         .await
         .expect_err("should fail due to nonexistent vision provider");
@@ -4543,7 +4581,7 @@ mod tests {
             0,
             None,
             None,
-        None, // override_registry
+            None, // override_registry
         )
         .await
         .expect("empty image markers should not trigger vision routing");
@@ -4599,7 +4637,7 @@ mod tests {
             0,
             None,
             None,
-        None, // override_registry
+            None, // override_registry
         )
         .await
         .expect_err("should attempt vision provider creation for multiple images");
@@ -4738,7 +4776,7 @@ mod tests {
             0,
             None,
             None,
-        None, // override_registry
+            None, // override_registry
         )
         .await
         .expect("parallel execution should complete");
@@ -4814,7 +4852,7 @@ mod tests {
             0,
             None,
             None,
-        None, // override_registry
+            None, // override_registry
         )
         .await
         .expect("cron_add delivery defaults should be injected");
@@ -4882,7 +4920,7 @@ mod tests {
             0,
             None,
             None,
-        None, // override_registry
+            None, // override_registry
         )
         .await
         .expect("explicit delivery mode should be preserved");
@@ -4945,7 +4983,7 @@ mod tests {
             0,
             None,
             None,
-        None, // override_registry
+            None, // override_registry
         )
         .await
         .expect("loop should finish after deduplicating repeated calls");
@@ -5021,7 +5059,7 @@ mod tests {
             0,
             None,
             None,
-        None, // override_registry
+            None, // override_registry
         )
         .await
         .expect("non-interactive shell should succeed for low-risk command");
@@ -5087,7 +5125,7 @@ mod tests {
             0,
             None,
             None,
-        None, // override_registry
+            None, // override_registry
         )
         .await
         .expect("loop should finish with exempt tool executing twice");
@@ -5173,7 +5211,7 @@ mod tests {
             0,
             None,
             None,
-        None, // override_registry
+            None, // override_registry
         )
         .await
         .expect("loop should complete");
@@ -5236,7 +5274,7 @@ mod tests {
             0,
             None,
             None,
-        None, // override_registry
+            None, // override_registry
         )
         .await
         .expect("native fallback id flow should complete");
@@ -5323,7 +5361,7 @@ mod tests {
             0,
             None,
             None,
-        None, // override_registry
+            None, // override_registry
         )
         .await
         .expect("native tool-call text should be relayed through on_delta");
@@ -5394,7 +5432,7 @@ mod tests {
             0,
             None,
             None,
-        None, // override_registry
+            None, // override_registry
         )
         .await
         .expect("streaming provider should complete");
@@ -5467,7 +5505,7 @@ mod tests {
             0,
             None,
             None,
-        None, // override_registry
+            None, // override_registry
         )
         .await
         .expect("streaming tool loop should execute tool and finish");
@@ -5544,7 +5582,7 @@ mod tests {
             0,
             None,
             None,
-        None, // override_registry
+            None, // override_registry
         )
         .await
         .expect("native streaming events should preserve tool loop semantics");
@@ -5630,7 +5668,7 @@ mod tests {
             0,
             None,
             None,
-        None, // override_registry
+            None, // override_registry
         )
         .await
         .expect("routed streaming provider should complete");

@@ -874,6 +874,52 @@ pub fn skills_to_prompt_with_mode(
     prompt
 }
 
+/// Replace the `## Available Skills` / `<available_skills>` block of an existing
+/// system prompt with a freshly rendered one (ADR-005 M3 hot reload).
+///
+/// Used to refresh the skills section in-place without rebuilding the entire
+/// system prompt. When the original prompt has no skills block, the refreshed
+/// section is inserted before `## Workspace` (or appended) so newly created
+/// skills still surface. Mirrors the channel orchestrator's per-session refresh.
+pub fn replace_skills_section(base_prompt: &str, refreshed_skills: &str) -> String {
+    const SKILLS_HEADER: &str = "## Available Skills\n\n";
+    const SKILLS_END: &str = "</available_skills>";
+    const WORKSPACE_HEADER: &str = "## Workspace\n\n";
+
+    if let Some(start) = base_prompt.find(SKILLS_HEADER)
+        && let Some(rel_end) = base_prompt[start..].find(SKILLS_END)
+    {
+        let end = start + rel_end + SKILLS_END.len();
+        let tail = base_prompt[end..]
+            .strip_prefix("\n\n")
+            .unwrap_or(&base_prompt[end..]);
+
+        let mut refreshed = String::with_capacity(base_prompt.len() + refreshed_skills.len() + 2);
+        refreshed.push_str(&base_prompt[..start]);
+        if !refreshed_skills.is_empty() {
+            refreshed.push_str(refreshed_skills);
+            refreshed.push_str("\n\n");
+        }
+        refreshed.push_str(tail);
+        return refreshed;
+    }
+
+    if refreshed_skills.is_empty() {
+        return base_prompt.to_string();
+    }
+
+    if let Some(workspace_start) = base_prompt.find(WORKSPACE_HEADER) {
+        let mut refreshed = String::with_capacity(base_prompt.len() + refreshed_skills.len() + 2);
+        refreshed.push_str(&base_prompt[..workspace_start]);
+        refreshed.push_str(refreshed_skills);
+        refreshed.push_str("\n\n");
+        refreshed.push_str(&base_prompt[workspace_start..]);
+        return refreshed;
+    }
+
+    format!("{base_prompt}\n\n{refreshed_skills}")
+}
+
 /// Convert skill tools into callable `Tool` trait objects.
 ///
 /// Each skill's `[[tools]]` entries are converted to either `SkillShellTool`
@@ -1361,5 +1407,46 @@ pub fn install_clawhub_skill_source(
             let _ = std::fs::remove_dir_all(&installed_dir);
             Err(err)
         }
+    }
+}
+
+#[cfg(test)]
+mod hot_reload_tests {
+    use super::replace_skills_section;
+
+    const NEW_SECTION: &str = "## Available Skills\n\n<available_skills>\nNEW\n</available_skills>";
+
+    #[test]
+    fn replaces_existing_section_in_place() {
+        let base = "## Tools\n\nstuff\n\n## Available Skills\n\n<available_skills>\nOLD\n</available_skills>\n\n## Workspace\n\nws";
+        let out = replace_skills_section(base, NEW_SECTION);
+        assert!(out.contains("NEW"), "new skills must appear");
+        assert!(!out.contains("OLD"), "old block must be gone");
+        assert!(out.contains("## Tools"), "preceding section preserved");
+        assert!(out.contains("## Workspace"), "trailing section preserved");
+    }
+
+    #[test]
+    fn inserts_before_workspace_when_no_existing_section() {
+        let base = "## Tools\n\nstuff\n\n## Workspace\n\nws";
+        let out = replace_skills_section(base, NEW_SECTION);
+        assert!(out.contains("NEW"));
+        let skills_idx = out.find("Available Skills").unwrap();
+        let ws_idx = out.find("## Workspace").unwrap();
+        assert!(skills_idx < ws_idx, "skills inserted before workspace");
+    }
+
+    #[test]
+    fn empty_section_removes_existing_block() {
+        let base = "A\n\n## Available Skills\n\n<available_skills>\nOLD\n</available_skills>\n\nB";
+        let out = replace_skills_section(base, "");
+        assert!(!out.contains("OLD"));
+        assert!(out.contains("A") && out.contains("B"));
+    }
+
+    #[test]
+    fn empty_section_without_existing_is_noop() {
+        let base = "just a prompt with no skills";
+        assert_eq!(replace_skills_section(base, ""), base);
     }
 }

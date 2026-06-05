@@ -167,6 +167,7 @@ mod tests {
             trigger_threshold: threshold,
             user_signal_keyword: true,
             user_signal_tool: true,
+            hot_reload: true,
         };
         // Leak the tempdir so it outlives the test — these tests never write
         // anything (we don't await the spawn), but the SkillCreator stores

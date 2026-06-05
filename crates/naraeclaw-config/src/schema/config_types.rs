@@ -755,6 +755,12 @@ pub struct SkillAutoEvolutionConfig {
     /// Surface the `mark_skill_candidate` agent tool (ADR-005 D2). Has no
     /// effect until the tool is registered in a later milestone.
     pub user_signal_tool: bool,
+    /// Hot-reload auto-generated skills within the same session (ADR-005 M3).
+    /// When `true`, the CLI interactive loop re-scans the skills directory at
+    /// turn boundaries and refreshes the prompt/tools when it changes, so a
+    /// skill created on one turn becomes usable on the next without a restart.
+    /// Default: `true`.
+    pub hot_reload: bool,
 }
 
 impl Default for SkillAutoEvolutionConfig {
@@ -764,6 +770,7 @@ impl Default for SkillAutoEvolutionConfig {
             trigger_threshold: 0.6,
             user_signal_keyword: true,
             user_signal_tool: true,
+            hot_reload: true,
         }
     }
 }
