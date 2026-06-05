@@ -353,7 +353,18 @@ enabled = false                  # M4 기본 off
 - **검증**: MockProvider로 멀티스텝 시나리오 통과, 무한 루프 가드(스킬 생성 동안 다시 트리거 차단)
 
 ### M3 — 핫 리로드 + Memory 브리지 (중위험)
-- `SkillRegistry` 도입, 기존 호출자 마이그레이션
+
+**M3a — 핫 리로드 ✅ 2026-06-05**
+- `SkillRegistry` 전면 도입(모든 호출자 마이그레이션) 대신 **최소 침습** 방식 채택:
+  `skills::replace_skills_section` 헬퍼 + `loop_::run` 인터랙티브 루프의 턴 경계
+  재스캔. 채널은 이미 새 세션마다 reload하므로 자연 커버, gateway(Agent 경로)는
+  Level 2 작업과 함께 별도.
+- `[skills.auto_evolution].hot_reload` config 키 신설 (기본 `true`)
+- 턴 경계에서 스킬 디렉토리 변경 감지 → `register_skill_tools`(idempotent) 재호출 +
+  `system_prompt`/`base_system_prompt`/`history[0]` 스킬 섹션 갱신
+- **검증**: `replace_skills_section` 단위 테스트 4개 (교체/삽입/제거/no-op)
+
+**M3b — Memory 브리지 (후속, 미구현)**
 - `consolidation` 프롬프트에 `skill_candidate` 추가 — **D6 비용 +10–15% 수용**
 - **D2** `mark_skill_candidate` 도구 신설 (auto_approve 목록 검토)
 - **D3** 스킬 인덱스 메모리 적재 (`Custom("skill_index")`, importance 0.8)
@@ -401,3 +412,4 @@ enabled = false                  # M4 기본 off
 - **2026-05-13 (제안)** — 초기 작성, Status: Proposed, 오픈 질문 6개 (Q1~Q6)
 - **2026-05-13 (확정)** — Status: Accepted. D1~D6 결정 확정 (`Decision` 섹션 참조). M5 신설(포맷 호환 레이어). Section 8 오픈 질문 제거 → `Decision` 표로 흡수
 - **2026-05-13 (M4 구현)** — SkillForge 백그라운드 스케줄러 도입. `[skillforge.scheduler]` config + daemon supervisor + 단위 테스트 6개. 기본값 off. 다음: M5 포맷 호환 레이어
+- **2026-06-05 (M3a 핫 리로드)** — 인터랙티브 세션 핫 리로드 구현. `[skills.auto_evolution].hot_reload` config(기본 true), `skills::replace_skills_section`, `loop_::run` 턴 경계 재스캔. `SkillRegistry` 대공사 대신 최소 침습. 자가 발전 하네스 버그픽스 병행(`agent.rs` 직접 도구 실행 경로의 실패 `error` 전달). 다음: **M3b Memory 브리지**(consolidation `skill_candidate` 추출, `skill_index` 적재, `mark_skill_candidate` 도구 — consolidation 회귀 위험으로 별도 진행), Level 2 도구 교체(Agent 경로 override 지원 + security 통합), M5 포맷 호환 레이어

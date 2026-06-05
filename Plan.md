@@ -236,6 +236,14 @@ P0–P1 핵심 작업은 모두 완료되었다. 남은 작업:
 1. naraeclaw-channels 프롬프트 어셈블리 테스트 12개 drift 수정 (P2, 채널 제거 잔재 정리 follow-up)
 2. Release workflow 실제 구현 — CLI 단일 바이너리 기준으로 단순화, 릴리즈 케이던스 확정 후 (P2)
 
+### ADR-005 자동 스킬 진화 루프 (`docs/architecture/adr-005-auto-skill-evolution.md`)
+
+M1·M2·M2.5·M4 완료. M3a 핫 리로드 완료(2026-06-05). 남은 작업:
+
+3. **M3b Memory 브리지** — consolidation `skill_candidate` 추출 + `skill_index` 적재 + `mark_skill_candidate` 도구. consolidation 회귀 위험으로 fixture replay 회귀 테스트 선행 (중위험)
+4. **Level 2 도구 교체 완성** — Agent 경로(gateway ws)에 `override_registry` 지원 추가 + ToolSwapTool SecurityPolicy 권한 통합 + audit 로그 (고위험: gateway/security)
+5. **M5 포맷 호환 레이어** — Hermes import/export (보류, 외부 마켓 연동 후속)
+
 ---
 
 ## Non-Goals For Now
