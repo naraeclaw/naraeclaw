@@ -364,12 +364,13 @@ enabled = false                  # M4 기본 off
   `system_prompt`/`base_system_prompt`/`history[0]` 스킬 섹션 갱신
 - **검증**: `replace_skills_section` 단위 테스트 4개 (교체/삽입/제거/no-op)
 
-**M3b — Memory 브리지 ✅ 2026-06-05 (실시간 trigger 연결만 후속)**
+**M3b — Memory 브리지 ✅ 2026-06-05 / 실시간 연결 ✅ 2026-06-09**
 - ✅ **D3** 스킬 인덱스 적재 — `skills::stats::store_skill_index` (`Custom("skill_index")`, importance 0.8). `try_trigger` spawn에서 생성 성공 시 적재, `SkillEvolutionService`에 memory 주입
-- ✅ **D2** `mark_skill_candidate` 도구 신설 + auto_approve 등록. `loop_::run_tool_call_loop`이 같은 턴 trace의 도구 호출을 감지해 `UserSignal::Tool` 도출(`user_signal_tool` 게이트는 `try_trigger` 내부)
+- ✅ **D2** `mark_skill_candidate` 도구 신설 + auto_approve 등록. `loop_::run_tool_call_loop`이 같은 턴 trace의 도구 호출을 감지해 `UserSignal::Tool` 도출
 - ✅ **D6** `consolidation` 프롬프트에 `skill_candidate` 추출 추가 — `ConsolidationResult`에 `#[serde(default)]` 필드, 후보 감지 시 `Custom("skill_candidate")` 마킹. 회귀 테스트로 pre-M3b 응답 파싱 불변 보장
-- ⏳ **후속**: consolidation의 `skill_candidate` 마킹을 다음 턴 `try_trigger`의 `user_signal`로 잇는 **실시간 연결**. `consolidate_turn`이 fire-and-forget(`tokio::spawn`)이라 "다음 턴 전 완료" 보장이 없어 타이밍 설계(마킹 폴링/소비 규칙)가 필요 — 별도 진행
-- **검증**: skill_index 단위 2건 + mark_skill_candidate 3건 + consolidation 회귀(legacy 파싱 불변 포함) 8건
+- ✅ **실시간 연결 (best-effort)** — `SkillEvolutionService::resolve_user_signal`이 trigger 직전 async pre-step으로 explicit 신호(Tool/Suppress)를 우선 처리하고, 없으면 pending `skill_candidate` 마킹을 **소비(drain)** 해 `UserSignal::Keyword`로 승격. config 게이트(`user_signal_tool`/`user_signal_keyword`)도 여기로 일원화.
+  - **한계(설계상 불가피)**: `memory → runtime` 단방향 의존이라 consolidation이 trigger를 직접 호출할 수 없고, consolidate_turn이 fire-and-forget이라 마킹은 *직전* 턴을 반영. 따라서 "최근 턴이 절차적 → 이번 턴 트리거 민감도 ↑"라는 best-effort 결합. 마킹은 read 시 drain되어 한 마킹이 다음 트리거 1회만 부스트.
+- **검증**: skill_index 2 + mark_skill_candidate 3 + consolidation 회귀 8 + resolve/consume 2건
 
 ### M4 — SkillForge 스케줄러 (저위험, 보너스) ✅ 2026-05-13
 - `[skillforge.scheduler]` 서브섹션 신설 (`enabled`, `interval_secs` 테스트 오버라이드)
@@ -415,3 +416,4 @@ enabled = false                  # M4 기본 off
 - **2026-05-13 (M4 구현)** — SkillForge 백그라운드 스케줄러 도입. `[skillforge.scheduler]` config + daemon supervisor + 단위 테스트 6개. 기본값 off. 다음: M5 포맷 호환 레이어
 - **2026-06-05 (M3a 핫 리로드)** — 인터랙티브 세션 핫 리로드 구현. `[skills.auto_evolution].hot_reload` config(기본 true), `skills::replace_skills_section`, `loop_::run` 턴 경계 재스캔. `SkillRegistry` 대공사 대신 최소 침습. 자가 발전 하네스 버그픽스 병행(`agent.rs` 직접 도구 실행 경로의 실패 `error` 전달). 다음: **M3b Memory 브리지**(consolidation `skill_candidate` 추출, `skill_index` 적재, `mark_skill_candidate` 도구 — consolidation 회귀 위험으로 별도 진행), Level 2 도구 교체(Agent 경로 override 지원 + security 통합), M5 포맷 호환 레이어
 - **2026-06-05 (M3b Memory 브리지)** — D3 `skill_index` 적재(`store_skill_index`, importance 0.8, `try_trigger` spawn 연동), D2 `mark_skill_candidate` 도구 + `UserSignal::Tool` 도출(trace 검사), D6 consolidation `skill_candidate` 추출(`#[serde(default)]` + `Custom("skill_candidate")` 마킹, 회귀 테스트로 legacy 파싱 불변 보장). 단위/회귀 테스트 13건. 후속: consolidation 마킹→다음 턴 trigger 실시간 연결(fire-and-forget 타이밍 설계), Level 2 도구 교체, M5 포맷 호환
+- **2026-06-09 (M3b 실시간 연결)** — `SkillEvolutionService::resolve_user_signal` async pre-step: explicit 신호 우선 + config 게이트 일원화, 없으면 pending `skill_candidate` 마킹을 drain해 `UserSignal::Keyword`로 승격. `memory→runtime` 단방향 의존 + fire-and-forget 제약 하의 best-effort 결합(직전 턴 절차 신호 → 이번 턴 민감도↑, drain으로 1회만). resolve/consume 테스트 2건. 남은 작업: M5 포맷 호환(보류)

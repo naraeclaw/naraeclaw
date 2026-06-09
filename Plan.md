@@ -238,10 +238,9 @@ P0–P1 핵심 작업은 모두 완료되었다. 남은 작업:
 
 ### ADR-005 자동 스킬 진화 루프 (`docs/architecture/adr-005-auto-skill-evolution.md`)
 
-M1·M2·M2.5·M4 완료. M3a 핫 리로드·M3b Memory 브리지·Level 2 도구 교체 완료(2026-06-05). channels clippy 부채 정리(2026-06-05). 남은 작업:
+M1·M2·M2.5·M3a·M3b(실시간 연결 포함)·M4·Level 2 도구 교체 완료. channels clippy 부채 정리. 남은 작업:
 
-3. **M3b 실시간 trigger 연결** — consolidation의 `skill_candidate` 마킹을 다음 턴 `try_trigger`의 `user_signal`로 잇기. `consolidate_turn`이 fire-and-forget이라 타이밍 설계(마킹 소비 규칙) 필요 (중위험)
-4. **M5 포맷 호환 레이어** — Hermes import/export (보류, 외부 마켓 연동 후속)
+3. **M5 포맷 호환 레이어** — Hermes import/export (보류, 외부 마켓 연동 후속)
 
 ---
 
