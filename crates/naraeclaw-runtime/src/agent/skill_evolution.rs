@@ -112,11 +112,9 @@ impl SkillEvolutionService {
         if matches!(user_signal, Some(UserSignal::Suppress)) {
             return TriggerDecision::Suppressed;
         }
-        // ADR-005 D2: the explicit tool-signal path can be turned off via config.
-        let user_signal = match user_signal {
-            Some(UserSignal::Tool) if !self.config.user_signal_tool => None,
-            other => other,
-        };
+        // Config gating of Tool/Keyword signals happens in the async
+        // `resolve_user_signal` pre-step, so `user_signal` here is already the
+        // effective signal for this turn.
 
         let signal = value_signal::evaluate(&trace, novelty_hint, user_signal);
         let score = value_signal::score(&signal);
@@ -162,6 +160,53 @@ impl SkillEvolutionService {
         });
 
         TriggerDecision::Spawned
+    }
+
+    /// Resolve the effective user signal for a turn (ADR-005 M3b bridge).
+    ///
+    /// Explicit signals from the caller take priority and are config-gated:
+    /// `Tool` (from `mark_skill_candidate`) requires `user_signal_tool`.
+    /// When there is no explicit signal, consume at most one pending
+    /// `skill_candidate` marking left by a prior turn's consolidation and treat
+    /// it as a `Keyword` signal (requires `user_signal_keyword`).
+    ///
+    /// NOTE: consolidation is fire-and-forget, so its marking reflects a
+    /// *previous* turn. This couples "recent turns were procedural" to "raise
+    /// trigger sensitivity now" — a best-effort bridge, since the strict
+    /// memory→runtime layering rules out consolidation calling the trigger
+    /// directly. Markings are drained on read so one marking boosts at most the
+    /// next trigger, never every subsequent turn.
+    pub async fn resolve_user_signal(&self, explicit: Option<UserSignal>) -> Option<UserSignal> {
+        match explicit {
+            Some(UserSignal::Tool) if !self.config.user_signal_tool => None,
+            Some(s) => Some(s),
+            None => {
+                if self.config.user_signal_keyword
+                    && let Some(mem) = self.memory.as_deref()
+                    && Self::consume_skill_candidate(mem).await
+                {
+                    Some(UserSignal::Keyword)
+                } else {
+                    None
+                }
+            }
+        }
+    }
+
+    /// Drain pending `skill_candidate` markings (consolidation output). Returns
+    /// `true` if at least one was found. Consumes them so a marking influences
+    /// at most the next trigger.
+    async fn consume_skill_candidate(memory: &dyn naraeclaw_memory::Memory) -> bool {
+        let cat = naraeclaw_memory::MemoryCategory::Custom("skill_candidate".to_string());
+        match memory.list(Some(&cat), None).await {
+            Ok(entries) if !entries.is_empty() => {
+                for e in &entries {
+                    let _ = memory.forget(&e.key).await;
+                }
+                true
+            }
+            _ => false,
+        }
     }
 }
 
@@ -209,6 +254,29 @@ mod tests {
         // the path.
         std::mem::forget(tmp);
         SkillEvolutionService::new(creator, None, None, config)
+    }
+
+    fn make_service_with_memory(
+        memory: Arc<dyn naraeclaw_memory::Memory>,
+    ) -> SkillEvolutionService {
+        let tmp = tempfile::tempdir().unwrap();
+        let creator = Arc::new(SkillCreator::new(
+            tmp.path().to_path_buf(),
+            SkillCreationConfig {
+                enabled: true,
+                max_skills: 10,
+                similarity_threshold: 0.85,
+            },
+        ));
+        let config = SkillAutoEvolutionConfig {
+            enabled: true,
+            trigger_threshold: 0.5,
+            user_signal_keyword: true,
+            user_signal_tool: true,
+            hot_reload: true,
+        };
+        std::mem::forget(tmp);
+        SkillEvolutionService::new(creator, None, Some(memory), config)
     }
 
     #[tokio::test]
@@ -259,6 +327,48 @@ mod tests {
         t.finalize("done");
         let decision = svc.try_trigger(t, 1.0, None);
         assert_eq!(decision, TriggerDecision::BelowThreshold);
+    }
+
+    #[tokio::test]
+    async fn resolve_passthrough_and_no_signal_without_memory() {
+        let svc = make_service(true, 0.5);
+        // Explicit Tool passes through (user_signal_tool=true, default).
+        assert!(matches!(
+            svc.resolve_user_signal(Some(UserSignal::Tool)).await,
+            Some(UserSignal::Tool)
+        ));
+        // Suppress passes through untouched.
+        assert!(matches!(
+            svc.resolve_user_signal(Some(UserSignal::Suppress)).await,
+            Some(UserSignal::Suppress)
+        ));
+        // No explicit signal and no memory backend → None.
+        assert!(svc.resolve_user_signal(None).await.is_none());
+    }
+
+    #[tokio::test]
+    async fn resolve_consumes_skill_candidate_marking_then_drains() {
+        use naraeclaw_memory::{Memory, MemoryCategory, SqliteMemory};
+        let tmp = tempfile::tempdir().unwrap();
+        let mem: Arc<dyn Memory> = Arc::new(SqliteMemory::new(tmp.path()).unwrap());
+        mem.store_with_metadata(
+            "skill_candidate_x",
+            "deploy-prod",
+            MemoryCategory::Custom("skill_candidate".into()),
+            None,
+            None,
+            Some(0.5),
+        )
+        .await
+        .unwrap();
+        let svc = make_service_with_memory(mem.clone());
+        // No explicit signal → consolidation marking consumed → Keyword.
+        assert!(matches!(
+            svc.resolve_user_signal(None).await,
+            Some(UserSignal::Keyword)
+        ));
+        // Marking drained on read → subsequent resolve yields None.
+        assert!(svc.resolve_user_signal(None).await.is_none());
     }
 
     fn config_with_evolution(enabled: bool) -> Config {

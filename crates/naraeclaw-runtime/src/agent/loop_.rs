@@ -1313,11 +1313,11 @@ pub async fn run_tool_call_loop(
                     trace.record_tool_call(call);
                 }
                 trace.finalize(display_text.clone());
-                // ADR-005 M3b (D2): if the agent explicitly called
-                // `mark_skill_candidate` this turn, feed UserSignal::Tool so the
-                // trigger bypasses the value threshold. The `user_signal_tool`
-                // config gate is enforced inside `try_trigger`.
-                let user_signal = if trace
+                // ADR-005 M3b (D2): explicit `mark_skill_candidate` call this
+                // turn → UserSignal::Tool. Otherwise resolve_user_signal may
+                // consume a pending consolidation `skill_candidate` marking
+                // (best-effort bridge). Config gating lives in resolve_user_signal.
+                let explicit = if trace
                     .tool_calls
                     .iter()
                     .any(|c| c.name == "mark_skill_candidate")
@@ -1326,6 +1326,7 @@ pub async fn run_tool_call_loop(
                 } else {
                     None
                 };
+                let user_signal = evolution.resolve_user_signal(explicit).await;
                 let _ = evolution.try_trigger(trace, 1.0, user_signal);
             }
             // No tool calls — this is the final response.
