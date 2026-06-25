@@ -240,6 +240,19 @@ pub trait Memory: Send + Sync {
         Ok(filtered)
     }
 
+    /// Rebuild the search index: re-create the keyword (FTS) index and compute
+    /// embeddings for any entries that lack them.
+    ///
+    /// Intended for use after enabling or switching an embedding provider, so
+    /// that pre-existing entries (stored while embeddings were disabled) become
+    /// vector-searchable. Returns the number of entries that were (re-)embedded.
+    ///
+    /// Default implementation is a no-op returning 0. Backends with a vector
+    /// index should override this.
+    async fn reindex(&self) -> anyhow::Result<usize> {
+        Ok(0)
+    }
+
     /// Store a memory entry with namespace and importance.
     ///
     /// Default implementation delegates to `store()`. Backends with native

@@ -21,6 +21,7 @@ pub async fn handle_command(command: crate::MemoryCommands, config: &Config) -> 
         crate::MemoryCommands::Clear { key, category, yes } => {
             handle_clear(config, key, category, yes).await
         }
+        crate::MemoryCommands::Reindex => handle_reindex(config).await,
     }
 }
 
@@ -41,6 +42,51 @@ fn create_cli_memory(config: &Config) -> Result<Box<dyn Memory>> {
         }
         _ => create_memory_for_migration(&backend, &config.workspace_dir),
     }
+}
+
+/// Rebuild the search index and (re-)embed entries that lack embeddings.
+///
+/// Unlike the other CLI commands, reindex needs the embedding provider, so it
+/// builds the full backend (with embedder) rather than the lightweight
+/// migration backend used by `create_cli_memory`.
+async fn handle_reindex(config: &Config) -> Result<()> {
+    let backend = effective_memory_backend_name(
+        &config.memory.backend,
+        Some(&config.storage.provider.config),
+    );
+    if matches!(classify_memory_backend(&backend), MemoryBackendKind::None) {
+        bail!("Memory backend is 'none' (disabled). Nothing to reindex.");
+    }
+
+    let mem = super::create_memory_with_storage_and_routes(
+        &config.memory,
+        &config.embedding_routes,
+        Some(&config.storage.provider.config),
+        &config.workspace_dir,
+        config.api_key.as_deref(),
+    )?;
+
+    let provider = config.memory.embedding_provider.trim();
+    if provider.is_empty() || provider == "none" {
+        println!(
+            "{} embedding_provider is 'none' — the keyword index will be rebuilt, \
+             but no embeddings will be computed. Set [memory] embedding_provider \
+             to enable vector search.",
+            style("!").yellow().bold(),
+        );
+    }
+
+    println!(
+        "Reindexing memory backend '{}'...",
+        style(mem.name()).white().bold()
+    );
+    let count = mem.reindex().await?;
+    println!(
+        "{} Reindex complete — {count} {} (re-)embedded.",
+        style("✓").green().bold(),
+        if count == 1 { "entry" } else { "entries" },
+    );
+    Ok(())
 }
 
 async fn handle_list(

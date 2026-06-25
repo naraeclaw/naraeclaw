@@ -314,6 +314,11 @@ impl Memory for LucidMemory {
         "lucid"
     }
 
+    async fn reindex(&self) -> anyhow::Result<usize> {
+        // sqlite remains the authoritative local store; reindex it.
+        self.local.reindex().await
+    }
+
     async fn store(
         &self,
         key: &str,

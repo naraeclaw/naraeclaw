@@ -453,6 +453,11 @@ pub enum MemoryCommands {
         #[arg(long)]
         yes: bool,
     },
+    /// Rebuild the search index and (re-)embed entries that lack embeddings.
+    ///
+    /// Useful after enabling or switching an embedding provider so that
+    /// pre-existing memories become vector-searchable.
+    Reindex,
 }
 
 /// Integration subcommands
