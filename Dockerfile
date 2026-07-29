@@ -83,7 +83,7 @@ RUN mkdir -p /naraeclaw-data/.naraeclaw /naraeclaw-data/workspace && \
         '' \
         '[autonomy]' \
         'level = "supervised"' \
-        'auto_approve = ["file_read", "file_write", "file_edit", "memory_recall", "memory_store", "web_search_tool", "web_fetch", "calculator", "glob_search", "content_search", "image_info", "weather", "git_operations"]' \
+        'auto_approve = ["file_read", "read_skill", "tool_search", "byoridb__memory_recall", "byoridb__memory_read", "byoridb__memory_query_read", "byoridb__memory_remember", "byoridb__memory_wiki_upsert", "byoridb__memory_export", "web_search_tool", "web_fetch", "calculator", "glob_search", "content_search", "image_info", "weather", "browser", "browser_open", "mark_skill_candidate"]' \
         > /naraeclaw-data/.naraeclaw/config.toml && \
     chown -R 65534:65534 /naraeclaw-data
 

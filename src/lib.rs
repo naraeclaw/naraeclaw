@@ -67,6 +67,8 @@ pub(crate) mod heartbeat;
 pub mod hooks;
 #[cfg(feature = "agent-runtime")]
 pub(crate) mod integrations;
+#[cfg(feature = "agent-runtime")]
+pub mod knowledge;
 pub mod memory;
 #[cfg(feature = "agent-runtime")]
 pub(crate) mod multimodal;
@@ -261,7 +263,7 @@ pub enum SkillCommands {
 /// Migration subcommands
 #[derive(Subcommand, Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum MigrateCommands {
-    /// Import memory from an `OpenClaw` workspace into this `NaraeClaw` workspace
+    /// Stage `OpenClaw` memory in a legacy backend before importing it into ByoriDB
     Openclaw {
         /// Optional path to `OpenClaw` workspace (defaults to ~/.openclaw/workspace)
         #[arg(long)]
@@ -458,6 +460,25 @@ pub enum MemoryCommands {
     /// Useful after enabling or switching an embedding provider so that
     /// pre-existing memories become vector-searchable.
     Reindex,
+}
+
+/// Durable knowledge management subcommands.
+#[derive(Subcommand, Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum KnowledgeCommands {
+    /// Diagnose the managed ByoriDB knowledge connection and safe tool surface.
+    Status,
+    /// Snapshot and migrate legacy NaraeClaw memory into ByoriDB.
+    Migrate {
+        /// Inspect and count legacy sources without writing any files or knowledge.
+        #[arg(long)]
+        dry_run: bool,
+        /// Include daily memory; conversation memory is always excluded.
+        #[arg(long)]
+        include_daily: bool,
+        /// Confirm an actual migration. Required unless --dry-run is used.
+        #[arg(long)]
+        yes: bool,
+    },
 }
 
 /// Integration subcommands

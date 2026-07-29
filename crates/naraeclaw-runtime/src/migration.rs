@@ -28,6 +28,8 @@ pub async fn migrate_openclaw_memory(
     source_workspace: Option<PathBuf>,
     dry_run: bool,
 ) -> Result<()> {
+    ensure_legacy_openclaw_target(config, dry_run)?;
+
     let source_workspace = resolve_openclaw_workspace(source_workspace)?;
     if !source_workspace.exists() {
         bail!(
@@ -101,6 +103,26 @@ pub async fn migrate_openclaw_memory(
     println!("  Renamed conflicts:{}", stats.renamed_conflicts);
     println!("  Source sqlite rows:{}", stats.from_sqlite);
     println!("  Source markdown:   {}", stats.from_markdown);
+
+    Ok(())
+}
+
+fn ensure_legacy_openclaw_target(config: &Config, dry_run: bool) -> Result<()> {
+    if dry_run {
+        return Ok(());
+    }
+
+    if config.uses_byori_knowledge() {
+        bail!(
+            "`naraeclaw migrate openclaw` is a legacy-[memory] staging importer and cannot write while ByoriDB knowledge is active. No data was written. Use `--dry-run` to inspect the OpenClaw source. To complete a two-stage import, temporarily set `[knowledge].enabled = false` and `[memory].backend = \"sqlite\"`, run this command, then run `naraeclaw knowledge migrate --dry-run` followed by `naraeclaw knowledge migrate --yes`; after success, enable ByoriDB, restore `[memory].backend = \"none\"`, and verify with `naraeclaw knowledge status`."
+        );
+    }
+
+    if config.memory.backend.trim().eq_ignore_ascii_case("none") {
+        bail!(
+            "`naraeclaw migrate openclaw` writes only to a legacy [memory] staging backend, but `[memory].backend` is `none`. No data was written. Set `[memory].backend = \"sqlite\"` for the staging import, then use `naraeclaw knowledge migrate` to move the staged data into ByoriDB."
+        );
+    }
 
     Ok(())
 }
@@ -424,6 +446,7 @@ mod tests {
         let mut config = Config::default();
         config.workspace_dir = workspace.to_path_buf();
         config.config_path = workspace.join("config.toml");
+        config.knowledge.enabled = false;
         config.memory = MemoryConfig {
             backend: "sqlite".to_string(),
             ..MemoryConfig::default()
@@ -547,6 +570,34 @@ mod tests {
             .err()
             .expect("backend=none should be rejected for migration target");
         assert!(err.to_string().contains("disables persistence"));
+    }
+
+    #[test]
+    fn openclaw_apply_rejects_default_byori_mode_before_writing() {
+        let config = Config::default();
+
+        let err = ensure_legacy_openclaw_target(&config, false).unwrap_err();
+        let message = err.to_string();
+        assert!(message.contains("legacy-[memory] staging importer"));
+        assert!(message.contains("No data was written"));
+        assert!(message.contains("naraeclaw knowledge migrate --yes"));
+    }
+
+    #[test]
+    fn openclaw_dry_run_is_allowed_in_byori_mode() {
+        ensure_legacy_openclaw_target(&Config::default(), true).unwrap();
+    }
+
+    #[test]
+    fn openclaw_apply_rejects_disabled_legacy_backend_with_byori_off() {
+        let mut config = Config::default();
+        config.knowledge.enabled = false;
+
+        let err = ensure_legacy_openclaw_target(&config, false).unwrap_err();
+        let message = err.to_string();
+        assert!(message.contains("[memory].backend` is `none"));
+        assert!(message.contains("staging import"));
+        assert!(message.contains("ByoriDB"));
     }
 
     // ── §7.1 / §7.2 Config backward compatibility & migration tests ──

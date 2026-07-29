@@ -13,6 +13,7 @@ use crate::mcp_client::McpRegistry;
 use crate::mcp_protocol::McpToolDef;
 use crate::mcp_tool::McpToolWrapper;
 use naraeclaw_api::tool::{Tool, ToolSpec};
+use naraeclaw_config::policy::SecurityPolicy;
 
 // ── DeferredMcpToolStub ──────────────────────────────────────────────────
 
@@ -58,6 +59,8 @@ pub struct DeferredMcpToolSet {
     pub stubs: Vec<DeferredMcpToolStub>,
     /// Shared registry — exposed for test construction.
     pub registry: Arc<McpRegistry>,
+    /// Security policy attached to wrappers materialized from these stubs.
+    pub security: Option<Arc<SecurityPolicy>>,
 }
 
 impl DeferredMcpToolSet {
@@ -70,7 +73,16 @@ impl DeferredMcpToolSet {
                 stubs.push(DeferredMcpToolStub::new(name, def));
             }
         }
-        Self { stubs, registry }
+        Self {
+            stubs,
+            registry,
+            security: None,
+        }
+    }
+
+    pub fn with_security(mut self, security: Arc<SecurityPolicy>) -> Self {
+        self.security = Some(security);
+        self
     }
 
     /// All stub names (for rendering in the system prompt).
@@ -136,7 +148,10 @@ impl DeferredMcpToolSet {
     /// Activate a stub by name, returning a boxed [`Tool`].
     pub fn activate(&self, name: &str) -> Option<Box<dyn Tool>> {
         self.get_by_name(name).map(|stub| {
-            let wrapper = stub.activate(Arc::clone(&self.registry));
+            let mut wrapper = stub.activate(Arc::clone(&self.registry));
+            if let Some(security) = self.security.as_ref() {
+                wrapper = wrapper.with_security(Arc::clone(security));
+            }
             Box::new(wrapper) as Box<dyn Tool>
         })
     }
@@ -144,7 +159,10 @@ impl DeferredMcpToolSet {
     /// Return the full [`ToolSpec`] for a stub (for inclusion in `tool_search` results).
     pub fn tool_spec(&self, name: &str) -> Option<ToolSpec> {
         self.get_by_name(name).map(|stub| {
-            let wrapper = stub.activate(Arc::clone(&self.registry));
+            let mut wrapper = stub.activate(Arc::clone(&self.registry));
+            if let Some(security) = self.security.as_ref() {
+                wrapper = wrapper.with_security(Arc::clone(security));
+            }
             wrapper.spec()
         })
     }
@@ -398,6 +416,7 @@ mod tests {
                     .block_on(McpRegistry::connect_all(&[]))
                     .unwrap(),
             ),
+            security: None,
         };
         assert!(build_deferred_tools_section(&set).is_empty());
     }
@@ -416,6 +435,7 @@ mod tests {
                     .block_on(McpRegistry::connect_all(&[]))
                     .unwrap(),
             ),
+            security: None,
         };
         let section = build_deferred_tools_section(&set);
         assert!(section.contains("<available-deferred-tools>"));
@@ -435,6 +455,7 @@ mod tests {
                     .block_on(McpRegistry::connect_all(&[]))
                     .unwrap(),
             ),
+            security: None,
         };
         let section = build_deferred_tools_section(&set);
         assert!(
@@ -462,6 +483,7 @@ mod tests {
                     .block_on(McpRegistry::connect_all(&[]))
                     .unwrap(),
             ),
+            security: None,
         };
         let section = build_deferred_tools_section(&set);
         assert!(section.contains("server_a__list"));
@@ -488,6 +510,7 @@ mod tests {
                     .block_on(McpRegistry::connect_all(&[]))
                     .unwrap(),
             ),
+            security: None,
         };
 
         // "file read" should rank fs__read_file highest (2 hits vs 1)
@@ -510,6 +533,7 @@ mod tests {
                     .block_on(McpRegistry::connect_all(&[]))
                     .unwrap(),
             ),
+            security: None,
         };
         assert!(set.get_by_name("a__one").is_some());
         assert!(set.get_by_name("nonexistent").is_none());
@@ -529,6 +553,7 @@ mod tests {
                     .block_on(McpRegistry::connect_all(&[]))
                     .unwrap(),
             ),
+            security: None,
         };
 
         // "read" should match stubs from both servers

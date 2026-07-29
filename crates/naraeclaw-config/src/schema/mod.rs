@@ -22,6 +22,7 @@ use anyhow::{Context, Result};
 use directories::UserDirs;
 #[cfg(feature = "schema-export")]
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{OnceLock, RwLock};
@@ -426,6 +427,92 @@ fn expand_tilde_path(path: &str) -> PathBuf {
     PathBuf::from(expanded_str)
 }
 
+fn is_valid_byori_identifier(identifier: &str) -> bool {
+    if identifier.len() > 64 {
+        return false;
+    }
+    let mut chars = identifier.chars();
+    match chars.next() {
+        Some(first) if first.is_ascii_alphabetic() || first == '_' => {}
+        _ => return false,
+    }
+    chars.all(|ch| ch.is_ascii_alphanumeric() || ch == '_')
+}
+
+const BYORI_KNOWLEDGE_KEYS: &[&str] = &["provider", "byoridb_home", "space", "required"];
+
+fn uses_explicit_byori_knowledge_schema(knowledge: &toml::Table) -> bool {
+    BYORI_KNOWLEDGE_KEYS
+        .iter()
+        .any(|key| knowledge.contains_key(*key))
+}
+
+fn legacy_knowledge_value(raw_toml: &str) -> Option<toml::Value> {
+    let root = raw_toml.parse::<toml::Table>().ok()?;
+    let knowledge_value = root.get("knowledge")?;
+    let knowledge = knowledge_value.as_table()?;
+
+    // Before ByoriDB, `[knowledge]` could legitimately contain only `enabled`
+    // (or even be empty) while the remaining graph fields came from defaults.
+    // Treat every table without an unmistakable Byori-only key as legacy so an
+    // upgrade cannot silently reinterpret `enabled = true` as a Byori cutover.
+    let is_legacy = !uses_explicit_byori_knowledge_schema(knowledge);
+    is_legacy.then(|| knowledge_value.clone())
+}
+
+fn is_legacy_knowledge_schema(raw_toml: &str) -> bool {
+    let Ok(root) = raw_toml.parse::<toml::Table>() else {
+        return false;
+    };
+    root.get("knowledge")
+        .and_then(toml::Value::as_table)
+        .is_none_or(|knowledge| !uses_explicit_byori_knowledge_schema(knowledge))
+}
+
+const LEGACY_KNOWLEDGE_MIGRATION_WARNING: &str = "Legacy [knowledge] configuration detected; keeping ByoriDB disabled in memory and leaving the legacy table unchanged so legacy memory remains active. Run `naraeclaw knowledge migrate --dry-run`, then `naraeclaw knowledge migrate --yes`; verify the migration result before replacing the legacy [knowledge] keys with the new ByoriDB provider settings.";
+
+fn top_level_table_range(raw_toml: &str, table_name: &str) -> Option<std::ops::Range<usize>> {
+    let header = format!("[{table_name}]");
+    let mut offset = 0;
+    let mut start = None;
+
+    for chunk in raw_toml.split_inclusive('\n') {
+        let line = chunk.trim_end_matches(['\r', '\n']);
+        if let Some(table_start) = start {
+            if line.starts_with('[') {
+                return Some(table_start..offset);
+            }
+        } else if line == header {
+            start = Some(offset);
+        }
+        offset += chunk.len();
+    }
+
+    start.map(|table_start| table_start..raw_toml.len())
+}
+
+fn merge_legacy_knowledge_value(
+    serialized_config: &str,
+    legacy_knowledge: toml::Value,
+) -> Result<String> {
+    let range = top_level_table_range(serialized_config, "knowledge")
+        .context("serialized config contains no [knowledge] table")?;
+    let mut wrapper = toml::Table::new();
+    wrapper.insert("knowledge".to_string(), legacy_knowledge);
+    let replacement = toml::to_string_pretty(&wrapper)
+        .context("failed to serialize preserved legacy [knowledge] table")?;
+
+    let mut merged = String::with_capacity(serialized_config.len() + replacement.len());
+    merged.push_str(&serialized_config[..range.start]);
+    merged.push_str(replacement.trim_end());
+    merged.push('\n');
+    if range.end < serialized_config.len() {
+        merged.push('\n');
+        merged.push_str(&serialized_config[range.end..]);
+    }
+    Ok(merged)
+}
+
 async fn resolve_runtime_config_dirs(
     default_config_dir: &Path,
     default_workspace_dir: &Path,
@@ -612,6 +699,133 @@ async fn ensure_bootstrap_files(workspace_dir: &Path) -> Result<()> {
 }
 
 impl Config {
+    /// Preserve access to legacy flat memory while a pre-Byori or ambiguous
+    /// `[knowledge]` table is waiting to be migrated to ByoriDB.
+    ///
+    /// This changes only the in-memory interpretation. [`Config::save`] keeps
+    /// the legacy table itself intact until the user explicitly replaces it
+    /// with new-schema keys.
+    pub fn apply_legacy_knowledge_compatibility(&mut self, raw_toml: &str) -> bool {
+        if !is_legacy_knowledge_schema(raw_toml) {
+            return false;
+        }
+
+        let legacy_enabled = self.knowledge.enabled;
+        self.knowledge.enabled = false;
+
+        // MemoryConfig defaults also changed at the Byori cutover. Restore the
+        // previous defaults only for fields omitted by a legacy config; keep
+        // every explicit operator choice intact until migration is complete.
+        let root = raw_toml.parse::<toml::Table>().ok();
+        let memory = root
+            .as_ref()
+            .and_then(|table| table.get("memory"))
+            .and_then(toml::Value::as_table);
+        let mut restored_legacy_memory_defaults = false;
+        if memory.is_none_or(|table| !table.contains_key("backend")) {
+            self.memory.backend = "sqlite".to_string();
+            restored_legacy_memory_defaults = true;
+        }
+        if memory.is_none_or(|table| !table.contains_key("auto_save")) {
+            self.memory.auto_save = true;
+            restored_legacy_memory_defaults = true;
+        }
+        if memory.is_none_or(|table| !table.contains_key("hygiene_enabled")) {
+            self.memory.hygiene_enabled = true;
+            restored_legacy_memory_defaults = true;
+        }
+        if memory.is_none_or(|table| !table.contains_key("auto_hydrate")) {
+            self.memory.auto_hydrate = true;
+            restored_legacy_memory_defaults = true;
+        }
+
+        tracing::warn!(
+            legacy_enabled,
+            restored_legacy_memory_defaults,
+            "{LEGACY_KNOWLEDGE_MIGRATION_WARNING}"
+        );
+        true
+    }
+
+    /// Return whether durable knowledge should be provided by ByoriDB.
+    pub fn uses_byori_knowledge(&self) -> bool {
+        self.knowledge.enabled
+            && self
+                .knowledge
+                .provider
+                .trim()
+                .eq_ignore_ascii_case("byoridb")
+    }
+
+    /// Resolve the configured ByoriDB space, or derive a workspace-scoped one.
+    pub fn byori_space_name(&self) -> String {
+        if let Some(space) = self
+            .knowledge
+            .space
+            .as_deref()
+            .map(str::trim)
+            .filter(|space| !space.is_empty())
+        {
+            return space.to_string();
+        }
+
+        let canonical_workspace = self.workspace_dir.canonicalize().unwrap_or_else(|_| {
+            if self.workspace_dir.is_absolute() {
+                self.workspace_dir.clone()
+            } else {
+                std::env::current_dir()
+                    .map(|current| current.join(&self.workspace_dir))
+                    .unwrap_or_else(|_| self.workspace_dir.clone())
+            }
+        });
+        let digest = Sha256::digest(canonical_workspace.to_string_lossy().as_bytes());
+        let digest_hex = hex::encode(digest);
+        format!("naraeclaw_{}", &digest_hex[..24])
+    }
+
+    /// Build the managed ByoriDB MCP server configuration.
+    pub fn byori_mcp_server_config(&self) -> McpServerConfig {
+        let wrapper = expand_tilde_path(self.knowledge.byoridb_home.trim())
+            .join("bin")
+            .join("run-mcp.sh");
+        let mut server = McpServerConfig {
+            name: "byoridb".to_string(),
+            transport: McpTransport::Stdio,
+            command: wrapper.to_string_lossy().into_owned(),
+            ..McpServerConfig::default()
+        };
+        server
+            .env
+            .insert("BYORIDB_MEMORY_SPACE".to_string(), self.byori_space_name());
+        server
+            .env
+            .insert("BYORIDB_MCP_PROFILE".to_string(), "safe".to_string());
+        server
+    }
+
+    /// Return the MCP servers active for this configuration, including managed ByoriDB.
+    pub fn effective_mcp_servers(&self) -> Vec<McpServerConfig> {
+        let mut servers = if self.mcp.enabled {
+            self.mcp.servers.clone()
+        } else {
+            Vec::new()
+        };
+
+        if !self.uses_byori_knowledge() {
+            return servers;
+        }
+
+        // Durable knowledge always uses exactly one managed local wrapper.
+        // Keeping a custom command, remote transport, or duplicate server under
+        // this reserved name would make runtime, status, and migration target
+        // different databases. Custom MCP servers remain available under any
+        // other name.
+        servers.retain(|server| !server.name.trim().eq_ignore_ascii_case("byoridb"));
+        servers.push(self.byori_mcp_server_config());
+
+        servers
+    }
+
     /// Return top-level TOML keys in `raw_toml` that Config does not recognise.
     ///
     /// Keys present in `Config::default()` serialization pass immediately.
@@ -720,6 +934,14 @@ impl Config {
             // configured it before `enabled` was introduced — treat it as
             // enabled so existing setups don't silently break.
             config.channels_config.backfill_enabled(&contents);
+
+            // Pre-Byori configs may omit `[knowledge]`, contain only its old
+            // `enabled` switch, or use the former graph fields. Automatically
+            // applying the new defaults would hide still-unmigrated legacy
+            // memory. Require a Byori-specific key for existing files; until
+            // then retain the pre-cutover memory defaults and direct the
+            // operator through explicit migration.
+            config.apply_legacy_knowledge_compatibility(&contents);
 
             // Detect unknown top-level config keys by comparing the raw
             // TOML table keys against what Config actually deserializes.
@@ -1105,12 +1327,46 @@ impl Config {
             tools::validate_mcp_config(&self.mcp)?;
         }
 
-        if self.knowledge.enabled {
-            if self.knowledge.max_nodes == 0 {
-                anyhow::bail!("knowledge.max_nodes must be greater than 0");
+        let knowledge_provider = self.knowledge.provider.trim();
+        if !knowledge_provider.eq_ignore_ascii_case("byoridb") {
+            anyhow::bail!("knowledge.provider must be 'byoridb' (got '{knowledge_provider}')");
+        }
+        if let Some(space) = self.knowledge.space.as_deref() {
+            let space = space.trim();
+            if !is_valid_byori_identifier(space) {
+                anyhow::bail!(
+                    "knowledge.space must be a 1-64 character identifier matching [A-Za-z_][A-Za-z0-9_]*"
+                );
             }
-            if self.knowledge.db_path.trim().is_empty() {
-                anyhow::bail!("knowledge.db_path must not be empty");
+        }
+        if (self.knowledge.enabled || self.knowledge.required)
+            && self.knowledge.byoridb_home.trim().is_empty()
+        {
+            anyhow::bail!("knowledge.byoridb_home must not be empty");
+        }
+        if self.knowledge.required {
+            let wrapper = expand_tilde_path(self.knowledge.byoridb_home.trim())
+                .join("bin")
+                .join("run-mcp.sh");
+            if !wrapper.is_file() {
+                anyhow::bail!(
+                    "knowledge.required = true but ByoriDB MCP wrapper was not found at {}",
+                    wrapper.display()
+                );
+            }
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                let mode = std::fs::metadata(&wrapper)
+                    .with_context(|| format!("failed to inspect {}", wrapper.display()))?
+                    .permissions()
+                    .mode();
+                if mode & 0o111 == 0 {
+                    anyhow::bail!(
+                        "knowledge.required = true but ByoriDB MCP wrapper is not executable: {}",
+                        wrapper.display()
+                    );
+                }
             }
         }
 
@@ -1700,8 +1956,23 @@ impl Config {
         // Encrypt all #[secret]-annotated fields via Configurable derive
         config_to_save.encrypt_secrets(&store)?;
 
-        let toml_str =
+        let mut toml_str =
             toml::to_string_pretty(&config_to_save).context("Failed to serialize config")?;
+        if config_path.exists() {
+            let existing = fs::read_to_string(&config_path).await.with_context(|| {
+                format!(
+                    "Failed to inspect existing config before save: {}",
+                    config_path.display()
+                )
+            })?;
+            if let Some(legacy_knowledge) = legacy_knowledge_value(&existing) {
+                toml_str = merge_legacy_knowledge_value(&toml_str, legacy_knowledge)?;
+                tracing::warn!(
+                    path = %config_path.display(),
+                    "Preserved legacy [knowledge] table while saving unrelated configuration; migrate and verify knowledge before replacing it with new ByoriDB provider settings"
+                );
+            }
+        }
 
         let parent_dir = config_path
             .parent()
@@ -2150,16 +2421,323 @@ default_temperature = 0.7
     }
 
     #[test]
-    async fn memory_config_default_hygiene_settings() {
+    async fn legacy_memory_defaults_to_disabled() {
         let m = MemoryConfig::default();
-        assert_eq!(m.backend, "sqlite");
-        assert!(m.auto_save);
-        assert!(m.hygiene_enabled);
+        assert_eq!(m.backend, "none");
+        assert!(!m.auto_save);
+        assert!(!m.hygiene_enabled);
+        assert!(!m.auto_hydrate);
         assert_eq!(m.archive_after_days, 7);
         assert_eq!(m.purge_after_days, 30);
         assert_eq!(m.conversation_retention_days, 30);
         assert!(m.sqlite_open_timeout_secs.is_none());
         assert_eq!(m.search_mode, SearchMode::Hybrid);
+    }
+
+    #[test]
+    async fn knowledge_defaults_to_optional_byoridb() {
+        let knowledge = KnowledgeConfig::default();
+        assert!(knowledge.enabled);
+        assert_eq!(knowledge.provider, "byoridb");
+        assert_eq!(knowledge.byoridb_home, "~/.byoridb");
+        assert!(knowledge.space.is_none());
+        assert!(!knowledge.required);
+    }
+
+    #[test]
+    async fn legacy_knowledge_schema_with_disabled_graph_keeps_byori_disabled() {
+        let raw = r#"
+[knowledge]
+enabled = false
+db_path = "~/.naraeclaw/knowledge.db"
+max_nodes = 100000
+auto_capture = false
+suggest_on_query = true
+cross_workspace_search = false
+"#;
+        let mut config: Config = toml::from_str(raw).unwrap();
+
+        assert!(is_legacy_knowledge_schema(raw));
+        assert!(config.apply_legacy_knowledge_compatibility(raw));
+        assert!(
+            !config.knowledge.enabled,
+            "legacy enabled=false must remain false until explicit migration"
+        );
+        assert!(!config.uses_byori_knowledge());
+        assert!(
+            LEGACY_KNOWLEDGE_MIGRATION_WARNING.contains("naraeclaw knowledge migrate --dry-run")
+        );
+        assert!(LEGACY_KNOWLEDGE_MIGRATION_WARNING.contains("naraeclaw knowledge migrate --yes"));
+    }
+
+    #[test]
+    async fn legacy_knowledge_schema_with_enabled_graph_disables_byori_until_migration() {
+        let raw = r#"
+[knowledge]
+enabled = true
+db_path = "~/.naraeclaw/knowledge.db"
+max_nodes = 100000
+auto_capture = true
+suggest_on_query = true
+cross_workspace_search = false
+"#;
+        let mut config: Config = toml::from_str(raw).unwrap();
+        assert!(config.knowledge.enabled);
+
+        assert!(config.apply_legacy_knowledge_compatibility(raw));
+        assert!(
+            !config.knowledge.enabled,
+            "legacy graph enablement must not activate Byori before migration"
+        );
+        assert!(!config.uses_byori_knowledge());
+    }
+
+    #[test]
+    async fn new_knowledge_schema_is_not_classified_as_legacy() {
+        let raw = r#"
+[knowledge]
+enabled = true
+provider = "byoridb"
+byoridb_home = "~/.byoridb"
+"#;
+        let mut config: Config = toml::from_str(raw).unwrap();
+
+        assert!(!is_legacy_knowledge_schema(raw));
+        assert!(!config.apply_legacy_knowledge_compatibility(raw));
+        assert!(config.knowledge.enabled);
+    }
+
+    #[test]
+    async fn enabled_only_legacy_knowledge_schema_never_activates_byori() {
+        for raw in [
+            r#"
+[knowledge]
+enabled = false
+"#,
+            r#"
+[knowledge]
+enabled = true
+"#,
+            r#"
+[knowledge]
+"#,
+        ] {
+            let mut config: Config = toml::from_str(raw).unwrap();
+
+            assert!(is_legacy_knowledge_schema(raw));
+            assert!(config.apply_legacy_knowledge_compatibility(raw));
+            assert!(!config.knowledge.enabled);
+            assert!(!config.uses_byori_knowledge());
+            assert_eq!(config.memory.backend, "sqlite");
+            assert!(config.memory.auto_save);
+            assert!(config.memory.hygiene_enabled);
+            assert!(config.memory.auto_hydrate);
+        }
+    }
+
+    #[test]
+    async fn missing_knowledge_and_memory_tables_use_pre_byori_compatibility_defaults() {
+        let raw = "default_temperature = 0.7\n";
+        let mut config: Config = toml::from_str(raw).unwrap();
+
+        assert!(is_legacy_knowledge_schema(raw));
+        assert!(config.apply_legacy_knowledge_compatibility(raw));
+        assert!(!config.uses_byori_knowledge());
+        assert_eq!(config.memory.backend, "sqlite");
+        assert!(config.memory.auto_save);
+        assert!(config.memory.hygiene_enabled);
+        assert!(config.memory.auto_hydrate);
+    }
+
+    #[test]
+    async fn legacy_compatibility_preserves_explicit_memory_choices() {
+        let raw = r#"
+[knowledge]
+enabled = true
+
+[memory]
+backend = "none"
+auto_save = false
+hygiene_enabled = false
+auto_hydrate = false
+"#;
+        let mut config: Config = toml::from_str(raw).unwrap();
+
+        assert!(config.apply_legacy_knowledge_compatibility(raw));
+        assert_eq!(config.memory.backend, "none");
+        assert!(!config.memory.auto_save);
+        assert!(!config.memory.hygiene_enabled);
+        assert!(!config.memory.auto_hydrate);
+    }
+
+    #[test]
+    async fn mixed_knowledge_schema_is_not_automatically_migrated() {
+        let raw = r#"
+[knowledge]
+enabled = true
+db_path = "~/.naraeclaw/knowledge.db"
+provider = "byoridb"
+"#;
+        let mut config: Config = toml::from_str(raw).unwrap();
+
+        assert!(!is_legacy_knowledge_schema(raw));
+        assert!(!config.apply_legacy_knowledge_compatibility(raw));
+        assert!(config.knowledge.enabled);
+    }
+
+    #[test]
+    async fn save_preserves_legacy_knowledge_value_during_unrelated_updates() {
+        for legacy_enabled in [false, true] {
+            let temporary = TempDir::new().unwrap();
+            let config_path = temporary.path().join("config.toml");
+            let raw = format!(
+                r#"default_temperature = 0.7
+
+[knowledge]
+enabled = {legacy_enabled}
+db_path = "/srv/narae/custom-knowledge.db"
+max_nodes = 4242
+auto_capture = true
+suggest_on_query = false
+cross_workspace_search = true
+"#
+            );
+            fs::write(&config_path, &raw).await.unwrap();
+            let original = raw.parse::<toml::Table>().unwrap();
+
+            let mut config: Config = toml::from_str(&raw).unwrap();
+            assert!(config.apply_legacy_knowledge_compatibility(&raw));
+            assert!(!config.uses_byori_knowledge());
+            config.config_path = config_path.clone();
+            config.workspace_dir = temporary.path().join("workspace");
+            config.default_temperature = 0.42;
+            config.save().await.unwrap();
+
+            let saved_raw = fs::read_to_string(&config_path).await.unwrap();
+            let saved = saved_raw.parse::<toml::Table>().unwrap();
+            assert_eq!(saved["knowledge"], original["knowledge"]);
+            assert_eq!(saved["default_temperature"].as_float(), Some(0.42));
+            assert_eq!(
+                saved["knowledge"]["db_path"].as_str(),
+                Some("/srv/narae/custom-knowledge.db")
+            );
+        }
+    }
+
+    #[test]
+    async fn save_allows_explicit_byori_cutover_to_replace_legacy_fields() {
+        let temporary = TempDir::new().unwrap();
+        let config_path = temporary.path().join("config.toml");
+        let raw = r#"
+[knowledge]
+enabled = true
+provider = "byoridb"
+byoridb_home = "~/.byoridb"
+db_path = "/srv/narae/migrated-knowledge.db"
+"#;
+        fs::write(&config_path, raw).await.unwrap();
+
+        let mut config: Config = toml::from_str(raw).unwrap();
+        assert!(!config.apply_legacy_knowledge_compatibility(raw));
+        assert!(config.uses_byori_knowledge());
+        config.config_path = config_path.clone();
+        config.workspace_dir = temporary.path().join("workspace");
+        config.save().await.unwrap();
+
+        let saved_raw = fs::read_to_string(&config_path).await.unwrap();
+        let saved = saved_raw.parse::<toml::Table>().unwrap();
+        assert_eq!(saved["knowledge"]["enabled"].as_bool(), Some(true));
+        assert_eq!(saved["knowledge"]["provider"].as_str(), Some("byoridb"));
+        assert!(saved["knowledge"].get("db_path").is_none());
+    }
+
+    #[test]
+    async fn byori_space_name_uses_explicit_valid_identifier() {
+        let mut config = Config::default();
+        config.knowledge.space = Some("team_memory_1".to_string());
+
+        assert_eq!(config.byori_space_name(), "team_memory_1");
+        config.validate().unwrap();
+    }
+
+    #[test]
+    async fn byori_space_name_hashes_canonical_workspace_path() {
+        let temp = TempDir::new().unwrap();
+        let workspace = temp.path().join("workspace");
+        std::fs::create_dir_all(&workspace).unwrap();
+        let mut config = Config::default();
+        config.workspace_dir = workspace.clone();
+
+        let canonical = workspace.canonicalize().unwrap();
+        let digest = Sha256::digest(canonical.to_string_lossy().as_bytes());
+        let expected = format!("naraeclaw_{}", &hex::encode(digest)[..24]);
+
+        assert_eq!(config.byori_space_name(), expected);
+    }
+
+    #[test]
+    async fn knowledge_validation_rejects_unknown_provider() {
+        let mut config = Config::default();
+        config.knowledge.provider = "legacy-sqlite".to_string();
+
+        let error = config.validate().expect_err("unknown provider must fail");
+        assert!(error.to_string().contains("knowledge.provider"));
+    }
+
+    #[test]
+    async fn knowledge_validation_rejects_invalid_explicit_space() {
+        let mut config = Config::default();
+        config.knowledge.space = Some("not-a-valid-space".to_string());
+
+        let error = config.validate().expect_err("invalid space must fail");
+        assert!(error.to_string().contains("knowledge.space"));
+    }
+
+    #[tokio::test]
+    async fn knowledge_validation_rejects_space_longer_than_engine_limit() {
+        let mut config = Config::default();
+        config.knowledge.space = Some(format!("n{}", "a".repeat(64)));
+
+        let error = config
+            .validate()
+            .expect_err("a ByoriDB space longer than 64 ASCII characters must fail");
+        assert!(error.to_string().contains("knowledge.space"));
+    }
+
+    #[test]
+    async fn required_knowledge_rejects_missing_byoridb_wrapper() {
+        let temp = TempDir::new().unwrap();
+        let mut config = Config::default();
+        config.knowledge.required = true;
+        config.knowledge.byoridb_home = temp.path().join("missing").display().to_string();
+
+        let error = config
+            .validate()
+            .expect_err("required knowledge must have an installed wrapper");
+        assert!(error.to_string().contains("run-mcp.sh"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    async fn required_knowledge_rejects_non_executable_byoridb_wrapper() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let temp = TempDir::new().unwrap();
+        let wrapper = temp.path().join("byoridb/bin/run-mcp.sh");
+        std::fs::create_dir_all(wrapper.parent().unwrap()).unwrap();
+        std::fs::write(&wrapper, "#!/bin/sh\n").unwrap();
+        let mut permissions = std::fs::metadata(&wrapper).unwrap().permissions();
+        permissions.set_mode(0o600);
+        std::fs::set_permissions(&wrapper, permissions).unwrap();
+
+        let mut config = Config::default();
+        config.knowledge.required = true;
+        config.knowledge.byoridb_home = temp.path().join("byoridb").display().to_string();
+
+        let error = config
+            .validate()
+            .expect_err("required knowledge must reject a non-executable wrapper");
+        assert!(error.to_string().contains("not executable"));
     }
 
     #[test]
@@ -2416,10 +2994,15 @@ default_temperature = 0.7
         assert_eq!(parsed.runtime.kind, "native");
         assert!(parsed.heartbeat.enabled);
         assert!(parsed.channels_config.cli);
-        assert!(parsed.memory.hygiene_enabled);
+        assert_eq!(parsed.memory.backend, "none");
+        assert!(!parsed.memory.auto_save);
+        assert!(!parsed.memory.hygiene_enabled);
+        assert!(!parsed.memory.auto_hydrate);
         assert_eq!(parsed.memory.archive_after_days, 7);
         assert_eq!(parsed.memory.purge_after_days, 30);
         assert_eq!(parsed.memory.conversation_retention_days, 30);
+        assert!(parsed.knowledge.enabled);
+        assert_eq!(parsed.knowledge.provider, "byoridb");
         // provider_timeout_secs defaults to 120 when not specified
         assert_eq!(parsed.provider_timeout_secs, 120);
     }
@@ -2484,7 +3067,7 @@ auto_approve = ["my_custom_tool", "another_tool"]
         // Defaults are merged in
         for default_tool in &[
             "file_read",
-            "memory_recall",
+            "byoridb__memory_recall",
             "weather",
             "calculator",
             "web_fetch",
@@ -2530,6 +3113,37 @@ default_temperature = 0.7
             assert!(
                 parsed.autonomy.auto_approve.contains(tool),
                 "default tool '{tool}' must be present when no [autonomy] section"
+            );
+        }
+    }
+
+    #[test]
+    async fn auto_approve_defaults_include_safe_knowledge_operations_only() {
+        let defaults = default_auto_approve();
+        for tool in [
+            "tool_search",
+            "byoridb__memory_recall",
+            "byoridb__memory_read",
+            "byoridb__memory_query_read",
+            "byoridb__memory_remember",
+            "byoridb__memory_wiki_upsert",
+            "byoridb__memory_export",
+        ] {
+            assert!(
+                defaults.iter().any(|entry| entry == tool),
+                "safe knowledge tool '{tool}' must be auto-approved"
+            );
+        }
+        for tool in [
+            "byoridb__memory_delete",
+            "byoridb__memory_link",
+            "memory_forget",
+            "memory_delete",
+            "memory_purge",
+        ] {
+            assert!(
+                defaults.iter().all(|entry| entry != tool),
+                "destructive knowledge tool '{tool}' must require approval"
             );
         }
     }
@@ -4049,6 +4663,14 @@ default_model = "legacy-model"
             &config_path,
             r#"default_temperature = 0.7
 default_model = "persisted-profile"
+
+[knowledge]
+enabled = false
+db_path = "~/.naraeclaw/knowledge.db"
+max_nodes = 100000
+auto_capture = false
+suggest_on_query = true
+cross_workspace_search = false
 "#,
         )
         .await
@@ -4071,6 +4693,7 @@ default_model = "persisted-profile"
         let guard = tracing::dispatcher::set_default(&dispatch);
 
         let config = Box::pin(Config::load_or_init()).await.unwrap();
+        let persisted_config = fs::read_to_string(&config_path).await.unwrap();
 
         drop(guard);
         let logs = capture.captured();
@@ -4078,6 +4701,9 @@ default_model = "persisted-profile"
         assert_eq!(config.workspace_dir, workspace_dir.join("workspace"));
         assert_eq!(config.config_path, config_path);
         assert_eq!(config.default_model.as_deref(), Some("persisted-profile"));
+        assert!(!config.knowledge.enabled);
+        assert!(persisted_config.contains("db_path ="));
+        assert!(!persisted_config.contains("provider = \"byoridb\""));
         assert!(logs.contains("Config loaded"), "{logs}");
         assert!(logs.contains("initialized=true"), "{logs}");
         assert!(!logs.contains("initialized=false"), "{logs}");
@@ -4887,6 +5513,142 @@ require_otp_to_resume = true
         config
     }
 
+    #[test]
+    async fn byori_mcp_server_uses_managed_wrapper_and_safe_environment() {
+        let temp = TempDir::new().unwrap();
+        let workspace = temp.path().join("workspace");
+        std::fs::create_dir_all(&workspace).unwrap();
+        let mut config = Config::default();
+        config.workspace_dir = workspace;
+        config.knowledge.byoridb_home = temp.path().join("byoridb").display().to_string();
+
+        let server = config.byori_mcp_server_config();
+        assert_eq!(server.name, "byoridb");
+        assert_eq!(server.transport, McpTransport::Stdio);
+        assert_eq!(
+            server.command,
+            temp.path().join("byoridb/bin/run-mcp.sh").to_string_lossy()
+        );
+        assert_eq!(
+            server.env.get("BYORIDB_MEMORY_SPACE"),
+            Some(&config.byori_space_name())
+        );
+        assert_eq!(
+            server.env.get("BYORIDB_MCP_PROFILE").map(String::as_str),
+            Some("safe")
+        );
+    }
+
+    #[test]
+    async fn effective_mcp_servers_include_users_only_when_mcp_enabled() {
+        let mut config = Config::default();
+        config.mcp.servers = vec![stdio_server("filesystem", "/usr/bin/mcp-fs")];
+
+        let servers = config.effective_mcp_servers();
+        assert_eq!(servers.len(), 1);
+        assert_eq!(servers[0].name, "byoridb");
+
+        config.mcp.enabled = true;
+        let servers = config.effective_mcp_servers();
+        assert_eq!(servers.len(), 2);
+        assert!(servers.iter().any(|server| server.name == "filesystem"));
+        assert!(servers.iter().any(|server| server.name == "byoridb"));
+    }
+
+    #[test]
+    async fn effective_mcp_servers_replace_existing_byoridb_with_managed_server() {
+        let mut configured = stdio_server("ByoriDB", "/custom/byori-wrapper");
+        configured.env.insert(
+            "BYORIDB_MEMORY_SPACE".to_string(),
+            "unsafe_space".to_string(),
+        );
+        configured
+            .env
+            .insert("BYORIDB_MCP_PROFILE".to_string(), "admin".to_string());
+        let mut config = Config::default();
+        config.knowledge.space = Some("safe_space".to_string());
+        config.knowledge.byoridb_home = "/managed/byoridb".to_string();
+        config.mcp.enabled = true;
+        config.mcp.servers = vec![configured];
+
+        let servers = config.effective_mcp_servers();
+        assert_eq!(servers.len(), 1);
+        assert_eq!(servers[0].name, "byoridb");
+        assert_eq!(servers[0].command, "/managed/byoridb/bin/run-mcp.sh");
+        assert_eq!(
+            servers[0]
+                .env
+                .get("BYORIDB_MEMORY_SPACE")
+                .map(String::as_str),
+            Some("safe_space")
+        );
+        assert_eq!(
+            servers[0]
+                .env
+                .get("BYORIDB_MCP_PROFILE")
+                .map(String::as_str),
+            Some("safe")
+        );
+    }
+
+    #[test]
+    async fn effective_mcp_servers_replace_remote_byoridb_with_managed_stdio() {
+        let mut configured = http_server("byoridb", "https://example.invalid/mcp");
+        configured.env.insert(
+            "BYORIDB_MCP_PROFILE".to_string(),
+            "safe-but-ignored".to_string(),
+        );
+        let mut config = Config::default();
+        config.knowledge.space = Some("isolated_space".to_string());
+        config.mcp.enabled = true;
+        config.mcp.servers = vec![configured];
+
+        let servers = config.effective_mcp_servers();
+        assert_eq!(servers.len(), 1);
+        assert_eq!(servers[0].name, "byoridb");
+        assert_eq!(servers[0].transport, McpTransport::Stdio);
+        assert!(servers[0].url.is_none());
+        assert_eq!(
+            servers[0]
+                .env
+                .get("BYORIDB_MEMORY_SPACE")
+                .map(String::as_str),
+            Some("isolated_space")
+        );
+        assert_eq!(
+            servers[0]
+                .env
+                .get("BYORIDB_MCP_PROFILE")
+                .map(String::as_str),
+            Some("safe")
+        );
+    }
+
+    #[test]
+    async fn effective_mcp_servers_collapse_duplicate_reserved_byoridb_names() {
+        let mut config = Config::default();
+        config.mcp.enabled = true;
+        config.mcp.servers = vec![
+            stdio_server("byoridb", "/first/unsafe-wrapper"),
+            stdio_server(" BYORIDB ", "/second/unsafe-wrapper"),
+            stdio_server("filesystem", "/usr/bin/mcp-fs"),
+        ];
+
+        let servers = config.effective_mcp_servers();
+        assert_eq!(
+            servers
+                .iter()
+                .filter(|server| server.name.eq_ignore_ascii_case("byoridb"))
+                .count(),
+            1
+        );
+        assert!(servers.iter().any(|server| server.name == "filesystem"));
+        assert!(servers.iter().all(|server| {
+            !server.name.eq_ignore_ascii_case("byoridb")
+                || server.command == config.byori_mcp_server_config().command
+        }));
+    }
+
     fn http_server(name: &str, url: &str) -> McpServerConfig {
         let mut config = McpServerConfig::default();
         config.name = name.to_string();
@@ -5537,7 +6299,7 @@ allow_public_bind = true
 
 [autonomy]
 level = "supervised"
-auto_approve = ["file_read", "file_write", "file_edit", "memory_recall", "memory_store", "web_search_tool", "web_fetch", "calculator", "glob_search", "content_search", "image_info", "weather", "git_operations"]
+auto_approve = ["file_read", "file_write", "file_edit", "tool_search", "byoridb__memory_recall", "byoridb__memory_read", "byoridb__memory_remember", "byoridb__memory_wiki_upsert", "web_search_tool", "web_fetch", "calculator", "glob_search", "content_search", "image_info", "weather", "git_operations"]
 "#;
 
     #[test]
@@ -5551,8 +6313,11 @@ auto_approve = ["file_read", "file_write", "file_edit", "memory_recall", "memory
             "file_read",
             "file_write",
             "file_edit",
-            "memory_recall",
-            "memory_store",
+            "tool_search",
+            "byoridb__memory_recall",
+            "byoridb__memory_read",
+            "byoridb__memory_remember",
+            "byoridb__memory_wiki_upsert",
             "web_search_tool",
             "web_fetch",
             "calculator",

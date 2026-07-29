@@ -10,6 +10,28 @@ use crate::skills::Skill;
 /// Maximum characters per injected workspace file (matches `OpenClaw` default).
 pub const BOOTSTRAP_MAX_CHARS: usize = 8_000;
 
+/// Core ByoriDB tools whose descriptions may be advertised after MCP discovery.
+/// Callers must filter this list against the tools that were actually registered
+/// (or retained as deferred stubs) for the current runtime surface.
+pub const BYORIDB_KNOWLEDGE_TOOL_DESCRIPTIONS: [(&str, &str); 4] = [
+    (
+        "byoridb__memory_read",
+        "Recall durable ByoriDB knowledge, decisions, preferences, and related entities.",
+    ),
+    (
+        "byoridb__memory_remember",
+        "Store a durable standalone fact in the workspace-scoped ByoriDB graph.",
+    ),
+    (
+        "byoridb__memory_wiki_upsert",
+        "Create or update typed ByoriDB knowledge.",
+    ),
+    (
+        "byoridb__memory_link",
+        "Link typed ByoriDB knowledge using an explicit relationship.",
+    ),
+];
+
 fn load_openclaw_bootstrap_files(
     prompt: &mut String,
     workspace_dir: &std::path::Path,
@@ -30,9 +52,6 @@ fn load_openclaw_bootstrap_files(
     if bootstrap_path.exists() {
         inject_workspace_file(prompt, workspace_dir, "BOOTSTRAP.md", max_chars_per_file);
     }
-
-    // MEMORY.md — curated long-term memory (main session only)
-    inject_workspace_file(prompt, workspace_dir, "MEMORY.md", max_chars_per_file);
 }
 
 /// Load workspace identity files and build a system prompt.
@@ -42,15 +61,15 @@ fn load_openclaw_bootstrap_files(
 /// 2. Safety — guardrail reminder
 /// 3. Skills — full skill instructions and tool metadata
 /// 4. Workspace — working directory
-/// 5. Bootstrap files — AGENTS, SOUL, TOOLS, IDENTITY, USER, BOOTSTRAP, MEMORY
+/// 5. Bootstrap files — AGENTS, SOUL, TOOLS, IDENTITY, USER, BOOTSTRAP
 /// 6. Date & Time — timezone for cache stability
 /// 7. Runtime — host, OS, model
 ///
 /// When `identity_config` is set to AIEOS format, the bootstrap files section
 /// is replaced with the AIEOS identity data loaded from file or inline JSON.
 ///
-/// Daily memory files (`memory/*.md`) are NOT injected — they are accessed
-/// on-demand via `memory_recall` / `memory_search` tools.
+/// Durable knowledge is retrieved on demand from ByoriDB and is never injected
+/// wholesale from workspace files.
 pub fn build_system_prompt(
     workspace_dir: &std::path::Path,
     model_name: &str,
@@ -199,19 +218,65 @@ pub fn build_system_prompt_with_mode_and_autonomy(
     });
     prompt.push('\n');
 
-    // ── 2b. Knowledge & Wiki ────────────────────────────────────
-    prompt.push_str(
-        "## 지식 관리\n\n\
-         - 사용자의 질문에 답하기 전에 `memory_recall` tool로 관련 메모리를 검색하세요.\n\
-         - 특히 category가 'wiki'인 항목은 사용자가 직접 정리한 지식입니다 — 우선적으로 참조하세요.\n\
-         - 사용자가 \"이거 기억해\", \"저장해\" 등을 말하면 `memory_store` tool로 category='wiki'에 저장하세요.\n\
-         - 새로운 패턴, 결정, 교훈을 발견하면 `knowledge` tool의 capture 액션으로 지식 그래프에 기록하세요.\n\n",
-    );
+    // ── 2b. Knowledge ───────────────────────────────────────────
+    // Configuration or a bundled skill alone does not make an MCP tool callable.
+    // Advertise only the tools that the caller actually registered (or retained
+    // as deferred stubs) for this runtime surface.
+    let has_byori_tool = |expected: &str| tools.iter().any(|(name, _)| *name == expected);
+    let byori_read_available = has_byori_tool("byoridb__memory_read");
+    let byori_remember_available = has_byori_tool("byoridb__memory_remember");
+    let byori_wiki_available = has_byori_tool("byoridb__memory_wiki_upsert");
+    let byori_link_available = has_byori_tool("byoridb__memory_link");
+    let byori_available = byori_read_available
+        || byori_remember_available
+        || byori_wiki_available
+        || byori_link_available;
+    if byori_available {
+        prompt.push_str("## 지식 관리\n\n");
+        if byori_read_available {
+            prompt.push_str(
+                "- 과거 결정, 선호, 프로젝트 맥락이 필요한 작업은 `byoridb__memory_read`로 먼저 검색하세요.\n",
+            );
+        }
+        if byori_remember_available {
+            prompt.push_str(
+                "- 독립된 사실은 `byoridb__memory_remember`로 의미 있는 체크포인트에 기록하세요.\n",
+            );
+        }
+        if byori_wiki_available {
+            prompt.push_str(
+                "- 관계가 중요한 결정·개념·모듈은 `byoridb__memory_wiki_upsert`로 기록하세요.\n",
+            );
+        }
+        if byori_link_available {
+            prompt.push_str(
+                "- 관계의 의미가 중요한 경우 `byoridb__memory_link`로 기존 노드를 연결하세요.\n",
+            );
+        }
+        prompt.push_str(
+            "- 현재 대화에만 필요한 임시 정보, 비밀, 원문 전체를 장기 지식으로 저장하지 마세요.\n\n",
+        );
+    }
+
+    // The bundled Byori workflow references all four core tools. Suppress only
+    // that skill when the current surface has an incomplete/unavailable MCP
+    // toolset; unrelated skills remain visible.
+    let byori_workflow_available = byori_read_available
+        && byori_remember_available
+        && byori_wiki_available
+        && byori_link_available;
+    let visible_skills = skills
+        .iter()
+        .filter(|skill| {
+            !skill.name.eq_ignore_ascii_case("byoridb-memory") || byori_workflow_available
+        })
+        .cloned()
+        .collect::<Vec<_>>();
 
     // ── 3. Skills (full or compact, based on config) ─────────────
-    if !skills.is_empty() {
+    if !visible_skills.is_empty() {
         prompt.push_str(&crate::skills::skills_to_prompt_with_mode(
-            skills,
+            &visible_skills,
             workspace_dir,
             skills_prompt_mode,
         ));
@@ -379,6 +444,81 @@ fn inject_workspace_file(
                 prompt,
                 "### {filename}\n\n[파일을 찾을 수 없음: {filename}]\n"
             );
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn skill(name: &str, marker: &str) -> Skill {
+        Skill {
+            name: name.to_string(),
+            description: format!("{name} test skill"),
+            version: "1.0.0".to_string(),
+            author: None,
+            tags: Vec::new(),
+            tools: Vec::new(),
+            prompts: vec![marker.to_string()],
+            location: None,
+        }
+    }
+
+    #[test]
+    fn byori_guidance_and_skill_are_hidden_without_registered_tools() {
+        let workspace = tempfile::tempdir().expect("temporary workspace");
+        let skills = [
+            skill("byoridb-memory", "BYORI_SKILL_MARKER"),
+            skill("unrelated", "UNRELATED_SKILL_MARKER"),
+        ];
+
+        let prompt = build_system_prompt(workspace.path(), "test-model", &[], &skills, None, None);
+
+        assert!(!prompt.contains("## 지식 관리"));
+        assert!(!prompt.contains("BYORI_SKILL_MARKER"));
+        assert!(!prompt.contains("<name>byoridb-memory</name>"));
+        assert!(prompt.contains("UNRELATED_SKILL_MARKER"));
+    }
+
+    #[test]
+    fn partial_byori_toolset_advertises_only_callable_guidance() {
+        let workspace = tempfile::tempdir().expect("temporary workspace");
+        let skills = [skill("byoridb-memory", "BYORI_SKILL_MARKER")];
+        let tools = [(
+            "byoridb__memory_read",
+            "Read durable knowledge from ByoriDB.",
+        )];
+
+        let prompt =
+            build_system_prompt(workspace.path(), "test-model", &tools, &skills, None, None);
+
+        assert!(prompt.contains("## 지식 관리"));
+        assert!(prompt.contains("과거 결정, 선호, 프로젝트 맥락"));
+        assert!(!prompt.contains("독립된 사실은 `byoridb__memory_remember`"));
+        assert!(!prompt.contains("관계가 중요한 결정·개념·모듈"));
+        assert!(!prompt.contains("BYORI_SKILL_MARKER"));
+    }
+
+    #[test]
+    fn complete_byori_toolset_exposes_full_workflow_skill() {
+        let workspace = tempfile::tempdir().expect("temporary workspace");
+        let skills = [skill("byoridb-memory", "BYORI_SKILL_MARKER")];
+
+        let prompt = build_system_prompt(
+            workspace.path(),
+            "test-model",
+            &BYORIDB_KNOWLEDGE_TOOL_DESCRIPTIONS,
+            &skills,
+            None,
+            None,
+        );
+
+        assert!(prompt.contains("## 지식 관리"));
+        assert!(prompt.contains("BYORI_SKILL_MARKER"));
+        assert!(prompt.contains("<name>byoridb-memory</name>"));
+        for (tool_name, _) in BYORIDB_KNOWLEDGE_TOOL_DESCRIPTIONS {
+            assert!(prompt.contains(tool_name));
         }
     }
 }

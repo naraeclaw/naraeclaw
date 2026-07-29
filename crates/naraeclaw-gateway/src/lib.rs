@@ -319,6 +319,8 @@ pub struct AppState {
     pub observer: Arc<dyn naraeclaw_runtime::observability::Observer>,
     /// Registered tool specs (for web dashboard tools page)
     pub tools_registry: Arc<Vec<ToolSpec>>,
+    /// Whether the managed ByoriDB MCP server connected with its required safe tools.
+    pub byori_mcp_ready: bool,
     /// Cost tracker (optional, for web dashboard cost page)
     pub cost_tracker: Option<Arc<CostTracker>>,
     /// SSE broadcast channel for real-time events
@@ -396,13 +398,7 @@ pub async fn run_gateway(
         .clone()
         .unwrap_or_else(|| "anthropic/claude-sonnet-4".into());
     let temperature = config.default_temperature;
-    let mem: Arc<dyn Memory> = Arc::from(naraeclaw_memory::create_memory_with_storage_and_routes(
-        &config.memory,
-        &config.embedding_routes,
-        Some(&config.storage.provider.config),
-        &config.workspace_dir,
-        config.api_key.as_deref(),
-    )?);
+    let mem: Arc<dyn Memory> = Arc::from(naraeclaw_memory::create_runtime_memory(&config)?);
     let runtime: Arc<dyn platform::RuntimeAdapter> =
         Arc::from(platform::create_runtime(&config.runtime)?);
     let security = Arc::new(SecurityPolicy::from_config(
@@ -437,18 +433,37 @@ pub async fn run_gateway(
 
     // ── Wire MCP tools into the gateway tool registry (non-fatal) ───
     // Without this, the `/api/tools` endpoint misses MCP tools.
-    if config.mcp.enabled && !config.mcp.servers.is_empty() {
+    let mcp_servers = config.effective_mcp_servers();
+    let mut byori_mcp_ready = false;
+    if !mcp_servers.is_empty() {
         tracing::info!(
             "Gateway: initializing MCP client — {} server(s) configured",
-            config.mcp.servers.len()
+            mcp_servers.len()
         );
-        match tools::McpRegistry::connect_all(&config.mcp.servers).await {
+        match tools::McpRegistry::connect_all(&mcp_servers).await {
             Ok(registry) => {
+                if config.uses_byori_knowledge() {
+                    let names = registry.tool_names();
+                    const REQUIRED_BYORI_TOOLS: &[&str] = &[
+                        "byoridb__memory_query_read",
+                        "byoridb__memory_wiki_upsert",
+                        "byoridb__memory_link",
+                        "byoridb__memory_read",
+                        "byoridb__memory_export",
+                        "byoridb__memory_remember",
+                        "byoridb__memory_recall",
+                    ];
+                    byori_mcp_ready = REQUIRED_BYORI_TOOLS
+                        .iter()
+                        .all(|required| names.iter().any(|name| name == required))
+                        && !names.iter().any(|name| name == "byoridb__memory_query");
+                }
                 let registry = std::sync::Arc::new(registry);
                 if config.mcp.deferred_loading {
                     let deferred_set =
                         tools::DeferredMcpToolSet::from_registry(std::sync::Arc::clone(&registry))
-                            .await;
+                            .await
+                            .with_security(Arc::clone(&security));
                     tracing::info!(
                         "Gateway MCP deferred: {} tool stub(s) from {} server(s)",
                         deferred_set.len(),
@@ -465,12 +480,14 @@ pub async fn run_gateway(
                     let mut registered = 0usize;
                     for name in names {
                         if let Some(def) = registry.get_tool_def(&name).await {
-                            let wrapper: std::sync::Arc<dyn tools::Tool> =
-                                std::sync::Arc::new(tools::McpToolWrapper::new(
+                            let wrapper: std::sync::Arc<dyn tools::Tool> = std::sync::Arc::new(
+                                tools::McpToolWrapper::new(
                                     name,
                                     def,
                                     std::sync::Arc::clone(&registry),
-                                ));
+                                )
+                                .with_security(Arc::clone(&security)),
+                            );
                             if let Some(ref handle) = delegate_handle_gw {
                                 handle.write().push(std::sync::Arc::clone(&wrapper));
                             }
@@ -701,6 +718,7 @@ pub async fn run_gateway(
         nextcloud_talk_webhook_secret: None,
         observer: broadcast_observer,
         tools_registry,
+        byori_mcp_ready,
         cost_tracker,
         event_tx,
         event_buffer,
@@ -744,8 +762,13 @@ pub async fn run_gateway(
         .route("/api/config", put(api::handle_api_config_put))
         .layer(RequestBodyLimitLayer::new(1_048_576));
 
+    // The flat `/api/memory` contract cannot represent ByoriDB's typed graph
+    // and would report false success through the no-op compatibility handle.
+    // Keep it only for deployments that explicitly disable Byori knowledge.
+    let legacy_memory_api_enabled = !config.uses_byori_knowledge();
+
     // Build router with middleware
-    let inner = Router::new()
+    let mut inner = Router::new()
         // ── Admin routes (for CLI management) ──
         .route("/admin/shutdown", post(handle_admin_shutdown))
         .route("/admin/paircode", get(handle_admin_paircode))
@@ -788,9 +811,6 @@ pub async fn run_gateway(
             "/api/doctor",
             get(api::handle_api_doctor).post(api::handle_api_doctor),
         )
-        .route("/api/memory", get(api::handle_api_memory_list))
-        .route("/api/memory", post(api::handle_api_memory_store))
-        .route("/api/memory/{key}", delete(api::handle_api_memory_delete))
         .route("/api/cost", get(api::handle_api_cost))
         .route("/api/cli-tools", get(api::handle_api_cli_tools))
         .route("/api/health", get(api::handle_api_health))
@@ -823,6 +843,13 @@ pub async fn run_gateway(
             "/api/canvas/{id}/history",
             get(canvas::handle_canvas_history),
         );
+
+    if legacy_memory_api_enabled {
+        inner = inner
+            .route("/api/memory", get(api::handle_api_memory_list))
+            .route("/api/memory", post(api::handle_api_memory_store))
+            .route("/api/memory/{key}", delete(api::handle_api_memory_delete));
+    }
 
     // ── WebAuthn hardware key authentication API (requires webauthn feature) ──
     #[cfg(feature = "webauthn")]
@@ -1677,6 +1704,7 @@ mod tests {
             nextcloud_talk_webhook_secret: None,
             observer: Arc::new(naraeclaw_runtime::observability::NoopObserver),
             tools_registry: Arc::new(Vec::new()),
+            byori_mcp_ready: false,
             cost_tracker: None,
             event_tx: tokio::sync::broadcast::channel(16).0,
             event_buffer: Arc::new(sse::EventBuffer::new(16)),
@@ -1741,6 +1769,7 @@ mod tests {
             idempotency_store: Arc::new(IdempotencyStore::new(Duration::from_secs(300), 1000)),
             observer,
             tools_registry: Arc::new(Vec::new()),
+            byori_mcp_ready: false,
             cost_tracker: None,
             event_tx,
             event_buffer: Arc::new(sse::EventBuffer::new(16)),
@@ -2113,6 +2142,7 @@ mod tests {
             nextcloud_talk_webhook_secret: None,
             observer: Arc::new(naraeclaw_runtime::observability::NoopObserver),
             tools_registry: Arc::new(Vec::new()),
+            byori_mcp_ready: false,
             cost_tracker: None,
             event_tx: tokio::sync::broadcast::channel(16).0,
             event_buffer: Arc::new(sse::EventBuffer::new(16)),
@@ -2187,6 +2217,7 @@ mod tests {
             nextcloud_talk_webhook_secret: None,
             observer: Arc::new(naraeclaw_runtime::observability::NoopObserver),
             tools_registry: Arc::new(Vec::new()),
+            byori_mcp_ready: false,
             cost_tracker: None,
             event_tx: tokio::sync::broadcast::channel(16).0,
             event_buffer: Arc::new(sse::EventBuffer::new(16)),
@@ -2273,6 +2304,7 @@ mod tests {
             nextcloud_talk_webhook_secret: None,
             observer: Arc::new(naraeclaw_runtime::observability::NoopObserver),
             tools_registry: Arc::new(Vec::new()),
+            byori_mcp_ready: false,
             cost_tracker: None,
             event_tx: tokio::sync::broadcast::channel(16).0,
             event_buffer: Arc::new(sse::EventBuffer::new(16)),
@@ -2331,6 +2363,7 @@ mod tests {
             nextcloud_talk_webhook_secret: None,
             observer: Arc::new(naraeclaw_runtime::observability::NoopObserver),
             tools_registry: Arc::new(Vec::new()),
+            byori_mcp_ready: false,
             cost_tracker: None,
             event_tx: tokio::sync::broadcast::channel(16).0,
             event_buffer: Arc::new(sse::EventBuffer::new(16)),
@@ -2394,6 +2427,7 @@ mod tests {
             nextcloud_talk_webhook_secret: None,
             observer: Arc::new(naraeclaw_runtime::observability::NoopObserver),
             tools_registry: Arc::new(Vec::new()),
+            byori_mcp_ready: false,
             cost_tracker: None,
             event_tx: tokio::sync::broadcast::channel(16).0,
             event_buffer: Arc::new(sse::EventBuffer::new(16)),

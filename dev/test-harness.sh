@@ -2,12 +2,11 @@
 # =============================================================================
 # NaraeClaw Harness Layer — Docker Smoke Test
 #
-# Validates the 9-phase harness implementation:
-#   1. Memory store/recall via REST API
-#   2. Memory persistence across daemon restart
-#   3. Agent loop continuity via WebSocket (multi-step task)
-#   4. Session state tracking via REST API
-#   5. Context overflow recovery (stress test)
+# Validates the gateway/runtime harness, including the ByoriDB knowledge contract:
+#   1. ByoriDB is the configured durable knowledge provider
+#   2. The retired flat /api/memory surface is absent
+#   3. The managed ByoriDB MCP connection is healthy when installed
+#   4. Agent and session APIs remain healthy
 #
 # Usage:
 #   docker exec naraeclaw-dev bash /naraeclaw-data/workspace/test-harness.sh
@@ -53,60 +52,48 @@ for i in $(seq 1 30); do
 done
 
 # ═══════════════════════════════════════════════════════════════════════
-# TEST 1: Memory Store via REST API
+# TEST 1: ByoriDB Knowledge Configuration
 # ═══════════════════════════════════════════════════════════════════════
 echo ""
-echo "=== Test 1: Memory Store (REST API) ==="
+echo "=== Test 1: ByoriDB Knowledge Configuration ==="
 
-STORE_RESP=$(curl -sf -X POST "$BASE_URL/api/memory" \
-    -H "Content-Type: application/json" \
-    -d '{"key":"harness-test-deadline","content":"The project deadline is March 30th 2026","category":"core"}' \
-    2>&1) || true
+KNOWLEDGE_CONFIG=$(curl -sf "$BASE_URL/api/config" 2>&1) || true
 
-if echo "$STORE_RESP" | grep -qi "error"; then
-    fail "Memory store" "$STORE_RESP"
+if echo "$KNOWLEDGE_CONFIG" | grep -qi "byoridb"; then
+    pass "ByoriDB is present in the effective configuration"
 else
-    pass "Memory store returned: $(echo "$STORE_RESP" | head -c 200)"
+    fail "ByoriDB knowledge configuration" "$(echo "$KNOWLEDGE_CONFIG" | head -c 300)"
 fi
 
 # ═══════════════════════════════════════════════════════════════════════
-# TEST 2: Memory Recall via REST API
+# TEST 2: Legacy Memory API Is Retired
 # ═══════════════════════════════════════════════════════════════════════
 echo ""
-echo "=== Test 2: Memory Recall (REST API) ==="
+echo "=== Test 2: Legacy Memory API Is Retired ==="
 
-RECALL_RESP=$(curl -sf "$BASE_URL/api/memory?query=deadline" 2>&1) || true
+LEGACY_MEMORY_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$BASE_URL/api/memory") || true
 
-if echo "$RECALL_RESP" | grep -qi "March 30th"; then
-    pass "Memory recall found 'March 30th'"
-elif echo "$RECALL_RESP" | grep -qi "deadline"; then
-    pass "Memory recall found 'deadline' keyword"
-elif echo "$RECALL_RESP" | grep -qi "entries"; then
-    info "Recall returned entries but didn't match keyword — check manually"
-    info "Response: $(echo "$RECALL_RESP" | head -c 300)"
-    pass "Memory recall returned entries (content may differ)"
+if [ "$LEGACY_MEMORY_STATUS" = "404" ]; then
+    pass "Legacy /api/memory route is not registered"
 else
-    fail "Memory recall" "$RECALL_RESP"
+    fail "Legacy /api/memory route" "expected HTTP 404, got $LEGACY_MEMORY_STATUS"
 fi
 
 # ═══════════════════════════════════════════════════════════════════════
-# TEST 3: Memory Persistence (brain.db exists)
+# TEST 3: Managed ByoriDB MCP Readiness
 # ═══════════════════════════════════════════════════════════════════════
 echo ""
-echo "=== Test 3: Memory Persistence (brain.db) ==="
+echo "=== Test 3: Managed ByoriDB MCP Readiness ==="
 
-BRAIN_DB="/naraeclaw-data/workspace/memory/brain.db"
-if [ -f "$BRAIN_DB" ]; then
-    SIZE=$(stat -c%s "$BRAIN_DB" 2>/dev/null || stat -f%z "$BRAIN_DB" 2>/dev/null || echo "?")
-    pass "brain.db exists (${SIZE} bytes)"
-else
-    # Check alternate locations
-    FOUND=$(find /naraeclaw-data -name "brain.db" 2>/dev/null | head -1)
-    if [ -n "$FOUND" ]; then
-        pass "brain.db found at $FOUND"
+if command -v naraeclaw >/dev/null 2>&1 && [ -x "${HOME}/.byoridb/bin/run-mcp.sh" ]; then
+    KNOWLEDGE_STATUS=$(naraeclaw knowledge status 2>&1) || true
+    if echo "$KNOWLEDGE_STATUS" | grep -q "MCP connection:.*ready"; then
+        pass "Managed ByoriDB MCP connection is ready"
     else
-        fail "brain.db not found anywhere under /naraeclaw-data"
+        fail "Managed ByoriDB MCP readiness" "$(echo "$KNOWLEDGE_STATUS" | head -c 400)"
     fi
+else
+    skip "Managed ByoriDB MCP readiness" "naraeclaw or ~/.byoridb/bin/run-mcp.sh is unavailable"
 fi
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -145,11 +132,13 @@ echo "=== Test 6: Tools List ==="
 
 TOOLS_RESP=$(curl -sf "$BASE_URL/api/tools" 2>&1) || true
 
-if echo "$TOOLS_RESP" | grep -qi "memory_store\|memory_recall"; then
-    pass "Memory tools registered (memory_store/memory_recall)"
+if echo "$TOOLS_RESP" | grep -qi "byoridb__memory_read"; then
+    pass "ByoriDB knowledge tools registered"
+elif echo "$TOOLS_RESP" | grep -qi '"memory_store"\|"memory_recall"'; then
+    fail "Legacy memory tools are still registered" "$(echo "$TOOLS_RESP" | head -c 300)"
 else
     info "Tools response: $(echo "$TOOLS_RESP" | head -c 300)"
-    skip "Could not verify memory tools in tools list"
+    skip "Could not verify ByoriDB tools in tools list"
 fi
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -197,7 +186,7 @@ fi
 if echo "$CONFIG_RESP" | grep -q "context_compression"; then
     CHECKS=$((CHECKS + 1))
 fi
-if echo "$CONFIG_RESP" | grep -qi "memory"; then
+if echo "$CONFIG_RESP" | grep -qi "byoridb"; then
     CHECKS=$((CHECKS + 1))
 fi
 

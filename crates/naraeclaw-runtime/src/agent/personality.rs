@@ -20,7 +20,6 @@ const PERSONALITY_FILES: &[&str] = &[
     "TOOLS.md",
     "HEARTBEAT.md",
     "BOOTSTRAP.md",
-    "MEMORY.md",
 ];
 
 /// A single personality file loaded from the workspace.

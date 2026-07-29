@@ -3913,13 +3913,7 @@ pub async fn start_channels(config: Config) -> Result<()> {
     ));
     let model = resolved_default_model(&config);
     let temperature = config.default_temperature;
-    let mem: Arc<dyn Memory> = Arc::from(naraeclaw_memory::create_memory_with_storage_and_routes(
-        &config.memory,
-        &config.embedding_routes,
-        Some(&config.storage.provider.config),
-        &config.workspace_dir,
-        config.api_key.as_deref(),
-    )?);
+    let mem: Arc<dyn Memory> = Arc::from(naraeclaw_memory::create_runtime_memory(&config)?);
     // Build the tool-override registry once and share it with the context
     // and the tools registry builder so ToolSwapTool can mutate overrides
     // that the execution loop also consults.
@@ -3955,26 +3949,35 @@ pub async fn start_channels(config: Config) -> Result<()> {
     // When `deferred_loading` is enabled, MCP tools are NOT added eagerly.
     // Instead, a `tool_search` built-in is registered for on-demand loading.
     let mut deferred_section = String::new();
+    let mut available_mcp_tools = HashSet::new();
     let mut ch_activated_handle: Option<
         std::sync::Arc<std::sync::Mutex<naraeclaw_runtime::tools::ActivatedToolSet>>,
     > = None;
-    if config.mcp.enabled && !config.mcp.servers.is_empty() {
+    let mcp_servers = config.effective_mcp_servers();
+    if !mcp_servers.is_empty() {
         tracing::info!(
             "Initializing MCP client — {} server(s) configured",
-            config.mcp.servers.len()
+            mcp_servers.len()
         );
-        match naraeclaw_runtime::tools::McpRegistry::connect_all(&config.mcp.servers).await {
+        match naraeclaw_runtime::tools::McpRegistry::connect_all(&mcp_servers).await {
             Ok(registry) => {
                 let registry = std::sync::Arc::new(registry);
                 if config.mcp.deferred_loading {
                     let deferred_set = naraeclaw_runtime::tools::DeferredMcpToolSet::from_registry(
                         std::sync::Arc::clone(&registry),
                     )
-                    .await;
+                    .await
+                    .with_security(Arc::clone(&security));
                     tracing::info!(
                         "MCP deferred: {} tool stub(s) from {} server(s)",
                         deferred_set.len(),
                         registry.server_count()
+                    );
+                    available_mcp_tools.extend(
+                        deferred_set
+                            .stubs
+                            .iter()
+                            .map(|stub| stub.prefixed_name.clone()),
                     );
                     deferred_section =
                         naraeclaw_runtime::tools::build_deferred_tools_section(&deferred_set);
@@ -3991,12 +3994,15 @@ pub async fn start_channels(config: Config) -> Result<()> {
                     let mut registered = 0usize;
                     for name in names {
                         if let Some(def) = registry.get_tool_def(&name).await {
-                            let wrapper: std::sync::Arc<dyn Tool> =
-                                std::sync::Arc::new(naraeclaw_runtime::tools::McpToolWrapper::new(
+                            available_mcp_tools.insert(name.clone());
+                            let wrapper: std::sync::Arc<dyn Tool> = std::sync::Arc::new(
+                                naraeclaw_runtime::tools::McpToolWrapper::new(
                                     name,
                                     def,
                                     std::sync::Arc::clone(&registry),
-                                ));
+                                )
+                                .with_security(Arc::clone(&security)),
+                            );
                             if let Some(ref handle) = delegate_handle_ch {
                                 handle.write().push(std::sync::Arc::clone(&wrapper));
                             }
@@ -4048,19 +4054,14 @@ pub async fn start_channels(config: Config) -> Result<()> {
             "file_write",
             "Write file contents. Use when: applying focused edits, scaffolding files, updating docs/code. Don't use when: side effects are unclear or file ownership is uncertain.",
         ),
-        (
-            "memory_store",
-            "Save to memory. Use when: preserving durable preferences, decisions, key context. Don't use when: information is transient/noisy/sensitive without need.",
-        ),
-        (
-            "memory_recall",
-            "Search memory. Use when: retrieving prior decisions, user preferences, historical context. Don't use when: answer is already in current context.",
-        ),
-        (
-            "memory_forget",
-            "Delete a memory entry. Use when: memory is incorrect/stale or explicitly requested for removal. Don't use when: impact is uncertain.",
-        ),
     ];
+
+    tool_descs.extend(
+        naraeclaw_runtime::agent::system_prompt::BYORIDB_KNOWLEDGE_TOOL_DESCRIPTIONS
+            .iter()
+            .copied()
+            .filter(|(name, _)| available_mcp_tools.contains(*name)),
+    );
 
     if matches!(
         config.skills.prompt_injection_mode,
@@ -4476,6 +4477,11 @@ mod tests {
         tmp
     }
 
+    fn test_override_registry()
+    -> naraeclaw_runtime::tools::override_registry::SharedOverrideRegistry {
+        naraeclaw_runtime::tools::override_registry::new_shared_registry(&std::env::temp_dir())
+    }
+
     #[test]
     fn effective_channel_message_timeout_secs_clamps_to_minimum() {
         assert_eq!(
@@ -4782,6 +4788,7 @@ mod tests {
             media_pipeline: naraeclaw_config::schema::MediaPipelineConfig::default(),
             transcription_config: naraeclaw_config::schema::TranscriptionConfig::default(),
             hooks: None,
+            override_registry: test_override_registry(),
             provider_runtime_options: naraeclaw_providers::ProviderRuntimeOptions::default(),
             workspace_dir: Arc::new(std::env::temp_dir()),
             prompt_config: Arc::new(naraeclaw_config::schema::Config::default()),
@@ -4909,6 +4916,7 @@ mod tests {
             media_pipeline: naraeclaw_config::schema::MediaPipelineConfig::default(),
             transcription_config: naraeclaw_config::schema::TranscriptionConfig::default(),
             hooks: None,
+            override_registry: test_override_registry(),
             provider_runtime_options: naraeclaw_providers::ProviderRuntimeOptions::default(),
             workspace_dir: Arc::new(std::env::temp_dir()),
             prompt_config: Arc::new(naraeclaw_config::schema::Config::default()),
@@ -4993,6 +5001,7 @@ mod tests {
             media_pipeline: naraeclaw_config::schema::MediaPipelineConfig::default(),
             transcription_config: naraeclaw_config::schema::TranscriptionConfig::default(),
             hooks: None,
+            override_registry: test_override_registry(),
             provider_runtime_options: naraeclaw_providers::ProviderRuntimeOptions::default(),
             workspace_dir: Arc::new(std::env::temp_dir()),
             prompt_config: Arc::new(naraeclaw_config::schema::Config::default()),
@@ -5095,6 +5104,7 @@ mod tests {
             media_pipeline: naraeclaw_config::schema::MediaPipelineConfig::default(),
             transcription_config: naraeclaw_config::schema::TranscriptionConfig::default(),
             hooks: None,
+            override_registry: test_override_registry(),
             provider_runtime_options: naraeclaw_providers::ProviderRuntimeOptions::default(),
             workspace_dir: Arc::new(std::env::temp_dir()),
             prompt_config: Arc::new(naraeclaw_config::schema::Config::default()),
@@ -5704,6 +5714,7 @@ BTC is currently around $65,000 based on latest tool output."#
             media_pipeline: naraeclaw_config::schema::MediaPipelineConfig::default(),
             transcription_config: naraeclaw_config::schema::TranscriptionConfig::default(),
             hooks: None,
+            override_registry: test_override_registry(),
             model_routes: Arc::new(Vec::new()),
             query_classification: naraeclaw_config::schema::QueryClassificationConfig::default(),
             ack_reactions: true,
@@ -5798,6 +5809,7 @@ BTC is currently around $65,000 based on latest tool output."#
             media_pipeline: naraeclaw_config::schema::MediaPipelineConfig::default(),
             transcription_config: naraeclaw_config::schema::TranscriptionConfig::default(),
             hooks: None,
+            override_registry: test_override_registry(),
             model_routes: Arc::new(Vec::new()),
             query_classification: naraeclaw_config::schema::QueryClassificationConfig::default(),
             ack_reactions: true,
@@ -5903,6 +5915,7 @@ BTC is currently around $65,000 based on latest tool output."#
             media_pipeline: naraeclaw_config::schema::MediaPipelineConfig::default(),
             transcription_config: naraeclaw_config::schema::TranscriptionConfig::default(),
             hooks: None,
+            override_registry: test_override_registry(),
             non_cli_excluded_tools: Arc::new(Vec::new()),
             autonomy_level: AutonomyLevel::default(),
             tool_call_dedup_exempt: Arc::new(Vec::new()),
@@ -5996,6 +6009,7 @@ BTC is currently around $65,000 based on latest tool output."#
             media_pipeline: naraeclaw_config::schema::MediaPipelineConfig::default(),
             transcription_config: naraeclaw_config::schema::TranscriptionConfig::default(),
             hooks: None,
+            override_registry: test_override_registry(),
             non_cli_excluded_tools: Arc::new(Vec::new()),
             autonomy_level: AutonomyLevel::default(),
             tool_call_dedup_exempt: Arc::new(Vec::new()),
@@ -6099,6 +6113,7 @@ BTC is currently around $65,000 based on latest tool output."#
             media_pipeline: naraeclaw_config::schema::MediaPipelineConfig::default(),
             transcription_config: naraeclaw_config::schema::TranscriptionConfig::default(),
             hooks: None,
+            override_registry: test_override_registry(),
             non_cli_excluded_tools: Arc::new(Vec::new()),
             autonomy_level: AutonomyLevel::default(),
             tool_call_dedup_exempt: Arc::new(Vec::new()),
@@ -6223,6 +6238,7 @@ BTC is currently around $65,000 based on latest tool output."#
             media_pipeline: naraeclaw_config::schema::MediaPipelineConfig::default(),
             transcription_config: naraeclaw_config::schema::TranscriptionConfig::default(),
             hooks: None,
+            override_registry: test_override_registry(),
             non_cli_excluded_tools: Arc::new(Vec::new()),
             autonomy_level: AutonomyLevel::default(),
             tool_call_dedup_exempt: Arc::new(Vec::new()),
@@ -6328,6 +6344,7 @@ BTC is currently around $65,000 based on latest tool output."#
             media_pipeline: naraeclaw_config::schema::MediaPipelineConfig::default(),
             transcription_config: naraeclaw_config::schema::TranscriptionConfig::default(),
             hooks: None,
+            override_registry: test_override_registry(),
             non_cli_excluded_tools: Arc::new(Vec::new()),
             autonomy_level: AutonomyLevel::default(),
             tool_call_dedup_exempt: Arc::new(Vec::new()),
@@ -6448,6 +6465,7 @@ BTC is currently around $65,000 based on latest tool output."#
             media_pipeline: naraeclaw_config::schema::MediaPipelineConfig::default(),
             transcription_config: naraeclaw_config::schema::TranscriptionConfig::default(),
             hooks: None,
+            override_registry: test_override_registry(),
             non_cli_excluded_tools: Arc::new(Vec::new()),
             autonomy_level: AutonomyLevel::default(),
             tool_call_dedup_exempt: Arc::new(Vec::new()),
@@ -6553,6 +6571,7 @@ BTC is currently around $65,000 based on latest tool output."#
             media_pipeline: naraeclaw_config::schema::MediaPipelineConfig::default(),
             transcription_config: naraeclaw_config::schema::TranscriptionConfig::default(),
             hooks: None,
+            override_registry: test_override_registry(),
             non_cli_excluded_tools: Arc::new(Vec::new()),
             autonomy_level: AutonomyLevel::default(),
             tool_call_dedup_exempt: Arc::new(Vec::new()),
@@ -6651,6 +6670,7 @@ BTC is currently around $65,000 based on latest tool output."#
             media_pipeline: naraeclaw_config::schema::MediaPipelineConfig::default(),
             transcription_config: naraeclaw_config::schema::TranscriptionConfig::default(),
             hooks: None,
+            override_registry: test_override_registry(),
             non_cli_excluded_tools: Arc::new(Vec::new()),
             autonomy_level: AutonomyLevel::default(),
             tool_call_dedup_exempt: Arc::new(Vec::new()),
@@ -6875,6 +6895,7 @@ BTC is currently around $65,000 based on latest tool output."#
             media_pipeline: naraeclaw_config::schema::MediaPipelineConfig::default(),
             transcription_config: naraeclaw_config::schema::TranscriptionConfig::default(),
             hooks: None,
+            override_registry: test_override_registry(),
             non_cli_excluded_tools: Arc::new(Vec::new()),
             autonomy_level: AutonomyLevel::default(),
             tool_call_dedup_exempt: Arc::new(Vec::new()),
@@ -6992,6 +7013,7 @@ BTC is currently around $65,000 based on latest tool output."#
             media_pipeline: naraeclaw_config::schema::MediaPipelineConfig::default(),
             transcription_config: naraeclaw_config::schema::TranscriptionConfig::default(),
             hooks: None,
+            override_registry: test_override_registry(),
             non_cli_excluded_tools: Arc::new(Vec::new()),
             autonomy_level: AutonomyLevel::default(),
             tool_call_dedup_exempt: Arc::new(Vec::new()),
@@ -7131,6 +7153,7 @@ BTC is currently around $65,000 based on latest tool output."#
             media_pipeline: naraeclaw_config::schema::MediaPipelineConfig::default(),
             transcription_config: naraeclaw_config::schema::TranscriptionConfig::default(),
             hooks: None,
+            override_registry: test_override_registry(),
             non_cli_excluded_tools: Arc::new(Vec::new()),
             autonomy_level: AutonomyLevel::default(),
             tool_call_dedup_exempt: Arc::new(Vec::new()),
@@ -7261,6 +7284,7 @@ BTC is currently around $65,000 based on latest tool output."#
             media_pipeline: naraeclaw_config::schema::MediaPipelineConfig::default(),
             transcription_config: naraeclaw_config::schema::TranscriptionConfig::default(),
             hooks: None,
+            override_registry: test_override_registry(),
             non_cli_excluded_tools: Arc::new(Vec::new()),
             autonomy_level: AutonomyLevel::default(),
             tool_call_dedup_exempt: Arc::new(Vec::new()),
@@ -7372,6 +7396,7 @@ BTC is currently around $65,000 based on latest tool output."#
             media_pipeline: naraeclaw_config::schema::MediaPipelineConfig::default(),
             transcription_config: naraeclaw_config::schema::TranscriptionConfig::default(),
             hooks: None,
+            override_registry: test_override_registry(),
             non_cli_excluded_tools: Arc::new(Vec::new()),
             autonomy_level: AutonomyLevel::default(),
             tool_call_dedup_exempt: Arc::new(Vec::new()),
@@ -7463,6 +7488,7 @@ BTC is currently around $65,000 based on latest tool output."#
             media_pipeline: naraeclaw_config::schema::MediaPipelineConfig::default(),
             transcription_config: naraeclaw_config::schema::TranscriptionConfig::default(),
             hooks: None,
+            override_registry: test_override_registry(),
             non_cli_excluded_tools: Arc::new(Vec::new()),
             autonomy_level: AutonomyLevel::default(),
             tool_call_dedup_exempt: Arc::new(Vec::new()),
@@ -7554,6 +7580,7 @@ BTC is currently around $65,000 based on latest tool output."#
             media_pipeline: naraeclaw_config::schema::MediaPipelineConfig::default(),
             transcription_config: naraeclaw_config::schema::TranscriptionConfig::default(),
             hooks: None,
+            override_registry: test_override_registry(),
             non_cli_excluded_tools: Arc::new(Vec::new()),
             autonomy_level: AutonomyLevel::default(),
             tool_call_dedup_exempt: Arc::new(Vec::new()),
@@ -7635,13 +7662,13 @@ BTC is currently around $65,000 based on latest tool output."#
         let ws = make_workspace();
         let tools = vec![
             ("shell", "Run commands"),
-            ("memory_recall", "Search memory"),
+            ("byoridb__memory_read", "Recall ByoriDB knowledge"),
         ];
         let prompt = build_system_prompt(ws.path(), "gpt-4o", &tools, &[], None, None);
 
         assert!(prompt.contains("**shell**"));
         assert!(prompt.contains("Run commands"));
-        assert!(prompt.contains("**memory_recall**"));
+        assert!(prompt.contains("**byoridb__memory_read**"));
     }
 
     #[test]
@@ -7696,8 +7723,14 @@ BTC is currently around $65,000 based on latest tool output."#
             !prompt.contains("### HEARTBEAT.md"),
             "HEARTBEAT.md should not be in channel prompt"
         );
-        assert!(prompt.contains("### MEMORY.md"), "missing MEMORY.md");
-        assert!(prompt.contains("User likes Rust"), "missing MEMORY content");
+        assert!(
+            !prompt.contains("### MEMORY.md"),
+            "legacy MEMORY.md must not be injected"
+        );
+        assert!(
+            !prompt.contains("User likes Rust"),
+            "legacy MEMORY.md content must not be injected"
+        );
     }
 
     #[test]
@@ -8357,6 +8390,7 @@ BTC is currently around $65,000 based on latest tool output."#
             media_pipeline: naraeclaw_config::schema::MediaPipelineConfig::default(),
             transcription_config: naraeclaw_config::schema::TranscriptionConfig::default(),
             hooks: None,
+            override_registry: test_override_registry(),
             non_cli_excluded_tools: Arc::new(Vec::new()),
             autonomy_level: AutonomyLevel::default(),
             tool_call_dedup_exempt: Arc::new(Vec::new()),
@@ -8442,7 +8476,8 @@ BTC is currently around $65,000 based on latest tool output."#
 
         let initial_skills =
             naraeclaw_runtime::skills::load_skills_with_config(workspace.path(), &config);
-        assert!(initial_skills.is_empty());
+        assert_eq!(initial_skills.len(), 1);
+        assert_eq!(initial_skills[0].name, "byoridb-memory");
 
         let initial_system_prompt = build_system_prompt_with_mode(
             workspace.path(),
@@ -8504,6 +8539,7 @@ BTC is currently around $65,000 based on latest tool output."#
             media_pipeline: naraeclaw_config::schema::MediaPipelineConfig::default(),
             transcription_config: naraeclaw_config::schema::TranscriptionConfig::default(),
             hooks: None,
+            override_registry: test_override_registry(),
             non_cli_excluded_tools: Arc::new(Vec::new()),
             autonomy_level: AutonomyLevel::default(),
             tool_call_dedup_exempt: Arc::new(Vec::new()),
@@ -8553,8 +8589,17 @@ BTC is currently around $65,000 based on latest tool output."#
         .unwrap();
         let refreshed_skills =
             naraeclaw_runtime::skills::load_skills_with_config(workspace.path(), &config);
-        assert_eq!(refreshed_skills.len(), 1);
-        assert_eq!(refreshed_skills[0].name, "refresh-test");
+        assert_eq!(refreshed_skills.len(), 2);
+        assert!(
+            refreshed_skills
+                .iter()
+                .any(|skill| skill.name == "refresh-test")
+        );
+        assert!(
+            refreshed_skills
+                .iter()
+                .any(|skill| skill.name == "byoridb-memory")
+        );
         assert!(
             refreshed_new_session_system_prompt(runtime_ctx.as_ref())
                 .contains("<name>refresh-test</name>"),
@@ -8695,6 +8740,7 @@ BTC is currently around $65,000 based on latest tool output."#
             media_pipeline: naraeclaw_config::schema::MediaPipelineConfig::default(),
             transcription_config: naraeclaw_config::schema::TranscriptionConfig::default(),
             hooks: None,
+            override_registry: test_override_registry(),
             non_cli_excluded_tools: Arc::new(Vec::new()),
             autonomy_level: AutonomyLevel::default(),
             tool_call_dedup_exempt: Arc::new(Vec::new()),
@@ -8815,6 +8861,7 @@ BTC is currently around $65,000 based on latest tool output."#
             media_pipeline: naraeclaw_config::schema::MediaPipelineConfig::default(),
             transcription_config: naraeclaw_config::schema::TranscriptionConfig::default(),
             hooks: None,
+            override_registry: test_override_registry(),
             non_cli_excluded_tools: Arc::new(Vec::new()),
             autonomy_level: AutonomyLevel::default(),
             tool_call_dedup_exempt: Arc::new(Vec::new()),
@@ -9360,6 +9407,7 @@ This is an example JSON object for profile settings."#;
             media_pipeline: naraeclaw_config::schema::MediaPipelineConfig::default(),
             transcription_config: naraeclaw_config::schema::TranscriptionConfig::default(),
             hooks: None,
+            override_registry: test_override_registry(),
             non_cli_excluded_tools: Arc::new(Vec::new()),
             autonomy_level: AutonomyLevel::default(),
             tool_call_dedup_exempt: Arc::new(Vec::new()),
@@ -9460,6 +9508,7 @@ This is an example JSON object for profile settings."#;
             media_pipeline: naraeclaw_config::schema::MediaPipelineConfig::default(),
             transcription_config: naraeclaw_config::schema::TranscriptionConfig::default(),
             hooks: None,
+            override_registry: test_override_registry(),
             non_cli_excluded_tools: Arc::new(Vec::new()),
             autonomy_level: AutonomyLevel::default(),
             tool_call_dedup_exempt: Arc::new(Vec::new()),
@@ -9593,6 +9642,7 @@ This is an example JSON object for profile settings."#;
             },
             multimodal: naraeclaw_config::schema::MultimodalConfig::default(),
             hooks: None,
+            override_registry: test_override_registry(),
             non_cli_excluded_tools: Arc::new(Vec::new()),
             autonomy_level: AutonomyLevel::default(),
             tool_call_dedup_exempt: Arc::new(Vec::new()),
@@ -9774,6 +9824,7 @@ This is an example JSON object for profile settings."#;
             media_pipeline: naraeclaw_config::schema::MediaPipelineConfig::default(),
             transcription_config: naraeclaw_config::schema::TranscriptionConfig::default(),
             hooks: None,
+            override_registry: test_override_registry(),
             non_cli_excluded_tools: Arc::new(Vec::new()),
             autonomy_level: AutonomyLevel::default(),
             tool_call_dedup_exempt: Arc::new(Vec::new()),
@@ -9898,6 +9949,7 @@ This is an example JSON object for profile settings."#;
             media_pipeline: naraeclaw_config::schema::MediaPipelineConfig::default(),
             transcription_config: naraeclaw_config::schema::TranscriptionConfig::default(),
             hooks: None,
+            override_registry: test_override_registry(),
             non_cli_excluded_tools: Arc::new(Vec::new()),
             autonomy_level: AutonomyLevel::default(),
             tool_call_dedup_exempt: Arc::new(Vec::new()),
@@ -10014,6 +10066,7 @@ This is an example JSON object for profile settings."#;
             media_pipeline: naraeclaw_config::schema::MediaPipelineConfig::default(),
             transcription_config: naraeclaw_config::schema::TranscriptionConfig::default(),
             hooks: None,
+            override_registry: test_override_registry(),
             non_cli_excluded_tools: Arc::new(Vec::new()),
             autonomy_level: AutonomyLevel::default(),
             tool_call_dedup_exempt: Arc::new(Vec::new()),
@@ -10150,6 +10203,7 @@ This is an example JSON object for profile settings."#;
             media_pipeline: naraeclaw_config::schema::MediaPipelineConfig::default(),
             transcription_config: naraeclaw_config::schema::TranscriptionConfig::default(),
             hooks: None,
+            override_registry: test_override_registry(),
             non_cli_excluded_tools: Arc::new(Vec::new()),
             autonomy_level: AutonomyLevel::default(),
             tool_call_dedup_exempt: Arc::new(Vec::new()),
@@ -10396,6 +10450,7 @@ This is an example JSON object for profile settings."#;
             media_pipeline: naraeclaw_config::schema::MediaPipelineConfig::default(),
             transcription_config: naraeclaw_config::schema::TranscriptionConfig::default(),
             hooks: None,
+            override_registry: test_override_registry(),
             non_cli_excluded_tools: Arc::new(Vec::new()),
             autonomy_level: AutonomyLevel::default(),
             tool_call_dedup_exempt: Arc::new(Vec::new()),

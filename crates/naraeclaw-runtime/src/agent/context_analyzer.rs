@@ -52,7 +52,9 @@ fn tools_for_keyword(keyword: &str) -> &'static [&'static str] {
             &["file_read", "file_write", "file_edit", "glob_search"]
         }
         "shell" | "command" | "run" | "execute" | "install" | "build" => &["shell"],
-        "memory" | "remember" | "recall" | "store" | "forget" => &["memory_store", "memory_recall"],
+        "memory" | "remember" | "recall" | "store" | "forget" | "knowledge" => {
+            &["byoridb__memory_remember", "byoridb__memory_read"]
+        }
         "search" | "find" | "grep" | "look" => {
             &["content_search", "glob_search", "web_search_tool"]
         }
@@ -115,7 +117,7 @@ mod tests {
     }
 
     #[test]
-    fn memory_keywords_suggest_memory_tools() {
+    fn knowledge_keywords_suggest_byori_tools() {
         let history = vec![
             make_message("user", "save this"),
             make_message("assistant", "I will store that in memory"),
@@ -124,12 +126,12 @@ mod tests {
         assert!(
             signals
                 .suggested_tools
-                .contains(&"memory_store".to_string())
+                .contains(&"byoridb__memory_remember".to_string())
         );
         assert!(
             signals
                 .suggested_tools
-                .contains(&"memory_recall".to_string())
+                .contains(&"byoridb__memory_read".to_string())
         );
     }
 

@@ -46,7 +46,7 @@ pub use traits::Memory;
 pub use traits::{ExportFilter, MemoryCategory, MemoryEntry, ProceduralMessage};
 
 use anyhow::Context;
-use naraeclaw_config::schema::{EmbeddingRouteConfig, MemoryConfig, StorageProviderConfig};
+use naraeclaw_config::schema::{Config, EmbeddingRouteConfig, MemoryConfig, StorageProviderConfig};
 use std::path::Path;
 use std::sync::Arc;
 
@@ -360,6 +360,38 @@ pub fn create_memory_with_storage_and_routes(
     )
 }
 
+/// Create the compatibility memory handle used by the agent runtime.
+///
+/// Durable user knowledge is owned by ByoriDB when the knowledge provider is
+/// enabled. In that mode the legacy flat-memory backend is deliberately
+/// replaced with a no-op handle so old autosave, hydration, and retrieval paths
+/// cannot create a second source of truth. Explicit legacy migration commands
+/// continue to use [`create_memory_with_storage_and_routes`] directly.
+pub fn create_runtime_memory(config: &Config) -> anyhow::Result<Box<dyn Memory>> {
+    if config.uses_byori_knowledge() {
+        if !config.memory.backend.trim().eq_ignore_ascii_case("none") || config.memory.auto_save {
+            tracing::warn!(
+                legacy_backend = %config.memory.backend,
+                legacy_auto_save = config.memory.auto_save,
+                "ByoriDB knowledge is active, so legacy memory settings are ignored; run `naraeclaw knowledge migrate --dry-run` before cutover if legacy data exists"
+            );
+        }
+        tracing::info!(
+            space = %config.byori_space_name(),
+            "ByoriDB knowledge active; legacy semantic memory is disabled"
+        );
+        return Ok(Box::new(NoneMemory::new()));
+    }
+
+    create_memory_with_storage_and_routes(
+        &config.memory,
+        &config.embedding_routes,
+        Some(&config.storage.provider.config),
+        &config.workspace_dir,
+        config.api_key.as_deref(),
+    )
+}
+
 pub fn create_memory_for_migration(
     backend: &str,
     workspace_dir: &Path,
@@ -478,6 +510,31 @@ mod tests {
         };
         let mem = create_memory(&cfg, tmp.path(), None).unwrap();
         assert_eq!(mem.name(), "none");
+    }
+
+    #[test]
+    fn runtime_factory_disables_legacy_backend_when_byori_is_active() {
+        let tmp = TempDir::new().unwrap();
+        let mut config = Config::default();
+        config.workspace_dir = tmp.path().to_path_buf();
+        config.memory.backend = "sqlite".to_string();
+        config.memory.auto_save = true;
+
+        let memory = create_runtime_memory(&config).unwrap();
+        assert_eq!(memory.name(), "none");
+        assert!(!tmp.path().join("memory").join("brain.db").exists());
+    }
+
+    #[test]
+    fn runtime_factory_keeps_explicit_legacy_compatibility_mode() {
+        let tmp = TempDir::new().unwrap();
+        let mut config = Config::default();
+        config.workspace_dir = tmp.path().to_path_buf();
+        config.knowledge.enabled = false;
+        config.memory.backend = "sqlite".to_string();
+
+        let memory = create_runtime_memory(&config).unwrap();
+        assert_eq!(memory.name(), "sqlite");
     }
 
     #[test]

@@ -429,7 +429,13 @@ mod tests {
     use tempfile::TempDir;
 
     fn default_cfg() -> MemoryConfig {
-        MemoryConfig::default()
+        MemoryConfig {
+            // Production defaults disable legacy hygiene when ByoriDB owns
+            // durable knowledge. These tests exercise the hygiene subsystem
+            // explicitly, so opt it in rather than depending on that default.
+            hygiene_enabled: true,
+            ..MemoryConfig::default()
+        }
     }
 
     #[test]

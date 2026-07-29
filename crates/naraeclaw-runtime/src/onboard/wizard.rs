@@ -6,9 +6,6 @@ use naraeclaw_config::schema::{
     AutonomyConfig, BrowserConfig, ChannelsConfig, Config, HeartbeatConfig, MemoryConfig,
     ObservabilityConfig, RuntimeConfig, SecretsConfig, SlackConfig, StorageConfig,
 };
-use naraeclaw_memory::{
-    default_memory_backend_key, memory_backend_profile, selectable_memory_backends,
-};
 use naraeclaw_providers::{
     canonical_provider_family, is_glm_alias, is_minimax_alias, is_moonshot_alias, is_qwen_alias,
     is_qwen_oauth_alias, is_zai_alias,
@@ -78,6 +75,9 @@ const MODEL_PREVIEW_LIMIT: usize = 20;
 const MODEL_CACHE_FILE: &str = "models_cache.json";
 const MODEL_CACHE_TTL_SECS: u64 = 12 * 60 * 60;
 const CUSTOM_MODEL_SENTINEL: &str = "__custom_model__";
+const BYORIDB_INSTALL_COMMAND: &str =
+    "curl -fsSL https://github.com/byoridb/byori/releases/latest/download/install.sh | bash";
+const BYORIDB_MEMORY_SKILL: &str = include_str!("../../assets/skills/byoridb-memory/SKILL.md");
 
 fn has_launchable_channels(channels: &ChannelsConfig) -> bool {
     channels.channels().iter().any(|(_, ok)| *ok)
@@ -127,17 +127,18 @@ pub async fn run_wizard(force: bool, callbacks: WizardCallbacks) -> Result<Confi
     print_step(5, 8, "Tool Mode & Security");
     let secrets_config = setup_tool_mode()?;
 
-    print_step(6, 8, "Memory Configuration");
-    let memory_config = setup_memory()?;
+    print_step(6, 8, "Knowledge (ByoriDB)");
+    setup_byoridb_knowledge();
 
     print_step(7, 8, "Project Context (Personalize Your Agent)");
     let project_ctx = setup_project_context()?;
 
     print_step(8, 8, "Workspace Files");
-    scaffold_workspace(&workspace_dir, &project_ctx, &memory_config.backend).await?;
+    scaffold_workspace(&workspace_dir, &project_ctx).await?;
 
     // ── Build config ──
-    // Defaults: SQLite memory, supervised autonomy, workspace-scoped, native runtime
+    // Defaults: ByoriDB knowledge, disabled legacy memory, supervised autonomy,
+    // workspace-scoped, native runtime.
     let config = Config {
         workspace_dir: workspace_dir.clone(),
         config_path: config_path.clone(),
@@ -176,7 +177,7 @@ pub async fn run_wizard(force: bool, callbacks: WizardCallbacks) -> Result<Confi
         cron: naraeclaw_config::schema::CronConfig::default(),
         skillforge: naraeclaw_config::schema::SkillForgeConfig::default(),
         channels_config,
-        memory: memory_config, // User-selected memory backend
+        memory: MemoryConfig::default(),
         storage: StorageConfig::default(),
         tunnel: tunnel_config,
         gateway: naraeclaw_config::schema::GatewayConfig::default(),
@@ -228,10 +229,9 @@ pub async fn run_wizard(force: bool, callbacks: WizardCallbacks) -> Result<Confi
         style("Supervised").green()
     );
     println!(
-        "  {} Memory: {} (auto-save: {})",
+        "  {} Knowledge: {}",
         style("✓").green().bold(),
-        style(&config.memory.backend).green(),
-        if config.memory.auto_save { "on" } else { "off" }
+        style("ByoriDB (optional)").green()
     );
 
     config.save().await?;
@@ -324,11 +324,28 @@ pub async fn run_channels_repair_wizard(callbacks: WizardCallbacks) -> Result<Co
     Ok(config)
 }
 
+fn parse_provider_update_config(
+    raw: &str,
+    workspace_dir: &Path,
+    config_path: &Path,
+) -> Result<Config> {
+    let mut config: Config = toml::from_str(raw).with_context(|| {
+        format!(
+            "Failed to parse existing config at {}",
+            config_path.display()
+        )
+    })?;
+    config.apply_legacy_knowledge_compatibility(raw);
+    config.workspace_dir = workspace_dir.to_path_buf();
+    config.config_path = config_path.to_path_buf();
+    Ok(config)
+}
+
 /// Interactive flow: update only provider/model/api key while preserving existing config.
 async fn run_provider_update_wizard(workspace_dir: &Path, config_path: &Path) -> Result<Config> {
     println!();
     println!(
-        "  {} Existing config detected. Running provider-only update mode (preserving channels, memory, tunnel, hooks, and other settings).",
+        "  {} Existing config detected. Running provider-only update mode (preserving channels, knowledge, tunnel, hooks, and other settings).",
         style("↻").cyan().bold()
     );
 
@@ -338,14 +355,7 @@ async fn run_provider_update_wizard(workspace_dir: &Path, config_path: &Path) ->
             config_path.display()
         )
     })?;
-    let mut config: Config = toml::from_str(&raw).with_context(|| {
-        format!(
-            "Failed to parse existing config at {}",
-            config_path.display()
-        )
-    })?;
-    config.workspace_dir = workspace_dir.to_path_buf();
-    config.config_path = config_path.to_path_buf();
+    let mut config = parse_provider_update_config(&raw, workspace_dir, config_path)?;
 
     print_step(1, 1, "AI Provider & API Key");
     let (provider, api_key, model, provider_api_url) = setup_provider(workspace_dir).await?;
@@ -408,57 +418,7 @@ fn apply_provider_update(
 // ── Quick setup (zero prompts) ───────────────────────────────────
 
 /// Non-interactive setup: generates a sensible default config instantly.
-/// Use `naraeclaw onboard` or `naraeclaw onboard --api-key sk-... --provider openrouter --memory sqlite|lucid`.
-fn backend_key_from_choice(choice: usize) -> &'static str {
-    selectable_memory_backends()
-        .get(choice)
-        .map_or(default_memory_backend_key(), |backend| backend.key)
-}
-
-fn memory_config_defaults_for_backend(backend: &str) -> MemoryConfig {
-    let profile = memory_backend_profile(backend);
-
-    MemoryConfig {
-        backend: backend.to_string(),
-        auto_save: profile.auto_save_default,
-        hygiene_enabled: profile.uses_sqlite_hygiene,
-        archive_after_days: if profile.uses_sqlite_hygiene { 7 } else { 0 },
-        purge_after_days: if profile.uses_sqlite_hygiene { 30 } else { 0 },
-        conversation_retention_days: 30,
-        embedding_provider: "none".to_string(),
-        embedding_model: "text-embedding-3-small".to_string(),
-        embedding_dimensions: 1536,
-        vector_weight: 0.7,
-        keyword_weight: 0.3,
-        search_mode: naraeclaw_config::schema::SearchMode::default(),
-        min_relevance_score: 0.4,
-        embedding_cache_size: if profile.uses_sqlite_hygiene {
-            10000
-        } else {
-            0
-        },
-        chunk_max_tokens: 512,
-        response_cache_enabled: false,
-        response_cache_ttl_minutes: 60,
-        response_cache_max_entries: 5_000,
-        response_cache_hot_entries: 256,
-        snapshot_enabled: false,
-        snapshot_on_hygiene: false,
-        auto_hydrate: true,
-        retrieval_stages: vec!["cache".into(), "fts".into(), "vector".into()],
-        rerank_enabled: false,
-        rerank_threshold: 5,
-        fts_early_return_score: 0.85,
-        default_namespace: "default".into(),
-        conflict_threshold: 0.85,
-        audit_enabled: false,
-        audit_retention_days: 30,
-        policy: naraeclaw_config::schema::MemoryPolicyConfig::default(),
-        sqlite_open_timeout_secs: None,
-        qdrant: naraeclaw_config::schema::QdrantConfig::default(),
-    }
-}
-
+/// Use `naraeclaw onboard` or `naraeclaw onboard --api-key sk-... --provider openrouter`.
 #[allow(clippy::too_many_lines)]
 pub async fn run_quick_setup(
     credential_override: Option<&str>,
@@ -566,7 +526,7 @@ async fn run_quick_setup_with_home(
     credential_override: Option<&str>,
     provider: Option<&str>,
     model_override: Option<&str>,
-    memory_backend: Option<&str>,
+    _memory_backend: Option<&str>,
     force: bool,
     home: &Path,
 ) -> Result<Config> {
@@ -591,12 +551,6 @@ async fn run_quick_setup_with_home(
     let model = model_override
         .map(str::to_string)
         .unwrap_or_else(|| default_model_for_provider(&provider_name));
-    let memory_backend_name = memory_backend
-        .unwrap_or(default_memory_backend_key())
-        .to_string();
-
-    // Create memory config based on backend choice
-    let memory_config = memory_config_defaults_for_backend(&memory_backend_name);
 
     let config = Config {
         workspace_dir: workspace_dir.clone(),
@@ -636,7 +590,7 @@ async fn run_quick_setup_with_home(
         cron: naraeclaw_config::schema::CronConfig::default(),
         skillforge: naraeclaw_config::schema::SkillForgeConfig::default(),
         channels_config: ChannelsConfig::default(),
-        memory: memory_config,
+        memory: MemoryConfig::default(),
         storage: StorageConfig::default(),
         tunnel: naraeclaw_config::schema::TunnelConfig::default(),
         gateway: naraeclaw_config::schema::GatewayConfig::default(),
@@ -694,7 +648,8 @@ async fn run_quick_setup_with_home(
             "Be warm, natural, and clear. Use occasional relevant emojis (1-2 max) and avoid robotic phrasing."
                 .into(),
     };
-    scaffold_workspace(&workspace_dir, &default_ctx, &memory_backend_name).await?;
+    scaffold_workspace(&workspace_dir, &default_ctx).await?;
+    print_byoridb_knowledge_status_with_home(home);
 
     println!(
         "  {} Workspace:  {}",
@@ -726,14 +681,9 @@ async fn run_quick_setup_with_home(
         style("Supervised (workspace-scoped)").green()
     );
     println!(
-        "  {} Memory:     {} (auto-save: {})",
+        "  {} Knowledge:  {}",
         style("✓").green().bold(),
-        style(&memory_backend_name).green(),
-        if memory_backend_name == "none" {
-            "off"
-        } else {
-            "on"
-        }
+        style("ByoriDB (optional)").green()
     );
     println!(
         "  {} Secrets:    {}",
@@ -3240,43 +3190,57 @@ fn setup_project_context() -> Result<ProjectContext> {
     })
 }
 
-// ── Step 6: Memory Configuration ───────────────────────────────
+// ── Step 6: Knowledge ──────────────────────────────────────────
 
-fn setup_memory() -> Result<MemoryConfig> {
-    print_bullet("Choose how NaraeClaw stores and searches memories.");
-    print_bullet("You can always change this later in config.toml.");
+fn byoridb_mcp_wrapper_with_home(home: &Path) -> PathBuf {
+    home.join(".byoridb").join("bin").join("run-mcp.sh")
+}
+
+fn byoridb_install_guidance_with_home(home: &Path) -> Option<String> {
+    let wrapper = byoridb_mcp_wrapper_with_home(home);
+    if wrapper.is_file() {
+        return None;
+    }
+
+    Some(format!(
+        "ByoriDB MCP wrapper was not found at {}.\n\
+         NaraeClaw will not install or modify ByoriDB automatically. Onboarding will continue because knowledge.required = false.\n\
+         Install it later with:\n  {}",
+        wrapper.display(),
+        BYORIDB_INSTALL_COMMAND
+    ))
+}
+
+fn print_byoridb_knowledge_status_with_home(home: &Path) {
+    print_bullet("ByoriDB is the default durable knowledge store.");
+    print_bullet("Knowledge is workspace-scoped and optional during onboarding.");
+
+    if let Some(guidance) = byoridb_install_guidance_with_home(home) {
+        println!("  {} {guidance}", style("⚠").yellow().bold());
+    } else {
+        println!(
+            "  {} ByoriDB: {}",
+            style("✓").green().bold(),
+            style(byoridb_mcp_wrapper_with_home(home).display()).green()
+        );
+    }
     println!();
+}
 
-    let options: Vec<&str> = selectable_memory_backends()
-        .iter()
-        .map(|backend| backend.label)
-        .collect();
-
-    let choice = Select::new()
-        .with_prompt("  Select memory backend")
-        .items(&options)
-        .default(0)
-        .interact()?;
-
-    let backend = backend_key_from_choice(choice);
-    let profile = memory_backend_profile(backend);
-
-    let auto_save = profile.auto_save_default
-        && Confirm::new()
-            .with_prompt("  Auto-save conversations to memory?")
-            .default(true)
-            .interact()?;
-
-    println!(
-        "  {} Memory: {} (auto-save: {})",
-        style("✓").green().bold(),
-        style(backend).green(),
-        if auto_save { "on" } else { "off" }
-    );
-
-    let mut config = memory_config_defaults_for_backend(backend);
-    config.auto_save = auto_save;
-    Ok(config)
+fn setup_byoridb_knowledge() {
+    if let Some(user_dirs) = directories::UserDirs::new() {
+        print_byoridb_knowledge_status_with_home(user_dirs.home_dir());
+    } else {
+        print_bullet("ByoriDB is the default durable knowledge store.");
+        println!(
+            "  {} Could not resolve the home directory, so ~/.byoridb/bin/run-mcp.sh was not checked.",
+            style("⚠").yellow().bold()
+        );
+        println!(
+            "  Onboarding will continue because knowledge.required = false. Install later with:\n  {BYORIDB_INSTALL_COMMAND}"
+        );
+        println!();
+    }
 }
 
 // ── Step 3: Channels ────────────────────────────────────────────
@@ -3552,11 +3516,7 @@ fn setup_tunnel() -> Result<naraeclaw_config::schema::TunnelConfig> {
 // ── Step 6: Scaffold workspace files ─────────────────────────────
 
 #[allow(clippy::too_many_lines)]
-async fn scaffold_workspace(
-    workspace_dir: &Path,
-    ctx: &ProjectContext,
-    memory_backend: &str,
-) -> Result<()> {
+async fn scaffold_workspace(workspace_dir: &Path, ctx: &ProjectContext) -> Result<()> {
     let agent = if ctx.agent_name.is_empty() {
         "NaraeClaw"
     } else {
@@ -3611,56 +3571,6 @@ async fn scaffold_workspace(
 "
     );
 
-    let memory_guidance = if memory_backend == "none" {
-        "## Memory System
-
-\
-         memory.backend = \"none\" — persistent memory is disabled.
-\
-         No daily notes or MEMORY.md will be created or injected.
-\
-         All context exists only within the current session.
-
-"
-        .to_string()
-    } else {
-        "## Memory System
-
-\
-         You wake up fresh each session. These files ARE your continuity:
-
-\
-         - **Daily notes:** `memory/YYYY-MM-DD.md` — raw logs (accessed via memory tools)
-\
-         - **Long-term:** `MEMORY.md` — curated memories (auto-injected in main session)
-
-\
-         Capture what matters. Decisions, context, things to remember.
-\
-         Skip secrets unless asked to keep them.
-
-"
-        .to_string()
-    };
-
-    let session_steps = if memory_backend == "none" {
-        "1. Read `SOUL.md` — this is who you are
-\
-         2. Read `USER.md` — this is who you're helping
-
-"
-    } else {
-        "1. Read `SOUL.md` — this is who you are
-\
-         2. Read `USER.md` — this is who you're helping
-\
-         3. Use `memory_recall` for recent context (daily notes are on-demand)
-\
-         4. If in MAIN SESSION (direct chat): `MEMORY.md` is already injected
-
-"
-    };
-
     let agents = format!(
         "# AGENTS.md — {agent} Personal Assistant
 
@@ -3671,20 +3581,44 @@ async fn scaffold_workspace(
          Before doing anything else:
 
 \
-         {session_steps}\
+         1. Read `SOUL.md` — this is who you are
+\
+         2. Read `USER.md` — this is who you're helping
+\
+         3. Use `byoridb__memory_read` for relevant prior context
+
+\
          Don't ask permission. Just do it.
 
 \
-         {memory_guidance}\
-         ### Write It Down — No Mental Notes!
+         ## Durable Knowledge (ByoriDB)
+
 \
-         - Memory is limited — if you want to remember something, WRITE IT TO A FILE
+         ByoriDB is the default source of durable, cross-session knowledge.
 \
-         - \"Mental notes\" don't survive session restarts. Files do.
+         Read `skills/byoridb-memory/SKILL.md` before using its knowledge workflow.
+
 \
-         - When someone says \"remember this\" -> update daily file or MEMORY.md
+         - Use `byoridb__memory_read` before re-deriving prior decisions or preferences.
 \
-         - When you learn a lesson -> update AGENTS.md, TOOLS.md, or the relevant skill
+         - Use `byoridb__memory_remember` for a standalone durable fact.
+\
+         - Use `byoridb__memory_wiki_upsert` plus `byoridb__memory_link` when relationships matter.
+\
+         - Use `byoridb__memory_read` or `byoridb__memory_query_read` to inspect typed wiki knowledge.
+\
+         - Never store secrets, credentials, or transient chatter.
+
+\
+         ### Record It — No Mental Notes!
+\
+         - If knowledge should survive a restart, record it in ByoriDB at a meaningful checkpoint.
+\
+         - When someone says \"remember this\", use `byoridb__memory_remember`.
+\
+         - When a lesson connects decisions, modules, bugs, or incidents, use the typed wiki tools.
+\
+         - Update AGENTS.md, TOOLS.md, or a relevant skill only for workspace operating guidance.
 
 \
          ## Safety
@@ -3729,7 +3663,7 @@ async fn scaffold_workspace(
 \
          - If a run stops unexpectedly, recover context before acting.
 \
-         - Check `MEMORY.md` + latest `memory/*.md` notes to avoid duplicate work.
+         - Recall relevant ByoriDB knowledge and inspect current workspace state to avoid duplicate work.
 \
          - Resume from the last confirmed step, not from scratch.
 
@@ -3864,9 +3798,11 @@ async fn scaffold_workspace(
          ## Continuity
 
 \
-         Each session, you wake up fresh. These files ARE your memory.
+         Each session, you wake up fresh. ByoriDB carries durable knowledge across sessions.
 \
-         Read them. Update them. They're how you persist.
+         Use `byoridb__memory_read` before non-trivial work and `byoridb__memory_remember` at meaningful checkpoints.
+\
+         Use `byoridb__memory_wiki_upsert`, `byoridb__memory_link`, and the typed wiki read tools when relationships matter.
 
 \
          ---
@@ -3957,23 +3893,35 @@ async fn scaffold_workspace(
 \
            - Don't use when: unsure about side effects or when the file should remain user-owned.
 \
-         - **memory_store** — Save to memory
+         - **byoridb__memory_read** — Recall durable knowledge and typed relationships
 \
-           - Use when: preserving durable preferences, decisions, or key context.
+           - Use when: starting non-trivial work or checking prior decisions and preferences.
 \
-           - Don't use when: info is transient, noisy, or sensitive without explicit need.
+           - Don't use when: the answer is already in the current conversation or workspace.
 \
-         - **memory_recall** — Search memory
+         - **byoridb__memory_remember** — Record a standalone durable fact
 \
-           - Use when: you need prior decisions, user preferences, or historical context.
+           - Use when: a preference, decision, or reusable fact should survive future sessions.
 \
-           - Don't use when: the answer is already in current files/conversation.
+           - Don't use when: information is transient, noisy, or sensitive.
 \
-         - **memory_forget** — Delete a memory entry
+         - **byoridb__memory_wiki_upsert** — Create or update typed wiki knowledge
 \
-           - Use when: memory is incorrect, stale, or explicitly requested to be removed.
+           - Use when: recording a module, decision, bug, incident, concept, entity, or task.
 \
-           - Don't use when: uncertain about impact; verify before deleting.
+           - Don't use when: the fact is isolated and has no meaningful relationships.
+\
+         - **byoridb__memory_link** — Connect typed wiki nodes
+\
+           - Use when: linking causes, fixes, dependencies, supersession, or affected modules.
+\
+           - Don't use when: either endpoint is not established yet.
+\
+         - **byoridb__memory_query_read** — Run a constrained read-only traversal
+\
+           - Use when: inspecting exact nodes, links, traversals, or historical context.
+\
+           - Don't use when: a simple `byoridb__memory_read` is sufficient.
 
 \
          ---
@@ -4022,55 +3970,7 @@ async fn scaffold_workspace(
 "
     );
 
-    let memory = "\
-         # MEMORY.md — Long-Term Memory
-
-\
-         *Your curated memories. The distilled essence, not raw logs.*
-
-\
-         ## How This Works
-\
-         - Daily files (`memory/YYYY-MM-DD.md`) capture raw events (on-demand via tools)
-\
-         - This file captures what's WORTH KEEPING long-term
-\
-         - This file is auto-injected into your system prompt each session
-\
-         - Keep it concise — every character here costs tokens
-
-\
-         ## Security
-\
-         - ONLY loaded in main session (direct chat with your human)
-\
-         - NEVER loaded in group chats or shared contexts
-
-\
-         ---
-
-\
-         ## Key Facts
-\
-         (Add important facts about your human here)
-
-\
-         ## Decisions & Preferences
-\
-         (Record decisions and preferences here)
-
-\
-         ## Lessons Learned
-\
-         (Document mistakes and insights here)
-
-\
-         ## Open Loops
-\
-         (Track unfinished tasks and follow-ups here)
-";
-
-    let mut files: Vec<(&str, String)> = vec![
+    let files: Vec<(&str, String)> = vec![
         ("IDENTITY.md", identity),
         ("AGENTS.md", agents),
         ("HEARTBEAT.md", heartbeat),
@@ -4079,12 +3979,15 @@ async fn scaffold_workspace(
         ("TOOLS.md", tools.to_string()),
         ("BOOTSTRAP.md", bootstrap),
     ];
-    if memory_backend != "none" {
-        files.push(("MEMORY.md", memory.to_string()));
-    }
 
     // Create subdirectories
-    let subdirs = ["sessions", "memory", "state", "cron", "skills"];
+    let subdirs = [
+        "sessions",
+        "state",
+        "cron",
+        "skills",
+        "skills/byoridb-memory",
+    ];
     for dir in &subdirs {
         fs::create_dir_all(workspace_dir.join(dir)).await?;
     }
@@ -4100,6 +4003,17 @@ async fn scaffold_workspace(
             fs::write(&path, content).await?;
             created += 1;
         }
+    }
+
+    let byori_skill_path = workspace_dir
+        .join("skills")
+        .join("byoridb-memory")
+        .join("SKILL.md");
+    if byori_skill_path.exists() {
+        skipped += 1;
+    } else {
+        fs::write(&byori_skill_path, BYORIDB_MEMORY_SKILL).await?;
+        created += 1;
     }
 
     println!(
@@ -4175,10 +4089,14 @@ fn print_summary(config: &Config) {
         config.autonomy.level
     );
     println!(
-        "    {} Memory:        {} (auto-save: {})",
+        "    {} Knowledge:     {} ({})",
         style("🧠").cyan(),
-        config.memory.backend,
-        if config.memory.auto_save { "on" } else { "off" }
+        config.knowledge.provider,
+        if config.knowledge.required {
+            "required"
+        } else {
+            "optional"
+        }
     );
 
     // Channels summary
@@ -4412,6 +4330,24 @@ mod tests {
     }
 
     #[test]
+    fn provider_update_parser_keeps_byori_disabled_for_legacy_knowledge() {
+        let temporary = TempDir::new().unwrap();
+        let workspace_dir = temporary.path().join("workspace");
+        let config_path = temporary.path().join("config.toml");
+        let raw = r#"
+[knowledge]
+enabled = true
+db_path = "/srv/narae/custom-knowledge.db"
+max_nodes = 100000
+"#;
+
+        let config = parse_provider_update_config(raw, &workspace_dir, &config_path).unwrap();
+        assert!(!config.uses_byori_knowledge());
+        assert_eq!(config.workspace_dir, workspace_dir);
+        assert_eq!(config.config_path, config_path);
+    }
+
+    #[test]
     fn apply_provider_update_clears_api_key_when_empty() {
         let mut config = Config::default();
         config.api_key = Some("sk-old".to_string());
@@ -4454,6 +4390,11 @@ mod tests {
         assert_eq!(config.default_provider.as_deref(), Some("openrouter"));
         assert_eq!(config.default_model.as_deref(), Some("custom-model-946"));
         assert_eq!(config.api_key.as_deref(), Some("sk-issue946"));
+        assert_eq!(config.memory.backend, "none");
+        assert!(!config.memory.auto_save);
+        assert!(config.knowledge.enabled);
+        assert_eq!(config.knowledge.provider, "byoridb");
+        assert!(!config.knowledge.required);
 
         let config_raw = tokio::fs::read_to_string(&config.config_path)
             .await
@@ -4637,15 +4578,36 @@ default_model = \"stale-model\"
         );
     }
 
+    #[test]
+    fn missing_byoridb_wrapper_returns_non_destructive_install_guidance() {
+        let tmp = TempDir::new().unwrap();
+
+        let guidance = byoridb_install_guidance_with_home(tmp.path())
+            .expect("a missing wrapper should produce installation guidance");
+
+        assert!(guidance.contains(".byoridb/bin/run-mcp.sh"));
+        assert!(guidance.contains("will not install or modify ByoriDB automatically"));
+        assert!(guidance.contains("knowledge.required = false"));
+        assert!(guidance.contains(BYORIDB_INSTALL_COMMAND));
+    }
+
+    #[test]
+    fn installed_byoridb_wrapper_needs_no_install_guidance() {
+        let tmp = TempDir::new().unwrap();
+        let wrapper = byoridb_mcp_wrapper_with_home(tmp.path());
+        std::fs::create_dir_all(wrapper.parent().unwrap()).unwrap();
+        std::fs::write(wrapper, "#!/bin/sh\n").unwrap();
+
+        assert!(byoridb_install_guidance_with_home(tmp.path()).is_none());
+    }
+
     // ── scaffold_workspace: basic file creation ─────────────────
 
     #[tokio::test]
-    async fn scaffold_creates_all_md_files() {
+    async fn scaffold_creates_workspace_docs_and_byori_skill() {
         let tmp = TempDir::new().unwrap();
         let ctx = ProjectContext::default();
-        scaffold_workspace(tmp.path(), &ctx, "sqlite")
-            .await
-            .unwrap();
+        scaffold_workspace(tmp.path(), &ctx).await.unwrap();
 
         let expected = [
             "IDENTITY.md",
@@ -4655,22 +4617,36 @@ default_model = \"stale-model\"
             "USER.md",
             "TOOLS.md",
             "BOOTSTRAP.md",
-            "MEMORY.md",
+            "skills/byoridb-memory/SKILL.md",
         ];
         for f in &expected {
             assert!(tmp.path().join(f).exists(), "missing file: {f}");
         }
+
+        let skill = tokio::fs::read_to_string(
+            tmp.path()
+                .join("skills")
+                .join("byoridb-memory")
+                .join("SKILL.md"),
+        )
+        .await
+        .unwrap();
+        assert_eq!(skill, BYORIDB_MEMORY_SKILL);
     }
 
     #[tokio::test]
     async fn scaffold_creates_all_subdirectories() {
         let tmp = TempDir::new().unwrap();
         let ctx = ProjectContext::default();
-        scaffold_workspace(tmp.path(), &ctx, "sqlite")
-            .await
-            .unwrap();
+        scaffold_workspace(tmp.path(), &ctx).await.unwrap();
 
-        for dir in &["sessions", "memory", "state", "cron", "skills"] {
+        for dir in &[
+            "sessions",
+            "state",
+            "cron",
+            "skills",
+            "skills/byoridb-memory",
+        ] {
             assert!(tmp.path().join(dir).is_dir(), "missing subdirectory: {dir}");
         }
     }
@@ -4684,9 +4660,7 @@ default_model = \"stale-model\"
             user_name: "Alice".into(),
             ..Default::default()
         };
-        scaffold_workspace(tmp.path(), &ctx, "sqlite")
-            .await
-            .unwrap();
+        scaffold_workspace(tmp.path(), &ctx).await.unwrap();
 
         let user_md = tokio::fs::read_to_string(tmp.path().join("USER.md"))
             .await
@@ -4712,9 +4686,7 @@ default_model = \"stale-model\"
             timezone: "US/Pacific".into(),
             ..Default::default()
         };
-        scaffold_workspace(tmp.path(), &ctx, "sqlite")
-            .await
-            .unwrap();
+        scaffold_workspace(tmp.path(), &ctx).await.unwrap();
 
         let user_md = tokio::fs::read_to_string(tmp.path().join("USER.md"))
             .await
@@ -4740,9 +4712,7 @@ default_model = \"stale-model\"
             agent_name: "Crabby".into(),
             ..Default::default()
         };
-        scaffold_workspace(tmp.path(), &ctx, "sqlite")
-            .await
-            .unwrap();
+        scaffold_workspace(tmp.path(), &ctx).await.unwrap();
 
         let identity = tokio::fs::read_to_string(tmp.path().join("IDENTITY.md"))
             .await
@@ -4792,9 +4762,7 @@ default_model = \"stale-model\"
             communication_style: "Be technical and detailed.".into(),
             ..Default::default()
         };
-        scaffold_workspace(tmp.path(), &ctx, "sqlite")
-            .await
-            .unwrap();
+        scaffold_workspace(tmp.path(), &ctx).await.unwrap();
 
         let soul = tokio::fs::read_to_string(tmp.path().join("SOUL.md"))
             .await
@@ -4827,9 +4795,7 @@ default_model = \"stale-model\"
     async fn scaffold_uses_defaults_for_empty_context() {
         let tmp = TempDir::new().unwrap();
         let ctx = ProjectContext::default(); // all empty
-        scaffold_workspace(tmp.path(), &ctx, "sqlite")
-            .await
-            .unwrap();
+        scaffold_workspace(tmp.path(), &ctx).await.unwrap();
 
         let identity = tokio::fs::read_to_string(tmp.path().join("IDENTITY.md"))
             .await
@@ -4879,10 +4845,19 @@ Do not overwrite me.",
         )
         .await
         .unwrap();
-
-        scaffold_workspace(tmp.path(), &ctx, "sqlite")
+        let skill_path = tmp
+            .path()
+            .join("skills")
+            .join("byoridb-memory")
+            .join("SKILL.md");
+        fs::create_dir_all(skill_path.parent().unwrap())
             .await
             .unwrap();
+        fs::write(&skill_path, "# Custom ByoriDB Skill\nKeep this version.")
+            .await
+            .unwrap();
+
+        scaffold_workspace(tmp.path(), &ctx).await.unwrap();
 
         // SOUL.md should be untouched
         let soul = tokio::fs::read_to_string(&soul_path).await.unwrap();
@@ -4900,6 +4875,9 @@ Do not overwrite me.",
             .await
             .unwrap();
         assert!(user_md.contains("**Name:** Bob"));
+
+        let skill = tokio::fs::read_to_string(&skill_path).await.unwrap();
+        assert_eq!(skill, "# Custom ByoriDB Skill\nKeep this version.");
     }
 
     // ── scaffold_workspace: idempotent ──────────────────────────
@@ -4913,17 +4891,13 @@ Do not overwrite me.",
             ..Default::default()
         };
 
-        scaffold_workspace(tmp.path(), &ctx, "sqlite")
-            .await
-            .unwrap();
+        scaffold_workspace(tmp.path(), &ctx).await.unwrap();
         let soul_v1 = tokio::fs::read_to_string(tmp.path().join("SOUL.md"))
             .await
             .unwrap();
 
         // Run again — should not change anything
-        scaffold_workspace(tmp.path(), &ctx, "sqlite")
-            .await
-            .unwrap();
+        scaffold_workspace(tmp.path(), &ctx).await.unwrap();
         let soul_v2 = tokio::fs::read_to_string(tmp.path().join("SOUL.md"))
             .await
             .unwrap();
@@ -4937,9 +4911,7 @@ Do not overwrite me.",
     async fn scaffold_files_are_non_empty() {
         let tmp = TempDir::new().unwrap();
         let ctx = ProjectContext::default();
-        scaffold_workspace(tmp.path(), &ctx, "sqlite")
-            .await
-            .unwrap();
+        scaffold_workspace(tmp.path(), &ctx).await.unwrap();
 
         for f in &[
             "IDENTITY.md",
@@ -4949,68 +4921,56 @@ Do not overwrite me.",
             "USER.md",
             "TOOLS.md",
             "BOOTSTRAP.md",
-            "MEMORY.md",
+            "skills/byoridb-memory/SKILL.md",
         ] {
             let content = tokio::fs::read_to_string(tmp.path().join(f)).await.unwrap();
             assert!(!content.trim().is_empty(), "{f} should not be empty");
         }
     }
 
-    // ── scaffold_workspace: AGENTS.md references on-demand memory
+    // ── scaffold_workspace: ByoriDB knowledge guidance ──────────
 
     #[tokio::test]
-    async fn agents_md_references_on_demand_memory() {
+    async fn workspace_docs_reference_byoridb_knowledge_tools_only() {
         let tmp = TempDir::new().unwrap();
         let ctx = ProjectContext::default();
-        scaffold_workspace(tmp.path(), &ctx, "sqlite")
-            .await
-            .unwrap();
+        scaffold_workspace(tmp.path(), &ctx).await.unwrap();
 
-        let agents = tokio::fs::read_to_string(tmp.path().join("AGENTS.md"))
-            .await
-            .unwrap();
-        assert!(
-            agents.contains("memory_recall"),
-            "AGENTS.md should reference memory_recall for on-demand access"
-        );
-        assert!(
-            agents.contains("on-demand"),
-            "AGENTS.md should mention daily notes are on-demand"
-        );
+        for filename in ["AGENTS.md", "TOOLS.md", "SOUL.md"] {
+            let document = tokio::fs::read_to_string(tmp.path().join(filename))
+                .await
+                .unwrap();
+            for tool in [
+                "byoridb__memory_read",
+                "byoridb__memory_remember",
+                "byoridb__memory_wiki_upsert",
+                "byoridb__memory_link",
+            ] {
+                assert!(
+                    document.contains(tool),
+                    "{filename} should guide use of {tool}"
+                );
+            }
+            for legacy in ["`memory_store`", "`memory_recall`", "`memory_forget`"] {
+                assert!(
+                    !document.contains(legacy),
+                    "{filename} should not reference legacy tool {legacy}"
+                );
+            }
+            assert!(
+                !document.contains("MEMORY.md"),
+                "{filename} should not reference the legacy memory file"
+            );
+        }
     }
 
-    // ── scaffold_workspace: MEMORY.md warns about token cost ────
+    // ── scaffold_workspace: TOOLS.md lists supported tools ──────
 
     #[tokio::test]
-    async fn memory_md_warns_about_token_cost() {
+    async fn tools_md_lists_core_and_byori_tools() {
         let tmp = TempDir::new().unwrap();
         let ctx = ProjectContext::default();
-        scaffold_workspace(tmp.path(), &ctx, "sqlite")
-            .await
-            .unwrap();
-
-        let memory = tokio::fs::read_to_string(tmp.path().join("MEMORY.md"))
-            .await
-            .unwrap();
-        assert!(
-            memory.contains("costs tokens"),
-            "MEMORY.md should warn about token cost"
-        );
-        assert!(
-            memory.contains("auto-injected"),
-            "MEMORY.md should mention it's auto-injected"
-        );
-    }
-
-    // ── scaffold_workspace: TOOLS.md lists memory_forget ────────
-
-    #[tokio::test]
-    async fn tools_md_lists_all_builtin_tools() {
-        let tmp = TempDir::new().unwrap();
-        let ctx = ProjectContext::default();
-        scaffold_workspace(tmp.path(), &ctx, "sqlite")
-            .await
-            .unwrap();
+        scaffold_workspace(tmp.path(), &ctx).await.unwrap();
 
         let tools = tokio::fs::read_to_string(tmp.path().join("TOOLS.md"))
             .await
@@ -5019,9 +4979,11 @@ Do not overwrite me.",
             "shell",
             "file_read",
             "file_write",
-            "memory_store",
-            "memory_recall",
-            "memory_forget",
+            "byoridb__memory_read",
+            "byoridb__memory_remember",
+            "byoridb__memory_wiki_upsert",
+            "byoridb__memory_link",
+            "byoridb__memory_query_read",
         ] {
             assert!(
                 tools.contains(tool),
@@ -5042,9 +5004,7 @@ Do not overwrite me.",
     async fn soul_md_includes_emoji_awareness_guidance() {
         let tmp = TempDir::new().unwrap();
         let ctx = ProjectContext::default();
-        scaffold_workspace(tmp.path(), &ctx, "sqlite")
-            .await
-            .unwrap();
+        scaffold_workspace(tmp.path(), &ctx).await.unwrap();
 
         let soul = tokio::fs::read_to_string(tmp.path().join("SOUL.md"))
             .await
@@ -5070,9 +5030,7 @@ Do not overwrite me.",
             timezone: "Europe/Madrid".into(),
             communication_style: "Be direct.".into(),
         };
-        scaffold_workspace(tmp.path(), &ctx, "sqlite")
-            .await
-            .unwrap();
+        scaffold_workspace(tmp.path(), &ctx).await.unwrap();
 
         let user_md = tokio::fs::read_to_string(tmp.path().join("USER.md"))
             .await
@@ -5098,9 +5056,7 @@ Do not overwrite me.",
                 "Be friendly, human, and conversational. Show warmth and empathy while staying efficient. Use natural contractions."
                     .into(),
         };
-        scaffold_workspace(tmp.path(), &ctx, "sqlite")
-            .await
-            .unwrap();
+        scaffold_workspace(tmp.path(), &ctx).await.unwrap();
 
         // Verify every file got personalized
         let identity = tokio::fs::read_to_string(tmp.path().join("IDENTITY.md"))
@@ -5139,25 +5095,21 @@ Do not overwrite me.",
         assert!(heartbeat.contains("Claw"));
     }
 
-    // ── scaffold_workspace: none backend skips MEMORY.md ────────
+    // ── scaffold_workspace: legacy memory files are never created
 
     #[tokio::test]
-    async fn scaffold_none_backend_disables_memory_guidance_and_skips_memory_md() {
+    async fn scaffold_never_creates_legacy_memory_files() {
         let tmp = TempDir::new().unwrap();
         let ctx = ProjectContext::default();
-        scaffold_workspace(tmp.path(), &ctx, "none").await.unwrap();
+        scaffold_workspace(tmp.path(), &ctx).await.unwrap();
 
         assert!(
             !tmp.path().join("MEMORY.md").exists(),
-            "MEMORY.md should not be created for none backend"
+            "the legacy memory file must not be scaffolded"
         );
-
-        let agents = tokio::fs::read_to_string(tmp.path().join("AGENTS.md"))
-            .await
-            .unwrap();
         assert!(
-            agents.contains("memory.backend = \"none\""),
-            "AGENTS.md should note that memory backend is none"
+            !tmp.path().join("memory").exists(),
+            "the legacy memory directory must not be scaffolded"
         );
     }
 
@@ -5790,58 +5742,6 @@ Do not overwrite me.",
     #[test]
     fn provider_env_var_unknown_falls_back() {
         assert_eq!(provider_env_var("some-new-provider"), "API_KEY");
-    }
-
-    #[test]
-    fn backend_key_from_choice_maps_supported_backends() {
-        assert_eq!(backend_key_from_choice(0), "sqlite");
-        assert_eq!(backend_key_from_choice(1), "lucid");
-        assert_eq!(backend_key_from_choice(2), "markdown");
-        assert_eq!(backend_key_from_choice(3), "none");
-        assert_eq!(backend_key_from_choice(999), "sqlite");
-    }
-
-    #[test]
-    fn memory_backend_profile_marks_lucid_as_optional_sqlite_backed() {
-        let lucid = memory_backend_profile("lucid");
-        assert!(lucid.auto_save_default);
-        assert!(lucid.uses_sqlite_hygiene);
-        assert!(lucid.sqlite_based);
-        assert!(lucid.optional_dependency);
-
-        let markdown = memory_backend_profile("markdown");
-        assert!(markdown.auto_save_default);
-        assert!(!markdown.uses_sqlite_hygiene);
-
-        let none = memory_backend_profile("none");
-        assert!(!none.auto_save_default);
-        assert!(!none.uses_sqlite_hygiene);
-
-        let custom = memory_backend_profile("custom-memory");
-        assert!(custom.auto_save_default);
-        assert!(!custom.uses_sqlite_hygiene);
-    }
-
-    #[test]
-    fn memory_config_defaults_for_lucid_enable_sqlite_hygiene() {
-        let config = memory_config_defaults_for_backend("lucid");
-        assert_eq!(config.backend, "lucid");
-        assert!(config.auto_save);
-        assert!(config.hygiene_enabled);
-        assert_eq!(config.archive_after_days, 7);
-        assert_eq!(config.purge_after_days, 30);
-        assert_eq!(config.embedding_cache_size, 10000);
-    }
-
-    #[test]
-    fn memory_config_defaults_for_none_disable_sqlite_hygiene() {
-        let config = memory_config_defaults_for_backend("none");
-        assert_eq!(config.backend, "none");
-        assert!(!config.auto_save);
-        assert!(!config.hygiene_enabled);
-        assert_eq!(config.archive_after_days, 0);
-        assert_eq!(config.purge_after_days, 0);
-        assert_eq!(config.embedding_cache_size, 0);
     }
 
     #[test]

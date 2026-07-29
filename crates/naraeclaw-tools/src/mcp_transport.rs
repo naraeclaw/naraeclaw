@@ -26,6 +26,31 @@ const MCP_JSON_CONTENT_TYPE: &str = "application/json";
 /// Streamable HTTP session header used to preserve MCP server state.
 const MCP_SESSION_ID_HEADER: &str = "Mcp-Session-Id";
 
+/// Parent-process variables that local MCP children may inherit implicitly.
+/// Credentials must be supplied explicitly through `McpServerConfig::env`.
+const MCP_STDIO_ENV_ALLOWLIST: &[&str] = &[
+    "PATH",
+    "HOME",
+    "USER",
+    "LOGNAME",
+    "SHELL",
+    "TMPDIR",
+    "TMP",
+    "TEMP",
+    "LANG",
+    "LC_ALL",
+    "LC_CTYPE",
+    "TZ",
+    "SSL_CERT_FILE",
+    "SSL_CERT_DIR",
+    "XDG_CONFIG_HOME",
+    "XDG_CACHE_HOME",
+    "XDG_DATA_HOME",
+    "SYSTEMROOT",
+    "WINDIR",
+    "PATHEXT",
+];
+
 // ── Transport Trait ──────────────────────────────────────────────────────
 
 /// Abstract transport for MCP communication.
@@ -49,13 +74,17 @@ pub struct StdioTransport {
 
 impl StdioTransport {
     pub fn new(config: &McpServerConfig) -> Result<Self> {
-        let mut child = Command::new(&config.command)
+        let mut command = Command::new(&config.command);
+        command
             .args(&config.args)
+            .env_clear()
+            .envs(inherited_stdio_environment())
             .envs(&config.env)
             .stdin(std::process::Stdio::piped())
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::inherit())
-            .kill_on_drop(true)
+            .kill_on_drop(true);
+        let mut child = command
             .spawn()
             .with_context(|| format!("failed to spawn MCP server `{}`", config.name))?;
 
@@ -100,6 +129,21 @@ impl StdioTransport {
         }
         Ok(line)
     }
+}
+
+fn inherited_stdio_environment() -> Vec<(String, std::ffi::OsString)> {
+    // MCP children receive only process-launch/runtime basics. Credentials and
+    // channel tokens must be passed deliberately through `server.env` instead
+    // of leaking from the NaraeClaw parent process.
+    MCP_STDIO_ENV_ALLOWLIST
+        .iter()
+        .filter_map(|key| std::env::var_os(key).map(|value| ((*key).to_string(), value)))
+        .collect()
+}
+
+#[cfg(test)]
+fn stdio_environment_is_inherited(key: &str) -> bool {
+    MCP_STDIO_ENV_ALLOWLIST.contains(&key)
 }
 
 #[async_trait::async_trait]
@@ -923,6 +967,28 @@ pub fn create_transport(config: &McpServerConfig) -> Result<Box<dyn McpTransport
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn stdio_environment_allowlist_excludes_parent_credentials() {
+        for key in ["PATH", "HOME", "LANG", "SSL_CERT_FILE"] {
+            assert!(
+                stdio_environment_is_inherited(key),
+                "missing runtime key {key}"
+            );
+        }
+        for key in [
+            "OPENAI_API_KEY",
+            "ANTHROPIC_API_KEY",
+            "TELEGRAM_BOT_TOKEN",
+            "BYORIDB_ROOT_PASSWORD",
+            "AWS_SECRET_ACCESS_KEY",
+        ] {
+            assert!(
+                !stdio_environment_is_inherited(key),
+                "credential {key} must require explicit MCP server.env configuration"
+            );
+        }
+    }
 
     #[test]
     fn test_transport_default_is_stdio() {

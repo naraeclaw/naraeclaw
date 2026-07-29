@@ -117,6 +117,43 @@ pub async fn handle_api_status(
         .map(String::from)
         .unwrap_or_else(naraeclaw_runtime::i18n::detect_locale);
 
+    let byori_enabled = config.uses_byori_knowledge();
+    let legacy_memory_backend = state.mem.name();
+    let knowledge = if byori_enabled {
+        let server = config.byori_mcp_server_config();
+        let wrapper_available = std::path::Path::new(&server.command).is_file();
+        let status = if state.byori_mcp_ready {
+            "ready"
+        } else if wrapper_available {
+            "mcp_unavailable"
+        } else {
+            "missing_wrapper"
+        };
+        serde_json::json!({
+            "enabled": true,
+            "provider": config.knowledge.provider,
+            "space": config.byori_space_name(),
+            "profile": "safe",
+            "ready": state.byori_mcp_ready,
+            "status": status,
+            "readiness_scope": "gateway_startup",
+            "wrapper_available": wrapper_available,
+            "readiness_check": "naraeclaw knowledge status",
+        })
+    } else {
+        serde_json::json!({
+            "enabled": false,
+            "provider": null,
+            "space": null,
+            "profile": null,
+            "ready": false,
+            "status": "disabled",
+            "readiness_scope": "gateway_startup",
+            "wrapper_available": false,
+            "readiness_check": "naraeclaw knowledge status",
+        })
+    };
+
     let body = serde_json::json!({
         "provider": config.default_provider,
         "model": state.model,
@@ -124,7 +161,13 @@ pub async fn handle_api_status(
         "uptime_seconds": health.uptime_seconds,
         "gateway_port": config.gateway.port,
         "locale": locale,
-        "memory_backend": state.mem.name(),
+        // Keep the historical field truthful at the user-facing level. The
+        // internal Memory handle is intentionally a no-op while ByoriDB owns
+        // durable knowledge, and exposing that handle as the active backend is
+        // misleading to dashboard clients.
+        "memory_backend": if byori_enabled { "byoridb" } else { legacy_memory_backend },
+        "legacy_memory_backend": legacy_memory_backend,
+        "knowledge": knowledge,
         "paired": state.pairing.is_paired(),
         "channels": channels,
         "health": health,
@@ -1453,6 +1496,7 @@ mod tests {
             nextcloud_talk_webhook_secret: None,
             observer: Arc::new(naraeclaw_runtime::observability::NoopObserver),
             tools_registry: Arc::new(Vec::new()),
+            byori_mcp_ready: false,
             cost_tracker: None,
             event_tx: tokio::sync::broadcast::channel(16).0,
             event_buffer: Arc::new(crate::sse::EventBuffer::new(16)),
@@ -1478,6 +1522,72 @@ mod tests {
             .expect("response body")
             .to_bytes();
         serde_json::from_slice(&body).expect("valid json response")
+    }
+
+    #[tokio::test]
+    async fn status_reports_ready_byori_as_the_effective_knowledge_backend() {
+        let temp = tempfile::TempDir::new().unwrap();
+        let wrapper = temp.path().join("bin/run-mcp.sh");
+        std::fs::create_dir_all(wrapper.parent().unwrap()).unwrap();
+        std::fs::write(&wrapper, "#!/bin/sh\n").unwrap();
+
+        let mut config = naraeclaw_config::schema::Config::default();
+        config.knowledge.byoridb_home = temp.path().display().to_string();
+        config.knowledge.space = Some("gateway_status_test".to_string());
+        let mut state = test_state(config);
+        state.byori_mcp_ready = true;
+
+        let response = handle_api_status(State(state), HeaderMap::new())
+            .await
+            .into_response();
+        let json = response_json(response).await;
+
+        assert_eq!(json["memory_backend"], "byoridb");
+        assert_eq!(json["legacy_memory_backend"], "mock");
+        assert_eq!(json["knowledge"]["provider"], "byoridb");
+        assert_eq!(json["knowledge"]["space"], "gateway_status_test");
+        assert_eq!(json["knowledge"]["profile"], "safe");
+        assert_eq!(json["knowledge"]["ready"], true);
+        assert_eq!(json["knowledge"]["status"], "ready");
+        assert_eq!(json["knowledge"]["readiness_scope"], "gateway_startup");
+        assert_eq!(json["knowledge"]["wrapper_available"], true);
+    }
+
+    #[tokio::test]
+    async fn status_distinguishes_missing_byori_wrapper_from_legacy_memory() {
+        let temp = tempfile::TempDir::new().unwrap();
+        let mut config = naraeclaw_config::schema::Config::default();
+        config.knowledge.byoridb_home = temp.path().join("missing").display().to_string();
+        let state = test_state(config);
+
+        let response = handle_api_status(State(state), HeaderMap::new())
+            .await
+            .into_response();
+        let json = response_json(response).await;
+
+        assert_eq!(json["memory_backend"], "byoridb");
+        assert_eq!(json["legacy_memory_backend"], "mock");
+        assert_eq!(json["knowledge"]["ready"], false);
+        assert_eq!(json["knowledge"]["status"], "missing_wrapper");
+        assert_eq!(json["knowledge"]["wrapper_available"], false);
+    }
+
+    #[tokio::test]
+    async fn status_uses_legacy_memory_name_only_when_byori_is_disabled() {
+        let mut config = naraeclaw_config::schema::Config::default();
+        config.knowledge.enabled = false;
+        let state = test_state(config);
+
+        let response = handle_api_status(State(state), HeaderMap::new())
+            .await
+            .into_response();
+        let json = response_json(response).await;
+
+        assert_eq!(json["memory_backend"], "mock");
+        assert_eq!(json["legacy_memory_backend"], "mock");
+        assert_eq!(json["knowledge"]["enabled"], false);
+        assert_eq!(json["knowledge"]["status"], "disabled");
+        assert!(json["knowledge"]["space"].is_null());
     }
 
     #[test]

@@ -462,14 +462,11 @@ async fn run_heartbeat_worker(config: Config) -> Result<()> {
             None
         };
 
-        // Create memory once per tick for recall + consolidation.
+        // ByoriDB knowledge is recalled and recorded by the agent through the
+        // managed MCP tools. This handle is active only for explicit legacy
+        // compatibility mode.
         let heartbeat_memory: Option<Box<dyn naraeclaw_memory::Memory>> =
-            naraeclaw_memory::create_memory(
-                &config.memory,
-                &config.workspace_dir,
-                config.api_key.as_deref(),
-            )
-            .ok();
+            naraeclaw_memory::create_runtime_memory(&config).ok();
 
         let mut tick_had_error = false;
         for task in &tasks_to_run {
@@ -556,8 +553,10 @@ async fn run_heartbeat_worker(config: Config) -> Result<()> {
                         duration_ms,
                         config.heartbeat.max_run_history,
                     );
-                    // Consolidate heartbeat output to memory for cross-session awareness.
-                    if config.memory.auto_save
+                    // Legacy-only consolidation. In ByoriDB mode the agent
+                    // records durable knowledge deliberately via MCP.
+                    if !config.uses_byori_knowledge()
+                        && config.memory.auto_save
                         && output.chars().count() >= 50
                         && let Some(ref mem) = heartbeat_memory
                     {

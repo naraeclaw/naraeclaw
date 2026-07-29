@@ -29,6 +29,27 @@ const DEFAULT_TOOL_TIMEOUT_SECS: u64 = 180;
 /// Maximum allowed tool call timeout (seconds) — hard safety ceiling.
 const MAX_TOOL_TIMEOUT_SECS: u64 = 600;
 
+fn mcp_tool_error(result: &serde_json::Value) -> Option<String> {
+    if result.get("isError").and_then(serde_json::Value::as_bool) != Some(true) {
+        return None;
+    }
+
+    let message = result
+        .get("content")
+        .and_then(serde_json::Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(|item| item.get("text").and_then(serde_json::Value::as_str))
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    Some(if message.trim().is_empty() {
+        "MCP tool reported an unspecified error".to_string()
+    } else {
+        message
+    })
+}
+
 // ── Internal server state ──────────────────────────────────────────────────
 
 struct McpServerInner {
@@ -200,7 +221,11 @@ impl McpServer {
         if let Some(err) = resp.error {
             bail!("MCP tool `{tool_name}` error {}: {}", err.code, err.message);
         }
-        Ok(resp.result.unwrap_or(serde_json::Value::Null))
+        let result = resp.result.unwrap_or(serde_json::Value::Null);
+        if let Some(message) = mcp_tool_error(&result) {
+            bail!("MCP tool `{tool_name}` failed: {message}");
+        }
+        Ok(result)
     }
 }
 
@@ -300,6 +325,26 @@ mod tests {
     fn tool_name_prefix_format() {
         let prefixed = format!("{}__{}", "filesystem", "read_file");
         assert_eq!(prefixed, "filesystem__read_file");
+    }
+
+    #[test]
+    fn mcp_is_error_result_is_detected() {
+        let result = serde_json::json!({
+            "content": [{"type": "text", "text": "invalid knowledge node"}],
+            "isError": true
+        });
+        assert_eq!(
+            mcp_tool_error(&result).as_deref(),
+            Some("invalid knowledge node")
+        );
+    }
+
+    #[test]
+    fn successful_mcp_result_is_not_an_error() {
+        let result = serde_json::json!({
+            "content": [{"type": "text", "text": "ok"}]
+        });
+        assert!(mcp_tool_error(&result).is_none());
     }
 
     #[tokio::test]

@@ -49,6 +49,11 @@ fn parse_temperature(s: &str) -> std::result::Result<f64, String> {
     config::schema::validate_temperature(t)
 }
 
+fn byori_mcp_wrapper_available(config: &Config) -> bool {
+    let server = config.byori_mcp_server_config();
+    std::path::Path::new(&server.command).is_file()
+}
+
 fn print_no_command_help() -> Result<()> {
     println!("명령어를 입력해주세요.");
     println!("`naraeclaw onboard` 로 작업 환경을 초기화할 수 있습니다.");
@@ -107,6 +112,8 @@ mod i18n;
 mod identity;
 #[cfg(feature = "agent-runtime")]
 mod integrations;
+#[cfg(feature = "agent-runtime")]
+mod knowledge;
 mod memory;
 #[cfg(feature = "agent-runtime")]
 mod migration;
@@ -146,8 +153,8 @@ use config::Config;
 
 // Re-export so binary modules can use crate::<CommandEnum> while keeping a single source of truth.
 pub use naraeclaw::{
-    ChannelCommands, CronCommands, GatewayCommands, IntegrationCommands, MigrateCommands,
-    ServiceCommands, SkillCommands, SopCommands,
+    ChannelCommands, CronCommands, GatewayCommands, IntegrationCommands, KnowledgeCommands,
+    MigrateCommands, ServiceCommands, SkillCommands, SopCommands,
 };
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, ValueEnum)]
@@ -216,8 +223,8 @@ enum Commands {
         /// 모델 ID (빠른 설정 모드에서 사용)
         #[arg(long)]
         model: Option<String>,
-        /// 메모리 백엔드 (sqlite, lucid, markdown, none) — 빠른 설정 모드, 기본값: sqlite
-        #[arg(long)]
+        /// Deprecated compatibility option; ignored because ByoriDB owns durable knowledge.
+        #[arg(long, hide = true)]
         memory: Option<String>,
 
         /// 대화형 입력 없이 기본값으로 빠르게 설정합니다
@@ -453,14 +460,25 @@ cron 표현식은 표준 5필드 형식을 사용합니다: 'min hour day month 
         migrate_command: MigrateCommands,
     },
 
+    /// ByoriDB durable knowledge status and legacy migration.
+    #[cfg(feature = "agent-runtime")]
+    Knowledge {
+        #[command(subcommand)]
+        knowledge_command: KnowledgeCommands,
+    },
+
     /// Provider 인증 프로파일 관리
     Auth {
         #[command(subcommand)]
         auth_command: AuthCommands,
     },
 
-    /// 에이전트 메모리 관리 (목록, 조회, 통계, 삭제)
-    #[command(long_about = "\
+    /// Legacy semantic-memory management.
+    #[command(
+        hide = true,
+        long_about = "\
+Legacy semantic-memory management retained for compatibility.
+
 에이전트 메모리 항목을 관리합니다.
 
 에이전트가 저장한 메모리 항목을 목록 확인, 조회, 삭제합니다.
@@ -471,7 +489,8 @@ cron 표현식은 표준 5필드 형식을 사용합니다: 'min hour day month 
   naraeclaw memory list
   naraeclaw memory list --category core --limit 10
   naraeclaw memory get <key>
-  naraeclaw memory clear --category conversation --yes")]
+  naraeclaw memory clear --category conversation --yes"
+    )]
     Memory {
         #[command(subcommand)]
         memory_command: MemoryCommands,
@@ -1371,10 +1390,6 @@ async fn main() -> Result<()> {
             } else {
                 println!("🔴 Service:       stopped");
             }
-            let effective_memory_backend = memory::effective_memory_backend_name(
-                &config.memory.backend,
-                Some(&config.storage.provider.config),
-            );
             println!(
                 "💓 Heartbeat:      {}",
                 if config.heartbeat.enabled {
@@ -1383,11 +1398,45 @@ async fn main() -> Result<()> {
                     "disabled".into()
                 }
             );
-            println!(
-                "🧠 Memory:         {} (auto-save: {})",
-                effective_memory_backend,
-                if config.memory.auto_save { "on" } else { "off" }
+            let effective_memory_backend = memory::effective_memory_backend_name(
+                &config.memory.backend,
+                Some(&config.storage.provider.config),
             );
+            let legacy_memory_configured =
+                effective_memory_backend != "none" || config.memory.auto_save;
+            if config.uses_byori_knowledge() {
+                println!(
+                    "🧠 Knowledge:      ByoriDB ({}, safe profile)",
+                    config.byori_space_name()
+                );
+                if byori_mcp_wrapper_available(&config) {
+                    println!(
+                        "   MCP wrapper:     available (run `naraeclaw knowledge status` to probe)"
+                    );
+                } else {
+                    println!(
+                        "   MCP wrapper:     missing (install ByoriDB, then run `naraeclaw knowledge status`)"
+                    );
+                }
+                if legacy_memory_configured {
+                    if effective_memory_backend == "qdrant" {
+                        println!(
+                            "   Migration:       Qdrant requires a separate export; keep ByoriDB disabled until planned"
+                        );
+                    } else {
+                        println!(
+                            "   Migration:       legacy data configured — run `naraeclaw knowledge migrate --dry-run`"
+                        );
+                    }
+                }
+            } else {
+                println!("🧠 Knowledge:      disabled");
+                println!(
+                    "   Legacy memory:  {} (auto-save: {})",
+                    effective_memory_backend,
+                    if config.memory.auto_save { "on" } else { "off" }
+                );
+            }
 
             println!();
             println!("Security:");
@@ -1570,6 +1619,11 @@ async fn main() -> Result<()> {
 
         Commands::Migrate { migrate_command } => {
             migration::handle_command(migrate_command, &config).await
+        }
+
+        #[cfg(feature = "agent-runtime")]
+        Commands::Knowledge { knowledge_command } => {
+            knowledge::cli::handle_command(knowledge_command, &config).await
         }
 
         Commands::Memory { memory_command } => {
@@ -2938,6 +2992,79 @@ mod tests {
     #[cfg(feature = "agent-runtime")]
     fn cli_definition_has_no_flag_conflicts() {
         Cli::command().debug_assert();
+    }
+
+    #[test]
+    #[cfg(feature = "agent-runtime")]
+    fn knowledge_migrate_cli_parses_preview_flags() {
+        let cli = Cli::try_parse_from([
+            "naraeclaw",
+            "knowledge",
+            "migrate",
+            "--dry-run",
+            "--include-daily",
+        ])
+        .expect("knowledge migrate preview should parse");
+
+        match cli.command {
+            Commands::Knowledge {
+                knowledge_command:
+                    KnowledgeCommands::Migrate {
+                        dry_run,
+                        include_daily,
+                        yes,
+                    },
+            } => {
+                assert!(dry_run);
+                assert!(include_daily);
+                assert!(!yes);
+            }
+            other => panic!("expected knowledge migrate command, got {other:?}"),
+        }
+    }
+
+    #[test]
+    #[cfg(feature = "agent-runtime")]
+    fn top_level_status_wrapper_check_uses_managed_byori_path() {
+        let temp = tempfile::TempDir::new().unwrap();
+        let mut config = Config::default();
+        config.knowledge.byoridb_home = temp.path().display().to_string();
+        assert!(!byori_mcp_wrapper_available(&config));
+
+        let wrapper = temp.path().join("bin/run-mcp.sh");
+        std::fs::create_dir_all(wrapper.parent().unwrap()).unwrap();
+        std::fs::write(wrapper, "#!/bin/sh\n").unwrap();
+        assert!(byori_mcp_wrapper_available(&config));
+    }
+
+    #[test]
+    #[cfg(feature = "agent-runtime")]
+    fn top_level_help_exposes_knowledge_and_hides_legacy_memory() {
+        let command = Cli::command();
+        let knowledge = command
+            .get_subcommands()
+            .find(|subcommand| subcommand.get_name() == "knowledge")
+            .expect("knowledge subcommand must exist");
+        assert!(!knowledge.is_hide_set());
+
+        let memory = command
+            .get_subcommands()
+            .find(|subcommand| subcommand.get_name() == "memory")
+            .expect("legacy memory subcommand must remain parseable");
+        assert!(memory.is_hide_set());
+    }
+
+    #[test]
+    #[cfg(feature = "agent-runtime")]
+    fn hidden_legacy_memory_command_remains_parseable() {
+        let cli = Cli::try_parse_from(["naraeclaw", "memory", "stats"])
+            .expect("legacy memory command must remain compatible");
+        assert!(matches!(
+            cli.command,
+            Commands::Memory {
+                memory_command: MemoryCommands::Stats
+            }
+        ));
     }
 
     #[test]

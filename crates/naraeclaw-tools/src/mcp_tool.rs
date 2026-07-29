@@ -8,6 +8,25 @@ use async_trait::async_trait;
 use crate::mcp_client::McpRegistry;
 use crate::mcp_protocol::McpToolDef;
 use naraeclaw_api::tool::{Tool, ToolResult};
+use naraeclaw_config::policy::{SecurityPolicy, ToolOperation};
+
+fn mcp_tool_operation(prefixed_name: &str) -> ToolOperation {
+    let Some((server, tool)) = prefixed_name.split_once("__") else {
+        return ToolOperation::Act;
+    };
+    if server.eq_ignore_ascii_case("byoridb")
+        && matches!(
+            tool,
+            "memory_recall" | "memory_read" | "memory_query_read" | "memory_export"
+        )
+    {
+        ToolOperation::Read
+    } else {
+        // MCP servers can perform arbitrary external side effects. Unless a
+        // tool has a narrow, trusted read classification, enforce it as an act.
+        ToolOperation::Act
+    }
+}
 
 /// A NaraeClaw [`Tool`] backed by an MCP server tool.
 ///
@@ -23,6 +42,9 @@ pub struct McpToolWrapper {
     input_schema: serde_json::Value,
     /// Shared registry — used to dispatch actual tool calls.
     registry: Arc<McpRegistry>,
+    /// Runtime policy shared with built-in tools. Optional only for low-level
+    /// tests and callers that deliberately provide their own outer gate.
+    security: Option<Arc<SecurityPolicy>>,
 }
 
 impl McpToolWrapper {
@@ -33,7 +55,13 @@ impl McpToolWrapper {
             description,
             input_schema: def.input_schema,
             registry,
+            security: None,
         }
+    }
+
+    pub fn with_security(mut self, security: Arc<SecurityPolicy>) -> Self {
+        self.security = Some(security);
+        self
     }
 }
 
@@ -52,6 +80,19 @@ impl Tool for McpToolWrapper {
     }
 
     async fn execute(&self, args: serde_json::Value) -> anyhow::Result<ToolResult> {
+        if let Some(security) = self.security.as_ref()
+            && let Err(error) = security.enforce_tool_operation(
+                mcp_tool_operation(&self.prefixed_name),
+                &self.prefixed_name,
+            )
+        {
+            return Ok(ToolResult {
+                success: false,
+                output: String::new(),
+                error: Some(error),
+            });
+        }
+
         // Strip the `approved` field before forwarding to the MCP server.
         // NaraeClaw's security model injects `approved: bool` into built-in tool
         // calls for supervised-mode confirmation. MCP servers have no knowledge
@@ -98,6 +139,50 @@ mod tests {
                 .await
                 .expect("empty connect_all should succeed"),
         )
+    }
+
+    #[test]
+    fn byori_operations_are_classified_conservatively() {
+        assert_eq!(
+            mcp_tool_operation("byoridb__memory_read"),
+            ToolOperation::Read
+        );
+        assert_eq!(
+            mcp_tool_operation("byoridb__memory_query_read"),
+            ToolOperation::Read
+        );
+        assert_eq!(
+            mcp_tool_operation("byoridb__memory_remember"),
+            ToolOperation::Act
+        );
+        assert_eq!(
+            mcp_tool_operation("byoridb__memory_delete"),
+            ToolOperation::Act
+        );
+        assert_eq!(mcp_tool_operation("unknown__read_file"), ToolOperation::Act);
+    }
+
+    #[tokio::test]
+    async fn read_only_policy_blocks_mutating_byori_tool_before_dispatch() {
+        let registry = empty_registry().await;
+        let def = make_def("memory_delete", Some("Delete knowledge"), json!({}));
+        let autonomy = naraeclaw_config::schema::AutonomyConfig {
+            level: naraeclaw_config::policy::AutonomyLevel::ReadOnly,
+            ..Default::default()
+        };
+        let security = Arc::new(SecurityPolicy::from_config(
+            &autonomy,
+            std::path::Path::new("."),
+        ));
+        let wrapper = McpToolWrapper::new("byoridb__memory_delete".to_string(), def, registry)
+            .with_security(security);
+
+        let result = wrapper
+            .execute(json!({"type": "note", "name": "probe"}))
+            .await
+            .unwrap();
+        assert!(!result.success);
+        assert!(result.error.unwrap().contains("read-only"));
     }
 
     // ── Accessor tests ─────────────────────────────────────────────────────

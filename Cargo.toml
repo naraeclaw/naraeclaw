@@ -159,7 +159,7 @@ ring = { version = "0.17", optional = true }
 lru = { version = "0.16", optional = true }
 
 # Memory / persistence (migration.rs, behind agent-runtime)
-rusqlite = { version = "0.37", features = ["bundled"], optional = true }
+rusqlite = { version = "0.37", features = ["bundled", "backup"], optional = true }
 chrono = { version = "0.4", default-features = false, features = ["clock", "std", "serde"] }
 chrono-tz = { version = "0.10", optional = true }
 cron = { version = "0.15", optional = true }

@@ -22,13 +22,19 @@ enabled = true
 tool_result_retrim_chars = 2000
 
 [memory]
-backend = "sqlite"
-auto_save = true
-hygiene_enabled = true
+backend = "none"
+auto_save = false
+hygiene_enabled = false
 archive_after_days = 7
 purge_after_days = 30
 embedding_provider = "none"
 
+[knowledge]
+enabled = true
+provider = "byoridb"
+byoridb_home = "~/.byoridb"
+required = false
+
 [autonomy]
 level = "supervised"
-auto_approve = ["file_read", "file_write", "file_edit", "memory_recall", "memory_store", "web_search_tool", "web_fetch", "calculator", "glob_search", "content_search", "image_info", "git_operations"]
+auto_approve = ["file_read", "file_write", "file_edit", "tool_search", "byoridb__memory_recall", "byoridb__memory_read", "byoridb__memory_remember", "byoridb__memory_wiki_upsert", "web_search_tool", "web_fetch", "calculator", "glob_search", "content_search", "image_info", "git_operations"]

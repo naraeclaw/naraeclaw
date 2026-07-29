@@ -219,8 +219,24 @@ impl PromptSection for SkillsSection {
     }
 
     fn build(&self, ctx: &PromptContext<'_>) -> Result<String> {
+        let byori_workflow_available =
+            crate::agent::system_prompt::BYORIDB_KNOWLEDGE_TOOL_DESCRIPTIONS
+                .iter()
+                .all(|(expected, _)| ctx.tools.iter().any(|tool| tool.name() == *expected));
+        let visible_skills = ctx
+            .skills
+            .iter()
+            .filter(|skill| {
+                !skill
+                    .name
+                    .eq_ignore_ascii_case(crate::skills::BYORIDB_MEMORY_SKILL_NAME)
+                    || byori_workflow_available
+            })
+            .cloned()
+            .collect::<Vec<_>>();
+
         Ok(crate::skills::skills_to_prompt_with_mode(
-            ctx.skills,
+            &visible_skills,
             ctx.workspace_dir,
             ctx.skills_prompt_mode,
         ))
@@ -303,6 +319,8 @@ mod tests {
 
     struct TestTool;
 
+    struct NamedTestTool(&'static str);
+
     #[async_trait]
     impl Tool for TestTool {
         fn name(&self) -> &str {
@@ -311,6 +329,32 @@ mod tests {
 
         fn description(&self) -> &str {
             "tool desc"
+        }
+
+        fn parameters_schema(&self) -> serde_json::Value {
+            serde_json::json!({"type": "object"})
+        }
+
+        async fn execute(
+            &self,
+            _args: serde_json::Value,
+        ) -> anyhow::Result<crate::tools::ToolResult> {
+            Ok(crate::tools::ToolResult {
+                success: true,
+                output: "ok".into(),
+                error: None,
+            })
+        }
+    }
+
+    #[async_trait]
+    impl Tool for NamedTestTool {
+        fn name(&self) -> &str {
+            self.0
+        }
+
+        fn description(&self) -> &str {
+            "named test tool"
         }
 
         fn parameters_schema(&self) -> serde_json::Value {
@@ -436,6 +480,92 @@ mod tests {
         // Registered tools (shell kind) appear under <callable_tools> with prefixed names
         assert!(output.contains("<callable_tools"));
         assert!(output.contains("<name>deploy.release_checklist</name>"));
+    }
+
+    #[test]
+    fn skills_section_hides_byori_without_complete_callable_core_tools() {
+        let tools: Vec<Box<dyn Tool>> =
+            crate::agent::system_prompt::BYORIDB_KNOWLEDGE_TOOL_DESCRIPTIONS
+                .iter()
+                .take(3)
+                .map(|(name, _)| Box::new(NamedTestTool(name)) as Box<dyn Tool>)
+                .collect();
+        let skills = vec![
+            crate::skills::Skill {
+                name: crate::skills::BYORIDB_MEMORY_SKILL_NAME.into(),
+                description: "Durable ByoriDB workflow".into(),
+                version: "1.0.0".into(),
+                author: None,
+                tags: vec![],
+                tools: vec![],
+                prompts: vec!["BYORI_SKILL_MARKER".into()],
+                location: None,
+            },
+            crate::skills::Skill {
+                name: "unrelated".into(),
+                description: "Unrelated workflow".into(),
+                version: "1.0.0".into(),
+                author: None,
+                tags: vec![],
+                tools: vec![],
+                prompts: vec!["UNRELATED_SKILL_MARKER".into()],
+                location: None,
+            },
+        ];
+        let ctx = PromptContext {
+            workspace_dir: Path::new("/tmp"),
+            model_name: "test-model",
+            tools: &tools,
+            skills: &skills,
+            skills_prompt_mode: naraeclaw_config::schema::SkillsPromptInjectionMode::Full,
+            identity_config: None,
+            dispatcher_instructions: "",
+            tool_descriptions: None,
+            security_summary: None,
+            autonomy_level: AutonomyLevel::Supervised,
+        };
+
+        let output = SkillsSection.build(&ctx).unwrap();
+
+        assert!(!output.contains("BYORI_SKILL_MARKER"));
+        assert!(!output.contains("<name>byoridb-memory</name>"));
+        assert!(output.contains("UNRELATED_SKILL_MARKER"));
+    }
+
+    #[test]
+    fn skills_section_exposes_byori_with_complete_callable_core_tools() {
+        let tools: Vec<Box<dyn Tool>> =
+            crate::agent::system_prompt::BYORIDB_KNOWLEDGE_TOOL_DESCRIPTIONS
+                .iter()
+                .map(|(name, _)| Box::new(NamedTestTool(name)) as Box<dyn Tool>)
+                .collect();
+        let skills = vec![crate::skills::Skill {
+            name: crate::skills::BYORIDB_MEMORY_SKILL_NAME.into(),
+            description: "Durable ByoriDB workflow".into(),
+            version: "1.0.0".into(),
+            author: None,
+            tags: vec![],
+            tools: vec![],
+            prompts: vec!["BYORI_SKILL_MARKER".into()],
+            location: None,
+        }];
+        let ctx = PromptContext {
+            workspace_dir: Path::new("/tmp"),
+            model_name: "test-model",
+            tools: &tools,
+            skills: &skills,
+            skills_prompt_mode: naraeclaw_config::schema::SkillsPromptInjectionMode::Full,
+            identity_config: None,
+            dispatcher_instructions: "",
+            tool_descriptions: None,
+            security_summary: None,
+            autonomy_level: AutonomyLevel::Supervised,
+        };
+
+        let output = SkillsSection.build(&ctx).unwrap();
+
+        assert!(output.contains("BYORI_SKILL_MARKER"));
+        assert!(output.contains("<name>byoridb-memory</name>"));
     }
 
     #[test]

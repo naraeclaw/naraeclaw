@@ -1695,7 +1695,7 @@ pub struct MemoryConfig {
     #[serde(default)]
     pub snapshot_on_hygiene: bool,
     /// Auto-hydrate from MEMORY_SNAPSHOT.md when brain.db is missing
-    #[serde(default = "default_true")]
+    #[serde(default)]
     pub auto_hydrate: bool,
 
     // ── Retrieval Pipeline ─────────────────────────────────────
@@ -1792,7 +1792,7 @@ pub fn default_embedding_provider() -> String {
     "none".into()
 }
 pub fn default_hygiene_enabled() -> bool {
-    true
+    false
 }
 pub fn default_archive_after_days() -> u32 {
     7
@@ -1838,8 +1838,8 @@ pub fn default_response_cache_hot_entries() -> usize {
 impl Default for MemoryConfig {
     fn default() -> Self {
         Self {
-            backend: "sqlite".into(),
-            auto_save: true,
+            backend: "none".into(),
+            auto_save: false,
             hygiene_enabled: default_hygiene_enabled(),
             archive_after_days: default_archive_after_days(),
             purge_after_days: default_purge_after_days(),
@@ -1859,7 +1859,7 @@ impl Default for MemoryConfig {
             response_cache_hot_entries: default_response_cache_hot_entries(),
             snapshot_enabled: false,
             snapshot_on_hygiene: false,
-            auto_hydrate: true,
+            auto_hydrate: false,
             retrieval_stages: default_retrieval_stages(),
             rerank_enabled: false,
             rerank_threshold: default_rerank_threshold(),

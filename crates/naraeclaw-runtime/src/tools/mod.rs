@@ -69,7 +69,6 @@ pub use naraeclaw_tools::http_request::HttpRequestTool;
 pub use naraeclaw_tools::image_gen::ImageGenTool;
 pub use naraeclaw_tools::image_info::ImageInfoTool;
 pub use naraeclaw_tools::jira_tool::JiraTool;
-pub use naraeclaw_tools::knowledge_tool::KnowledgeTool;
 pub use naraeclaw_tools::linkedin::LinkedInTool;
 pub use naraeclaw_tools::llm_task::LlmTaskTool;
 pub use naraeclaw_tools::mark_skill_candidate::MarkSkillCandidateTool;
@@ -253,7 +252,7 @@ pub fn register_skill_tools(
     }
 }
 
-/// Create full tool registry including memory tools and external integrations
+/// Create the full built-in tool registry and external integrations.
 #[allow(
     clippy::implicit_hasher,
     clippy::too_many_arguments,
@@ -296,7 +295,7 @@ pub fn all_tools(
     )
 }
 
-/// Create full tool registry including memory tools and external integrations.
+/// Create the full built-in tool registry and external integrations.
 #[allow(
     clippy::implicit_hasher,
     clippy::too_many_arguments,
@@ -346,11 +345,6 @@ pub fn all_tools_with_runtime(
         Arc::new(CronUpdateTool::new(config.clone(), security.clone())),
         Arc::new(CronRunTool::new(config.clone(), security.clone())),
         Arc::new(CronRunsTool::new(config.clone())),
-        Arc::new(MemoryStoreTool::new(memory.clone(), security.clone())),
-        Arc::new(MemoryRecallTool::new(memory.clone())),
-        Arc::new(MemoryForgetTool::new(memory.clone(), security.clone())),
-        Arc::new(MemoryExportTool::new(memory.clone())),
-        Arc::new(MemoryPurgeTool::new(memory.clone(), security.clone())),
         Arc::new(ScheduleTool::new(security.clone(), root_config.clone())),
         Arc::new(ModelRoutingConfigTool::new(
             config.clone(),
@@ -379,6 +373,19 @@ pub fn all_tools_with_runtime(
             .with_autonomy(security.autonomy),
         ),
     ];
+
+    // ByoriDB is the sole durable knowledge surface when enabled. Keep the
+    // legacy tools available only for explicitly configured compatibility
+    // deployments; exposing both would create competing sources of truth.
+    if !root_config.uses_byori_knowledge() {
+        tool_arcs.extend([
+            Arc::new(MemoryStoreTool::new(memory.clone(), security.clone())) as Arc<dyn Tool>,
+            Arc::new(MemoryRecallTool::new(memory.clone())),
+            Arc::new(MemoryForgetTool::new(memory.clone(), security.clone())),
+            Arc::new(MemoryExportTool::new(memory.clone())),
+            Arc::new(MemoryPurgeTool::new(memory.clone(), security.clone())),
+        ]);
+    }
 
     // discord_search tool is disabled (discord_history channel removed)
     if false {
@@ -418,10 +425,9 @@ pub fn all_tools_with_runtime(
         root_config.skills.prompt_injection_mode,
         naraeclaw_config::schema::SkillsPromptInjectionMode::Compact
     ) {
-        tool_arcs.push(Arc::new(ReadSkillTool::new(
+        tool_arcs.push(Arc::new(ReadSkillTool::from_config(
             workspace_dir.to_path_buf(),
-            root_config.skills.open_skills_enabled,
-            root_config.skills.open_skills_dir.clone(),
+            root_config,
         )));
     }
 
@@ -730,28 +736,6 @@ pub fn all_tools_with_runtime(
     let escalate_handle = escalate_tool.channel_map_handle();
     tool_arcs.push(Arc::new(escalate_tool));
 
-    // Knowledge graph tool
-    if root_config.knowledge.enabled {
-        let db_path_str = root_config.knowledge.db_path.replace(
-            '~',
-            &directories::UserDirs::new()
-                .map(|u| u.home_dir().to_string_lossy().to_string())
-                .unwrap_or_else(|| ".".to_string()),
-        );
-        let db_path = std::path::PathBuf::from(&db_path_str);
-        match naraeclaw_memory::knowledge_graph::KnowledgeGraph::new(
-            &db_path,
-            root_config.knowledge.max_nodes,
-        ) {
-            Ok(graph) => {
-                tool_arcs.push(Arc::new(KnowledgeTool::new(Arc::new(graph))));
-            }
-            Err(e) => {
-                tracing::warn!("knowledge graph disabled due to init error: {e}");
-            }
-        }
-    }
-
     // Add delegation tool when agents are configured
     let delegate_fallback_credential = fallback_api_key.and_then(|value| {
         let trimmed_value = value.trim();
@@ -775,6 +759,9 @@ pub fn all_tools_with_runtime(
             provider_runtime_options.clone(),
         )
         .with_parent_tools(Arc::clone(&parent_tools))
+        .with_approval_manager(Arc::new(
+            crate::approval::ApprovalManager::for_non_interactive(&root_config.autonomy),
+        ))
         .with_multimodal_config(root_config.multimodal.clone())
         .with_delegate_config(root_config.delegate.clone())
         .with_workspace_dir(workspace_dir.to_path_buf())

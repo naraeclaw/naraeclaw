@@ -5,7 +5,7 @@
 //! authored_by, applies_to). Supports full-text search, tag filtering,
 //! and relation traversal.
 
-use anyhow::Context;
+use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
 use parking_lot::Mutex;
 use rusqlite::{Connection, params};
@@ -296,6 +296,43 @@ impl KnowledgeGraph {
             Some(row) => Ok(Some(row_to_node(row)?)),
             None => Ok(None),
         }
+    }
+
+    /// Export every node and edge in deterministic order.
+    ///
+    /// Nodes are ordered by ID. Edges are ordered by source ID, target ID, and
+    /// relation. Unlike traversal APIs, this includes disconnected nodes.
+    pub fn export_all(&self) -> Result<(Vec<KnowledgeNode>, Vec<KnowledgeEdge>)> {
+        let conn = self.conn.lock();
+
+        let mut node_stmt = conn.prepare(
+            "SELECT id, node_type, title, content, tags, created_at, updated_at, source_project
+             FROM nodes
+             ORDER BY id ASC",
+        )?;
+        let mut nodes = Vec::new();
+        let mut node_rows = node_stmt.query([])?;
+        while let Some(row) = node_rows.next()? {
+            nodes.push(row_to_node(row)?);
+        }
+
+        let mut edge_stmt = conn.prepare(
+            "SELECT from_id, to_id, relation
+             FROM edges
+             ORDER BY from_id ASC, to_id ASC, relation ASC",
+        )?;
+        let mut edges = Vec::new();
+        let mut edge_rows = edge_stmt.query([])?;
+        while let Some(row) = edge_rows.next()? {
+            let relation: String = row.get(2)?;
+            edges.push(KnowledgeEdge {
+                from_id: row.get(0)?,
+                to_id: row.get(1)?,
+                relation: Relation::parse(&relation)?,
+            });
+        }
+
+        Ok((nodes, edges))
     }
 
     /// Query nodes by tags (all listed tags must be present).
@@ -629,6 +666,176 @@ mod tests {
     fn get_node_missing_returns_none() {
         let (_tmp, graph) = test_graph();
         assert!(graph.get_node("nonexistent").unwrap().is_none());
+    }
+
+    #[test]
+    fn export_all_empty_graph_returns_empty_collections() {
+        let (_tmp, graph) = test_graph();
+
+        let (nodes, edges) = graph.export_all().unwrap();
+
+        assert!(nodes.is_empty());
+        assert!(edges.is_empty());
+    }
+
+    #[test]
+    fn export_all_preserves_graph_and_uses_deterministic_order() {
+        let (_tmp, graph) = test_graph();
+        let created_at = "2026-01-02T03:04:05Z";
+        let updated_at = "2026-02-03T04:05:06Z";
+
+        {
+            let conn = graph.conn.lock();
+            let nodes = [
+                (
+                    "node-04",
+                    NodeType::Expert,
+                    "Expert",
+                    "Expert content",
+                    "people,rust",
+                    Some("project-d"),
+                ),
+                (
+                    "node-02",
+                    NodeType::Decision,
+                    "Decision",
+                    "결정 내용\n두 번째 줄",
+                    "architecture,database",
+                    Some("project-b"),
+                ),
+                (
+                    "node-05",
+                    NodeType::Technology,
+                    "Technology",
+                    "Disconnected technology",
+                    "",
+                    None,
+                ),
+                (
+                    "node-01",
+                    NodeType::Pattern,
+                    "Pattern",
+                    "Pattern content",
+                    "pattern",
+                    Some("project-a"),
+                ),
+                (
+                    "node-03",
+                    NodeType::Lesson,
+                    "Lesson",
+                    "Lesson content",
+                    "lesson",
+                    None,
+                ),
+            ];
+
+            for (id, node_type, title, content, tags, source_project) in nodes {
+                conn.execute(
+                    "INSERT INTO nodes
+                     (id, node_type, title, content, tags, created_at, updated_at, source_project)
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+                    params![
+                        id,
+                        node_type.as_str(),
+                        title,
+                        content,
+                        tags,
+                        created_at,
+                        updated_at,
+                        source_project,
+                    ],
+                )
+                .unwrap();
+            }
+        }
+
+        // Insert out of sort order, including two relations between the same endpoints.
+        graph
+            .add_edge("node-01", "node-02", Relation::Uses)
+            .unwrap();
+        graph
+            .add_edge("node-02", "node-04", Relation::AuthoredBy)
+            .unwrap();
+        graph
+            .add_edge("node-01", "node-03", Relation::Replaces)
+            .unwrap();
+        graph
+            .add_edge("node-01", "node-02", Relation::AppliesTo)
+            .unwrap();
+        graph
+            .add_edge("node-02", "node-03", Relation::Extends)
+            .unwrap();
+
+        let (nodes, edges) = graph.export_all().unwrap();
+
+        assert_eq!(
+            nodes
+                .iter()
+                .map(|node| node.id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["node-01", "node-02", "node-03", "node-04", "node-05"]
+        );
+        assert_eq!(
+            nodes
+                .iter()
+                .map(|node| node.node_type.clone())
+                .collect::<Vec<_>>(),
+            vec![
+                NodeType::Pattern,
+                NodeType::Decision,
+                NodeType::Lesson,
+                NodeType::Expert,
+                NodeType::Technology,
+            ]
+        );
+
+        let decision = &nodes[1];
+        assert_eq!(decision.title, "Decision");
+        assert_eq!(decision.content, "결정 내용\n두 번째 줄");
+        assert_eq!(decision.tags, vec!["architecture", "database"]);
+        assert_eq!(
+            decision.created_at,
+            DateTime::parse_from_rfc3339(created_at)
+                .unwrap()
+                .with_timezone(&Utc)
+        );
+        assert_eq!(
+            decision.updated_at,
+            DateTime::parse_from_rfc3339(updated_at)
+                .unwrap()
+                .with_timezone(&Utc)
+        );
+        assert_eq!(decision.source_project.as_deref(), Some("project-b"));
+
+        let disconnected = &nodes[4];
+        assert_eq!(disconnected.title, "Technology");
+        assert_eq!(disconnected.content, "Disconnected technology");
+        assert!(disconnected.tags.is_empty());
+        assert!(disconnected.source_project.is_none());
+
+        assert_eq!(edges.len(), 5);
+        assert_eq!(
+            edges
+                .iter()
+                .map(|edge| (
+                    edge.from_id.as_str(),
+                    edge.to_id.as_str(),
+                    edge.relation.clone(),
+                ))
+                .collect::<Vec<_>>(),
+            vec![
+                ("node-01", "node-02", Relation::AppliesTo),
+                ("node-01", "node-02", Relation::Uses),
+                ("node-01", "node-03", Relation::Replaces),
+                ("node-02", "node-03", Relation::Extends),
+                ("node-02", "node-04", Relation::AuthoredBy),
+            ]
+        );
+        assert!(
+            edges
+                .iter()
+                .all(|edge| edge.from_id != "node-05" && edge.to_id != "node-05")
+        );
     }
 
     #[test]

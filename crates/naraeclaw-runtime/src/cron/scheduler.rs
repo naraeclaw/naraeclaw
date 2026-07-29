@@ -271,14 +271,10 @@ async fn run_agent_job(
     let name = job.name.clone().unwrap_or_else(|| "cron-job".to_string());
     let prompt = job.prompt.clone().unwrap_or_default();
 
-    // Recall relevant memories so cron jobs have context awareness.
-    // Exclude `Conversation` memories to prevent chat context from
-    // leaking into scheduled executions (see #5415).
-    let memory_context = match naraeclaw_memory::create_memory(
-        &config.memory,
-        &config.workspace_dir,
-        config.api_key.as_deref(),
-    ) {
+    // ByoriDB knowledge is recalled on demand by the agent through its managed
+    // MCP tools. This compatibility injection is retained only when durable
+    // ByoriDB knowledge is explicitly disabled.
+    let memory_context = match naraeclaw_memory::create_runtime_memory(config) {
         Ok(mem) => match mem.recall(&prompt, 5, None, None, None).await {
             Ok(entries) if !entries.is_empty() => {
                 let ctx: String = entries

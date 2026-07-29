@@ -21,6 +21,7 @@ use naraeclaw_runtime::agent::agent::{Agent, TurnEvent};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
+use std::path::Path;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
@@ -113,6 +114,20 @@ pub struct AcpServer {
     config: Config,
     acp_config: AcpServerConfig,
     sessions: Arc<Mutex<HashMap<String, Session>>>,
+}
+
+fn session_config_for_workspace(base: &Config, requested: &str) -> Config {
+    let requested = Path::new(requested);
+    let workspace_dir = if requested.is_absolute() {
+        requested.to_path_buf()
+    } else {
+        base.workspace_dir.join(requested)
+    };
+    let workspace_dir = workspace_dir.canonicalize().unwrap_or(workspace_dir);
+
+    let mut config = base.clone();
+    config.workspace_dir = workspace_dir;
+    config
 }
 
 impl AcpServer {
@@ -256,18 +271,21 @@ impl AcpServer {
             });
         }
 
-        let workspace_dir = params
+        let requested_workspace = params
             .get("cwd")
             .or_else(|| params.get("workspaceDir"))
             .or_else(|| params.get("workspace_dir"))
             .and_then(|v| v.as_str())
-            .unwrap_or_else(|| self.config.workspace_dir.to_str().unwrap_or("."))
-            .to_string();
+            .unwrap_or_else(|| self.config.workspace_dir.to_str().unwrap_or("."));
+        let session_config = session_config_for_workspace(&self.config, requested_workspace);
+        let workspace_dir = session_config.workspace_dir.to_string_lossy().into_owned();
 
         let session_id = Uuid::new_v4().to_string();
 
-        // Build agent from global config
-        let agent = Agent::from_config(&self.config)
+        // Build the agent with the session workspace so security boundaries,
+        // workspace skills, and the derived ByoriDB space all use the same
+        // effective path advertised by the ACP session.
+        let agent = Agent::from_config(&session_config)
             .await
             .map_err(|e| RpcError {
                 code: INTERNAL_ERROR,
@@ -528,6 +546,28 @@ mod tests {
         let cfg: AcpServerConfig = serde_json::from_str(json).unwrap();
         assert_eq!(cfg.max_sessions, 3);
         assert_eq!(cfg.session_timeout_secs, 3600);
+    }
+
+    #[test]
+    fn session_workspace_changes_the_derived_byori_space() {
+        let temp = tempfile::tempdir().unwrap();
+        let first = temp.path().join("first");
+        let second = temp.path().join("second");
+        std::fs::create_dir_all(&first).unwrap();
+        std::fs::create_dir_all(&second).unwrap();
+
+        let mut base = Config::default();
+        base.workspace_dir = temp.path().to_path_buf();
+        let first_config = session_config_for_workspace(&base, first.to_str().unwrap());
+        let second_config = session_config_for_workspace(&base, second.to_str().unwrap());
+
+        assert_eq!(first_config.workspace_dir, first.canonicalize().unwrap());
+        assert_eq!(second_config.workspace_dir, second.canonicalize().unwrap());
+        assert_ne!(
+            first_config.byori_space_name(),
+            second_config.byori_space_name(),
+            "ACP workspaces must not share an implicitly derived ByoriDB space"
+        );
     }
 
     #[test]

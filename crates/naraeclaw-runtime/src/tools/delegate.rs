@@ -1,5 +1,6 @@
 use crate::agent::loop_::run_tool_call_loop;
 use crate::agent::prompt::{PromptContext, SystemPromptBuilder};
+use crate::approval::ApprovalManager;
 use crate::observability::traits::{Observer, ObserverEvent, ObserverMetric};
 use crate::security::SecurityPolicy;
 use crate::security::policy::ToolOperation;
@@ -73,6 +74,8 @@ pub struct DelegateTool {
     cancellation_token: CancellationToken,
     /// Optional memory instance for namespace isolation on delegate agents.
     memory: Option<Arc<dyn Memory>>,
+    /// Non-interactive approval policy inherited from the parent runtime.
+    approval_manager: Option<Arc<ApprovalManager>>,
 }
 
 impl DelegateTool {
@@ -107,6 +110,7 @@ impl DelegateTool {
             workspace_dir: PathBuf::new(),
             cancellation_token: CancellationToken::new(),
             memory: None,
+            approval_manager: None,
         }
     }
 
@@ -147,12 +151,18 @@ impl DelegateTool {
             workspace_dir: PathBuf::new(),
             cancellation_token: CancellationToken::new(),
             memory: None,
+            approval_manager: None,
         }
     }
 
     /// Attach parent tools used to build sub-agent allowlist registries.
     pub fn with_parent_tools(mut self, parent_tools: Arc<RwLock<Vec<Arc<dyn Tool>>>>) -> Self {
         self.parent_tools = parent_tools;
+        self
+    }
+
+    pub fn with_approval_manager(mut self, manager: Arc<ApprovalManager>) -> Self {
+        self.approval_manager = Some(manager);
         self
     }
 
@@ -640,6 +650,7 @@ impl DelegateTool {
         let workspace_dir = self.workspace_dir.clone();
         let child_token = self.cancellation_token.child_token();
         let task_id_clone = task_id.clone();
+        let approval_manager = self.approval_manager.clone();
 
         tokio::spawn(async move {
             // Build an inner DelegateTool for the spawned context
@@ -655,6 +666,7 @@ impl DelegateTool {
                 workspace_dir: workspace_dir.clone(),
                 cancellation_token: child_token.clone(),
                 memory: None,
+                approval_manager,
             };
 
             let args_inner = json!({
@@ -799,6 +811,7 @@ impl DelegateTool {
             let agent_name = agent_name.clone();
             let prompt = prompt.to_string();
             let args_clone = args.clone();
+            let approval_manager = self.approval_manager.clone();
 
             handles.push(tokio::spawn(async move {
                 let inner = DelegateTool {
@@ -813,6 +826,7 @@ impl DelegateTool {
                     workspace_dir,
                     cancellation_token,
                     memory: None,
+                    approval_manager,
                 };
                 let result = Box::pin(inner.execute_sync(&agent_name, &prompt, &args_clone)).await;
                 (agent_name, result)
@@ -1159,7 +1173,7 @@ impl DelegateTool {
                 &agent_config.model,
                 temperature,
                 true,
-                None,
+                self.approval_manager.as_deref(),
                 "delegate",
                 None,
                 &self.multimodal_config,

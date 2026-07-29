@@ -81,8 +81,14 @@ pub fn default_shell_timeout_secs() -> u64 {
 pub fn default_auto_approve() -> Vec<String> {
     vec![
         "file_read".into(),
-        "memory_recall".into(),
-        "memory_store".into(),
+        "read_skill".into(),
+        "tool_search".into(),
+        "byoridb__memory_recall".into(),
+        "byoridb__memory_read".into(),
+        "byoridb__memory_query_read".into(),
+        "byoridb__memory_remember".into(),
+        "byoridb__memory_wiki_upsert".into(),
+        "byoridb__memory_export".into(),
         "web_search_tool".into(),
         "web_fetch".into(),
         "calculator".into(),
@@ -340,7 +346,7 @@ pub fn default_otp_gated_actions() -> Vec<String> {
         "file_write".to_string(),
         "browser_open".to_string(),
         "browser".to_string(),
-        "memory_forget".to_string(),
+        "byoridb__memory_delete".to_string(),
     ]
 }
 

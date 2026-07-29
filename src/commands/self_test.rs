@@ -37,8 +37,8 @@ pub async fn run_quick(config: &crate::config::Config) -> Result<Vec<CheckResult
     // 2. Workspace directory is writable
     results.push(check_workspace(&config.workspace_dir).await);
 
-    // 3. SQLite memory backend opens
-    results.push(check_sqlite(&config.workspace_dir));
+    // 3. Durable knowledge installation is present
+    results.push(check_knowledge_install(config));
 
     // 4. Provider registry has entries
     results.push(check_provider_registry());
@@ -65,8 +65,8 @@ pub async fn run_full(config: &crate::config::Config) -> Result<Vec<CheckResult>
     // 9. Gateway health endpoint
     results.push(check_gateway_health(config).await);
 
-    // 10. Memory write/read round-trip
-    results.push(check_memory_roundtrip(config).await);
+    // 10. Durable knowledge read path
+    results.push(check_knowledge_read(config).await);
 
     // 11. WebSocket handshake
     results.push(check_websocket_handshake(config).await);
@@ -139,14 +139,32 @@ async fn check_workspace(workspace_dir: &Path) -> CheckResult {
     }
 }
 
-fn check_sqlite(workspace_dir: &Path) -> CheckResult {
-    let db_path = workspace_dir.join("memory.db");
-    match rusqlite::Connection::open(&db_path) {
-        Ok(conn) => match conn.execute_batch("SELECT 1") {
-            Ok(()) => CheckResult::pass("sqlite", "memory.db opens and responds"),
-            Err(e) => CheckResult::fail("sqlite", format!("query failed: {e}")),
-        },
-        Err(e) => CheckResult::fail("sqlite", format!("cannot open memory.db: {e}")),
+fn check_knowledge_install(config: &crate::config::Config) -> CheckResult {
+    if !config.uses_byori_knowledge() {
+        return CheckResult::pass(
+            "knowledge",
+            format!(
+                "ByoriDB disabled; legacy compatibility backend is {}",
+                config.memory.backend
+            ),
+        );
+    }
+
+    let server = config.byori_mcp_server_config();
+    let wrapper = Path::new(&server.command);
+    if wrapper.is_file() {
+        CheckResult::pass(
+            "knowledge",
+            format!(
+                "ByoriDB wrapper present; space={}",
+                config.byori_space_name()
+            ),
+        )
+    } else {
+        CheckResult::fail(
+            "knowledge",
+            format!("ByoriDB MCP wrapper not found at {}", wrapper.display()),
+        )
     }
 }
 
@@ -224,7 +242,7 @@ async fn check_gateway_health(config: &crate::config::Config) -> CheckResult {
     }
 }
 
-async fn check_memory_roundtrip(config: &crate::config::Config) -> CheckResult {
+async fn check_legacy_memory_roundtrip(config: &crate::config::Config) -> CheckResult {
     let mem = match crate::memory::create_memory(
         &config.memory,
         &config.workspace_dir,
@@ -262,6 +280,52 @@ async fn check_memory_roundtrip(config: &crate::config::Config) -> CheckResult {
             let _ = mem.forget(test_key).await;
             CheckResult::fail("memory", format!("read failed: {e}"))
         }
+    }
+}
+
+async fn check_knowledge_read(config: &crate::config::Config) -> CheckResult {
+    if !config.uses_byori_knowledge() {
+        return check_legacy_memory_roundtrip(config).await;
+    }
+
+    let server = config.byori_mcp_server_config();
+    let registry = match naraeclaw_tools::mcp_client::McpRegistry::connect_all(&[server]).await {
+        Ok(registry) if !registry.is_empty() => registry,
+        Ok(_) => {
+            return CheckResult::fail("knowledge", "managed ByoriDB MCP server did not connect");
+        }
+        Err(error) => {
+            return CheckResult::fail(
+                "knowledge",
+                format!("managed ByoriDB MCP connection failed: {error}"),
+            );
+        }
+    };
+
+    let tool = "byoridb__memory_read";
+    if !registry.tool_names().iter().any(|name| name == tool) {
+        return CheckResult::fail("knowledge", format!("safe tool {tool} is unavailable"));
+    }
+
+    match registry
+        .call_tool(
+            tool,
+            serde_json::json!({
+                "text": "__naraeclaw_selftest_read_probe__",
+                "limit": 1,
+                "include_links": false
+            }),
+        )
+        .await
+    {
+        Ok(_) => CheckResult::pass(
+            "knowledge",
+            format!(
+                "ByoriDB MCP read probe OK; space={}",
+                config.byori_space_name()
+            ),
+        ),
+        Err(error) => CheckResult::fail("knowledge", format!("read probe failed: {error}")),
     }
 }
 

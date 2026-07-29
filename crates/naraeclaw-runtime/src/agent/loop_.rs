@@ -683,6 +683,25 @@ fn maybe_inject_channel_delivery_defaults(
     }
 }
 
+fn canonical_tool_name_for_policy(
+    tool_name: &str,
+    tools_registry: &[Box<dyn Tool>],
+    activated_tools: Option<&std::sync::Arc<std::sync::Mutex<crate::tools::ActivatedToolSet>>>,
+) -> String {
+    if tools_registry.iter().any(|tool| tool.name() == tool_name) {
+        return tool_name.to_string();
+    }
+    activated_tools
+        .and_then(|activated| {
+            activated
+                .lock()
+                .ok()?
+                .get_resolved(tool_name)
+                .map(|tool| tool.name().to_string())
+        })
+        .unwrap_or_else(|| tool_name.to_string())
+}
+
 // ── Agent Tool-Call Loop ──────────────────────────────────────────────────
 // Core agentic iteration: send conversation to the LLM, parse any tool
 // calls from the response, execute them, append results to history, and
@@ -1462,11 +1481,13 @@ pub async fn run_tool_call_loop(
             );
 
             // ── Approval hook ────────────────────────────────
+            let approval_tool_name =
+                canonical_tool_name_for_policy(&tool_name, tools_registry, activated_tools);
             if let Some(mgr) = approval
-                && mgr.needs_approval(&tool_name)
+                && mgr.needs_approval(&approval_tool_name)
             {
                 let request = ApprovalRequest {
-                    tool_name: tool_name.clone(),
+                    tool_name: approval_tool_name.clone(),
                     arguments: tool_args.clone(),
                 };
 
@@ -1479,7 +1500,7 @@ pub async fn run_tool_call_loop(
                     mgr.prompt_cli(&request)
                 };
 
-                mgr.record_decision(&tool_name, &tool_args, decision, channel_name);
+                mgr.record_decision(&approval_tool_name, &tool_args, decision, channel_name);
 
                 if decision == ApprovalResponse::No {
                     let denied = "Denied by user.".to_string();
@@ -1943,17 +1964,12 @@ pub async fn run(
         &config.workspace_dir,
     ));
 
-    // ── Memory (the brain) ────────────────────────────────────────
-    let mem: Arc<dyn Memory> = Arc::from(naraeclaw_memory::create_memory_with_storage_and_routes(
-        &config.memory,
-        &config.embedding_routes,
-        Some(&config.storage.provider.config),
-        &config.workspace_dir,
-        config.api_key.as_deref(),
-    )?);
-    tracing::info!(backend = mem.name(), "Memory initialized");
+    // Compatibility handle for session/runtime consumers. Durable knowledge is
+    // served by ByoriDB and returns a no-op legacy handle here.
+    let mem: Arc<dyn Memory> = Arc::from(naraeclaw_memory::create_runtime_memory(&config)?);
+    tracing::info!(backend = mem.name(), "Runtime memory handle initialized");
 
-    // ── Tools (including memory tools) ────────────
+    // ── Tools ────────────────────────────────────────────────────
     let (
         mut tools_registry,
         delegate_handle,
@@ -1991,59 +2007,82 @@ pub async fn run(
     }
 
     // ── Wire MCP tools (non-fatal) — CLI path ────────────────────
-    // NOTE: MCP tools are injected after built-in tool filtering
-    // (filter_primary_agent_tools_or_fail / agent.allowed_tools / agent.denied_tools).
-    // MCP servers are user-declared external integrations; the built-in allow/deny
-    // filter is not appropriate for them and would silently drop all MCP tools when
-    // a restrictive allowlist is configured. Keep this block after any such filter call.
+    // MCP tools are connected after built-ins, but a per-run capability
+    // allowlist (used by cron jobs) still applies to their canonical prefixed
+    // names. This prevents an MCP tool from bypassing a restricted job scope.
     //
     // When `deferred_loading` is enabled, MCP tools are NOT added to the registry
     // eagerly. Instead, a `tool_search` built-in is registered so the LLM can
     // fetch schemas on demand. This reduces context window waste.
     let mut deferred_section = String::new();
+    let mut available_mcp_tools = HashSet::new();
     let mut activated_handle: Option<
         std::sync::Arc<std::sync::Mutex<crate::tools::ActivatedToolSet>>,
     > = None;
-    if config.mcp.enabled && !config.mcp.servers.is_empty() {
+    let mcp_servers = config.effective_mcp_servers();
+    if !mcp_servers.is_empty() {
         tracing::info!(
             "Initializing MCP client — {} server(s) configured",
-            config.mcp.servers.len()
+            mcp_servers.len()
         );
-        match crate::tools::McpRegistry::connect_all(&config.mcp.servers).await {
+        match crate::tools::McpRegistry::connect_all(&mcp_servers).await {
             Ok(registry) => {
                 let registry = std::sync::Arc::new(registry);
                 if config.mcp.deferred_loading {
                     // Deferred path: build stubs and register tool_search
-                    let deferred_set = crate::tools::DeferredMcpToolSet::from_registry(
+                    let mut deferred_set = crate::tools::DeferredMcpToolSet::from_registry(
                         std::sync::Arc::clone(&registry),
                     )
-                    .await;
+                    .await
+                    .with_security(Arc::clone(&security));
+                    if let Some(ref allow_list) = allowed_tools {
+                        deferred_set.stubs.retain(|stub| {
+                            allow_list.iter().any(|name| name == &stub.prefixed_name)
+                        });
+                    }
+                    available_mcp_tools.extend(
+                        deferred_set
+                            .stubs
+                            .iter()
+                            .map(|stub| stub.prefixed_name.clone()),
+                    );
                     tracing::info!(
                         "MCP deferred: {} tool stub(s) from {} server(s)",
                         deferred_set.len(),
                         registry.server_count()
                     );
-                    deferred_section = crate::tools::build_deferred_tools_section(&deferred_set);
-                    let activated = std::sync::Arc::new(std::sync::Mutex::new(
-                        crate::tools::ActivatedToolSet::new(),
-                    ));
-                    activated_handle = Some(std::sync::Arc::clone(&activated));
-                    tools_registry.push(Box::new(crate::tools::ToolSearchTool::new(
-                        deferred_set,
-                        activated,
-                    )));
+                    if !deferred_set.is_empty() {
+                        deferred_section =
+                            crate::tools::build_deferred_tools_section(&deferred_set);
+                        let activated = std::sync::Arc::new(std::sync::Mutex::new(
+                            crate::tools::ActivatedToolSet::new(),
+                        ));
+                        activated_handle = Some(std::sync::Arc::clone(&activated));
+                        tools_registry.push(Box::new(crate::tools::ToolSearchTool::new(
+                            deferred_set,
+                            activated,
+                        )));
+                    }
                 } else {
                     // Eager path: register all MCP tools directly
                     let names = registry.tool_names();
                     let mut registered = 0usize;
                     for name in names {
+                        if allowed_tools.as_ref().is_some_and(|allow_list| {
+                            !allow_list.iter().any(|allowed| allowed == &name)
+                        }) {
+                            continue;
+                        }
                         if let Some(def) = registry.get_tool_def(&name).await {
-                            let wrapper: std::sync::Arc<dyn Tool> =
-                                std::sync::Arc::new(crate::tools::McpToolWrapper::new(
+                            available_mcp_tools.insert(name.clone());
+                            let wrapper: std::sync::Arc<dyn Tool> = std::sync::Arc::new(
+                                crate::tools::McpToolWrapper::new(
                                     name,
                                     def,
                                     std::sync::Arc::clone(&registry),
-                                ));
+                                )
+                                .with_security(Arc::clone(&security)),
+                            );
                             if let Some(ref handle) = delegate_handle {
                                 handle.write().push(std::sync::Arc::clone(&wrapper));
                             }
@@ -2137,19 +2176,13 @@ pub async fn run(
             "file_write",
             "Write file contents. Use when: applying focused edits, scaffolding files, updating docs/code. Don't use when: side effects are unclear or file ownership is uncertain.",
         ),
-        (
-            "memory_store",
-            "Save to memory. Use when: preserving durable preferences, decisions, key context. Don't use when: information is transient/noisy/sensitive without need.",
-        ),
-        (
-            "memory_recall",
-            "Search memory. Use when: retrieving prior decisions, user preferences, historical context. Don't use when: answer is already in current context.",
-        ),
-        (
-            "memory_forget",
-            "Delete a memory entry. Use when: memory is incorrect/stale or explicitly requested for removal. Don't use when: impact is uncertain.",
-        ),
     ];
+    tool_descs.extend(
+        crate::agent::system_prompt::BYORIDB_KNOWLEDGE_TOOL_DESCRIPTIONS
+            .iter()
+            .copied()
+            .filter(|(name, _)| available_mcp_tools.contains(*name)),
+    );
     if matches!(
         config.skills.prompt_injection_mode,
         naraeclaw_config::schema::SkillsPromptInjectionMode::Compact
@@ -2238,11 +2271,11 @@ pub async fn run(
     }
 
     // ── Approval manager (supervised mode) ───────────────────────
-    let approval_manager = if interactive {
-        Some(ApprovalManager::from_config(&config.autonomy))
+    let approval_manager = Some(if interactive {
+        ApprovalManager::from_config(&config.autonomy)
     } else {
-        None
-    };
+        ApprovalManager::for_non_interactive(&config.autonomy)
+    });
     let channel_name = if interactive { "cli" } else { "daemon" };
     let memory_session_id = session_state_file.as_deref().and_then(|path| {
         let raw = path.to_string_lossy().trim().to_string();
@@ -2904,13 +2937,7 @@ pub async fn process_message(
         &config.workspace_dir,
     ));
     let approval_manager = ApprovalManager::for_non_interactive(&config.autonomy);
-    let mem: Arc<dyn Memory> = Arc::from(naraeclaw_memory::create_memory_with_storage_and_routes(
-        &config.memory,
-        &config.embedding_routes,
-        Some(&config.storage.provider.config),
-        &config.workspace_dir,
-        config.api_key.as_deref(),
-    )?);
+    let mem: Arc<dyn Memory> = Arc::from(naraeclaw_memory::create_runtime_memory(&config)?);
 
     let (
         mut tools_registry,
@@ -2940,22 +2967,31 @@ pub async fn process_message(
     // injected after filter_primary_agent_tools_or_fail (or equivalent built-in
     // tool allow/deny filtering) to avoid MCP tools being silently dropped.
     let mut deferred_section = String::new();
+    let mut available_mcp_tools = HashSet::new();
     let mut activated_handle_pm: Option<
         std::sync::Arc<std::sync::Mutex<crate::tools::ActivatedToolSet>>,
     > = None;
-    if config.mcp.enabled && !config.mcp.servers.is_empty() {
+    let mcp_servers = config.effective_mcp_servers();
+    if !mcp_servers.is_empty() {
         tracing::info!(
             "Initializing MCP client — {} server(s) configured",
-            config.mcp.servers.len()
+            mcp_servers.len()
         );
-        match crate::tools::McpRegistry::connect_all(&config.mcp.servers).await {
+        match crate::tools::McpRegistry::connect_all(&mcp_servers).await {
             Ok(registry) => {
                 let registry = std::sync::Arc::new(registry);
                 if config.mcp.deferred_loading {
                     let deferred_set = crate::tools::DeferredMcpToolSet::from_registry(
                         std::sync::Arc::clone(&registry),
                     )
-                    .await;
+                    .await
+                    .with_security(Arc::clone(&security));
+                    available_mcp_tools.extend(
+                        deferred_set
+                            .stubs
+                            .iter()
+                            .map(|stub| stub.prefixed_name.clone()),
+                    );
                     tracing::info!(
                         "MCP deferred: {} tool stub(s) from {} server(s)",
                         deferred_set.len(),
@@ -2975,12 +3011,15 @@ pub async fn process_message(
                     let mut registered = 0usize;
                     for name in names {
                         if let Some(def) = registry.get_tool_def(&name).await {
-                            let wrapper: std::sync::Arc<dyn Tool> =
-                                std::sync::Arc::new(crate::tools::McpToolWrapper::new(
+                            available_mcp_tools.insert(name.clone());
+                            let wrapper: std::sync::Arc<dyn Tool> = std::sync::Arc::new(
+                                crate::tools::McpToolWrapper::new(
                                     name,
                                     def,
                                     std::sync::Arc::clone(&registry),
-                                ));
+                                )
+                                .with_security(Arc::clone(&security)),
+                            );
                             if let Some(ref handle) = delegate_handle_pm {
                                 handle.write().push(std::sync::Arc::clone(&wrapper));
                             }
@@ -3037,9 +3076,6 @@ pub async fn process_message(
         ("shell", "Execute terminal commands."),
         ("file_read", "Read file contents."),
         ("file_write", "Write file contents."),
-        ("memory_store", "Save to memory."),
-        ("memory_recall", "Search memory."),
-        ("memory_forget", "Delete a memory entry."),
         (
             "model_routing_config",
             "Configure default model, scenario routing, and delegate agents.",
@@ -3047,6 +3083,12 @@ pub async fn process_message(
         ("screenshot", "Capture a screenshot."),
         ("image_info", "Read image metadata."),
     ];
+    tool_descs.extend(
+        crate::agent::system_prompt::BYORIDB_KNOWLEDGE_TOOL_DESCRIPTIONS
+            .iter()
+            .copied()
+            .filter(|(name, _)| available_mcp_tools.contains(*name)),
+    );
     if matches!(
         config.skills.prompt_injection_mode,
         naraeclaw_config::schema::SkillsPromptInjectionMode::Compact

@@ -35,6 +35,7 @@ impl ModelRoutingConfigTool {
                 self.config.config_path.display()
             )
         })?;
+        parsed.apply_legacy_knowledge_compatibility(&contents);
         parsed.config_path = self.config.config_path.clone();
         parsed.workspace_dir = self.config.workspace_dir.clone();
         Ok(parsed)
@@ -991,6 +992,29 @@ mod tests {
         config.config_path = tmp.path().join("config.toml");
         config.save().await.unwrap();
         Arc::new(config)
+    }
+
+    #[test]
+    fn reload_keeps_byori_disabled_for_legacy_knowledge_schema() {
+        let tmp = TempDir::new().unwrap();
+        let config_path = tmp.path().join("config.toml");
+        fs::write(
+            &config_path,
+            r#"
+[knowledge]
+enabled = true
+db_path = "/srv/narae/custom-knowledge.db"
+max_nodes = 100000
+"#,
+        )
+        .unwrap();
+        let mut runtime_config = Config::default();
+        runtime_config.config_path = config_path;
+        runtime_config.workspace_dir = tmp.path().join("workspace");
+        let tool = ModelRoutingConfigTool::new(Arc::new(runtime_config), test_security());
+
+        let loaded = tool.load_config_without_env().unwrap();
+        assert!(!loaded.uses_byori_knowledge());
     }
 
     #[tokio::test]

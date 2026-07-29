@@ -64,6 +64,8 @@ pub struct Agent {
     /// `execute_tool_call` consults it before static/MCP tools so the agent can
     /// disable or HTTP-delegate any built-in at runtime via `tool_swap`.
     override_registry: Option<crate::tools::override_registry::SharedOverrideRegistry>,
+    /// Non-interactive approval gate used by gateway/embedded Agent paths.
+    approval_manager: Option<Arc<crate::approval::ApprovalManager>>,
 }
 
 pub struct AgentBuilder {
@@ -94,6 +96,7 @@ pub struct AgentBuilder {
     activated_tools: Option<Arc<std::sync::Mutex<crate::tools::ActivatedToolSet>>>,
     hook_runner: Option<Arc<crate::hooks::HookRunner>>,
     override_registry: Option<crate::tools::override_registry::SharedOverrideRegistry>,
+    approval_manager: Option<Arc<crate::approval::ApprovalManager>>,
 }
 
 impl Default for AgentBuilder {
@@ -132,6 +135,7 @@ impl AgentBuilder {
             activated_tools: None,
             hook_runner: None,
             override_registry: None,
+            approval_manager: None,
         }
     }
 
@@ -288,6 +292,14 @@ impl AgentBuilder {
         self
     }
 
+    pub(crate) fn approval_manager(
+        mut self,
+        manager: Option<Arc<crate::approval::ApprovalManager>>,
+    ) -> Self {
+        self.approval_manager = manager;
+        self
+    }
+
     pub fn build(self) -> Result<Agent> {
         let mut tools = self
             .tools
@@ -346,6 +358,7 @@ impl AgentBuilder {
             activated_tools: self.activated_tools,
             hook_runner: self.hook_runner,
             override_registry: self.override_registry,
+            approval_manager: self.approval_manager,
         })
     }
 }
@@ -396,14 +409,7 @@ impl Agent {
             &config.workspace_dir,
         ));
 
-        let memory: Arc<dyn Memory> =
-            Arc::from(naraeclaw_memory::create_memory_with_storage_and_routes(
-                &config.memory,
-                &config.embedding_routes,
-                Some(&config.storage.provider.config),
-                &config.workspace_dir,
-                config.api_key.as_deref(),
-            )?);
+        let memory: Arc<dyn Memory> = Arc::from(naraeclaw_memory::create_runtime_memory(config)?);
 
         // ADR-004 Level 2: a runtime override registry wired into both the tool
         // set (so `ToolSwapTool` mutates it) and the Agent (so `execute_tool_call`
@@ -440,19 +446,21 @@ impl Agent {
         // and webhook paths (loop_.rs) so that the WebSocket/daemon UI
         // path also has access to MCP tools.
         let mut activated_tools: Option<Arc<std::sync::Mutex<tools::ActivatedToolSet>>> = None;
-        if config.mcp.enabled && !config.mcp.servers.is_empty() {
+        let mcp_servers = config.effective_mcp_servers();
+        if !mcp_servers.is_empty() {
             tracing::info!(
                 "Initializing MCP client — {} server(s) configured",
-                config.mcp.servers.len()
+                mcp_servers.len()
             );
-            match tools::McpRegistry::connect_all(&config.mcp.servers).await {
+            match tools::McpRegistry::connect_all(&mcp_servers).await {
                 Ok(registry) => {
                     let registry = std::sync::Arc::new(registry);
                     if config.mcp.deferred_loading {
                         let deferred_set = tools::DeferredMcpToolSet::from_registry(
                             std::sync::Arc::clone(&registry),
                         )
-                        .await;
+                        .await
+                        .with_security(Arc::clone(&security));
                         tracing::info!(
                             "MCP deferred: {} tool stub(s) from {} server(s)",
                             deferred_set.len(),
@@ -470,12 +478,14 @@ impl Agent {
                         let mut registered = 0usize;
                         for name in names {
                             if let Some(def) = registry.get_tool_def(&name).await {
-                                let wrapper: std::sync::Arc<dyn tools::Tool> =
-                                    std::sync::Arc::new(tools::McpToolWrapper::new(
+                                let wrapper: std::sync::Arc<dyn tools::Tool> = std::sync::Arc::new(
+                                    tools::McpToolWrapper::new(
                                         name,
                                         def,
                                         std::sync::Arc::clone(&registry),
-                                    ));
+                                    )
+                                    .with_security(Arc::clone(&security)),
+                                );
                                 if let Some(ref handle) = delegate_handle {
                                     handle.write().push(std::sync::Arc::clone(&wrapper));
                                 }
@@ -573,6 +583,9 @@ impl Agent {
             .auto_save(config.memory.auto_save)
             .security_summary(Some(security.prompt_summary()))
             .autonomy_level(config.autonomy.level)
+            .approval_manager(Some(Arc::new(
+                crate::approval::ApprovalManager::for_non_interactive(&config.autonomy),
+            )))
             .activated_tools(activated_tools)
             .hook_runner(if config.hooks.enabled {
                 let mut runner = crate::hooks::HookRunner::new();
@@ -688,6 +701,44 @@ impl Agent {
                     };
                 }
             }
+        }
+
+        // Agent::from_config is used by gateway/WebSocket paths that do not
+        // pass through loop_.rs's approval hook. Apply the same non-interactive
+        // policy here before overrides, static tools, or deferred MCP tools can
+        // execute. Calls requiring approval are denied because this surface has
+        // no interactive approver.
+        let approval_tool_name = if self.tools.iter().any(|tool| tool.name() == tool_name) {
+            tool_name.clone()
+        } else {
+            self.activated_tools
+                .as_ref()
+                .and_then(|activated| {
+                    activated
+                        .lock()
+                        .ok()?
+                        .get_resolved(&tool_name)
+                        .map(|tool| tool.name().to_string())
+                })
+                .unwrap_or_else(|| tool_name.clone())
+        };
+        if let Some(manager) = self.approval_manager.as_ref()
+            && manager.needs_approval(&approval_tool_name)
+        {
+            manager.record_decision(
+                &approval_tool_name,
+                &tool_args,
+                crate::approval::ApprovalResponse::No,
+                "agent-non-interactive",
+            );
+            return ToolExecutionResult {
+                name: tool_name.clone(),
+                output: format!(
+                    "Denied by approval policy: tool '{approval_tool_name}' requires explicit approval."
+                ),
+                success: false,
+                tool_call_id: call.tool_call_id.clone(),
+            };
         }
 
         // ── Priority 1: ToolOverrideRegistry (ADR-004 Level 2 runtime swap) ──
