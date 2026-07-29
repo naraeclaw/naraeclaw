@@ -4,7 +4,7 @@ SOPs are deterministic procedures executed by the `SopEngine`. They provide expl
 
 ## Quick Paths
 
-- **Connect Events:** [Connectivity & Fan-In](connectivity.md) — trigger SOPs via MQTT, webhooks, cron,.
+- **Connectivity status:** [Connectivity](connectivity.md) — current manual entry point and unwired external trigger schemas.
 - **Write SOPs:** [Syntax Reference](syntax.md) — required file layout and trigger/step syntax.
 - **Monitor:** [Observability & Audit](observability.md) — where run state and audit entries are stored.
 - **Examples:** [Cookbook](cookbook.md) — reusable SOP patterns.
@@ -13,22 +13,22 @@ SOPs are deterministic procedures executed by the `SopEngine`. They provide expl
 
 - SOP definitions are loaded from `<workspace>/sops/<sop_name>/SOP.toml` plus optional `SOP.md`.
 - CLI `naraeclaw sop` currently manages definitions only: `list`, `validate`, `show`.
-- SOP runs are started by event fan-in (MQTT/webhook/cron) or by the in-agent tool `sop_execute`.
+- SOP runs are currently started by the in-agent tool `sop_execute`. MQTT/webhook/cron
+  trigger schemas exist, but external event fan-in is not wired into the daemon or gateway.
 - Run progression uses tools: `sop_status`, `sop_approve`, `sop_advance`.
-- SOP audit records are persisted in the configured Memory backend under category `sop`.
+- SOP audit logging still uses the legacy Memory compatibility interface. It is durable
+  only when ByoriDB knowledge is disabled and a persistent legacy `[memory]` backend is
+  explicitly active; default ByoriDB mode supplies a no-op compatibility handle and does
+  not mix operational SOP events into the knowledge graph.
 
 ## 2. Event Flow
 
 ```mermaid
 graph LR
-    MQTT[MQTT] -->|topic match| Dispatch
-    WH[POST /sop/* or /webhook] -->|path match| Dispatch
-    CRON[Scheduler] -->|window check| Dispatch
-
-    Dispatch --> Engine[SOP Engine]
+    Agent[Agent turn] -->|sop_execute| Engine[SOP Engine]
     Engine --> Run[SOP Run]
     Run --> Action{Action}
-    Action -->|ExecuteStep| Agent[Agent Loop]
+    Action -->|ExecuteStep| Loop[Agent Loop]
     Action -->|WaitApproval| Human[Operator]
     Human -->|sop_approve| Run
 ```
@@ -58,6 +58,6 @@ graph LR
    naraeclaw sop show deploy-prod
    ```
 
-4. Trigger runs via configured event sources, or manually from an agent turn with `sop_execute`.
+4. Trigger runs manually from an agent turn with `sop_execute`.
 
-For trigger routing and auth details, see [Connectivity](connectivity.md).
+For current connectivity limitations, see [Connectivity](connectivity.md).

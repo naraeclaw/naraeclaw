@@ -211,5 +211,5 @@ agent-browser get text body
 ## Related
 
 - [agent-browser Documentation](https://github.com/vercel-labs/agent-browser)
-- [NaraeClaw Configuration Reference](./config-reference.md)
-- [Skills Documentation](../skills/)
+- [NaraeClaw Configuration Reference](reference/api/config-reference.md)
+- [Skills CLI Reference](reference/cli/commands-reference.md#skills)

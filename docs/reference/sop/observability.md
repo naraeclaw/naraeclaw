@@ -4,7 +4,11 @@ This page covers where SOP execution evidence is stored and how to inspect it.
 
 ## 1. Audit Persistence
 
-SOP audit entries are persisted via `SopAuditLogger` into the configured Memory backend, category `sop`.
+`SopAuditLogger` writes through the legacy Memory compatibility interface, category `sop`.
+Those entries are durable only when `[knowledge].enabled = false` and a persistent legacy
+`[memory]` backend is active. In the default ByoriDB mode the compatibility handle is a
+no-op: SOP operational events are deliberately not stored as user knowledge. Runtime
+state and the metrics below remain available, but this legacy audit stream is not durable.
 
 Common key patterns:
 

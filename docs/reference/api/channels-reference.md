@@ -1,387 +1,107 @@
 # Channels Reference
 
-This document is the canonical reference for channel configuration in NaraeClaw.
+This is the current public channel configuration contract.
 
-For encrypted Matrix rooms, also read the dedicated runbook:
-- [Matrix E2EE Guide](../../security/matrix-e2ee-guide.md)
+Last verified: **July 29, 2026**.
 
-## Quick Paths
+## Supported Surfaces
 
-- Need a full config reference by channel: jump to [Per-Channel Config Examples](#4-per-channel-config-examples).
-- Need a no-response diagnosis flow: jump to [Troubleshooting Checklist](#6-troubleshooting-checklist).
-- Need Matrix encrypted-room help: use [Matrix E2EE Guide](../../security/matrix-e2ee-guide.md).
-- Need Nextcloud Talk bot setup: use [Nextcloud Talk Setup](../../setup-guides/nextcloud-talk-setup.md).
-- Need deployment/network assumptions (polling vs webhook): use [Network Deployment](../../ops/network-deployment.md).
+| Surface | Receive mode | Public inbound port |
+|---|---|---|
+| CLI | local stdin/stdout | no |
+| Slack | Socket Mode WebSocket | no |
+| Gateway | HTTP/WebSocket API, separate from `channels_config` | yes, when exposed |
 
-## FAQ: Matrix setup passes but no reply
+The current `ChannelsConfig` schema contains only CLI and Slack. Older documentation and
+configuration examples for Telegram, Discord, Matrix, Mattermost, Signal, WhatsApp,
+Nextcloud Talk, email, Nostr, and regional channels are not part of the current public
+runtime contract.
 
-This is the most common symptom (same class as issue #499). Check these in order:
+The gateway still reserves several integration-specific paths as compatibility stubs.
+`/whatsapp`, `/wati`, `/nextcloud-talk`, and `/webhook/gmail` return `404 Not Found`; their
+presence in the router does not mean the integration is available.
 
-1. **Allowlist mismatch**: `allowed_users` does not include the sender (or is empty).
-2. **Wrong room target**: bot is not joined to the configured `room_id` / alias target room.
-3. **Token/account mismatch**: token is valid but belongs to another Matrix account.
-4. **E2EE device identity gap**: `whoami` does not return `device_id` and config does not provide one.
-5. **Key sharing/trust gap**: room keys were not shared to the bot device, so encrypted events cannot be decrypted.
-6. **Stale runtime state**: config changed but `naraeclaw daemon` was not restarted.
-
----
-
-## 1. Configuration Namespace
-
-All channel settings live under `channels_config` in `~/.naraeclaw/config.toml`.
+## `[channels_config]`
 
 ```toml
 [channels_config]
 cli = true
+message_timeout_secs = 300
+ack_reactions = true
+show_tool_calls = false
+session_persistence = true
+session_backend = "sqlite"
+session_ttl_hours = 0
+debounce_ms = 0
 ```
 
-Each channel is enabled by creating its sub-table (for example, `[channels_config.telegram]`).
-
-## In-Chat Runtime Model Switching (Telegram / Discord)
-
-When running `naraeclaw channel start` (or daemon mode), Telegram and Discord now support sender-scoped runtime switching:
-
-- `/models` — show available providers and current selection
-- `/models <provider>` — switch provider for the current sender session
-- `/model` — show current model and cached model IDs (if available)
-- `/model <model-id>` — switch model for the current sender session
-- `/new` — clear conversation history and start a fresh session
-
-Notes:
-
-- Switching provider or model clears only that sender's in-memory conversation history to avoid cross-model context contamination.
-- `/new` clears the sender's conversation history without changing provider or model selection.
-- Model cache previews come from `naraeclaw models refresh --provider <ID>`.
-- These are runtime chat commands, not CLI subcommands.
-
-## Inbound Image Marker Protocol
-
-NaraeClaw supports multimodal input through inline message markers:
-
-- Syntax: ``[IMAGE:<source>]``
-- `<source>` can be:
-  - Local file path
-  - Data URI (`data:image/...;base64,...`)
-  - Remote URL only when `[multimodal].allow_remote_fetch = true`
-
-Operational notes:
-
-- Marker parsing applies to user-role messages before provider calls.
-- Provider capability is enforced at runtime: if the selected provider does not support vision, the request fails with a structured capability error (`capability=vision`).
-
-## Channel Matrix
-
-### Build Feature Toggles (`channel-matrix`)
-
-Matrix support is controlled at compile time.
-
-- Default builds are lean and do not include Matrix.
-- Enable Matrix explicitly when needed:
-
-```bash
-cargo check --features channel-matrix
-```
-
-If `[channels_config.matrix]` is present but the corresponding feature is not compiled in, `naraeclaw channel list`, `naraeclaw channel doctor`, and `naraeclaw channel start` will report that the channel is intentionally skipped for this build.
-
----
-
-## 2. Delivery Modes at a Glance
-
-| Channel | Receive mode | Public inbound port required? |
+| Key | Default | Purpose |
 |---|---|---|
-| CLI | local stdin/stdout | No |
-| Telegram | polling | No |
-| Discord | gateway/websocket | No |
-| Slack | events API | No (token-based channel flow) |
-| Mattermost | polling | No |
-| Matrix | sync API (supports E2EE) | No |
-| Signal | signal-cli HTTP bridge | No (local bridge endpoint) |
-| WhatsApp | webhook (Cloud API) or websocket (Web mode) | Cloud API: Yes (public HTTPS callback), Web mode: No |
-| Nextcloud Talk | webhook (`/nextcloud-talk`) | Yes (public HTTPS callback) |
-| Webhook | gateway endpoint (`/webhook`) | Usually yes |
-| Email | IMAP polling + SMTP send | No |
-| Nostr | relay websocket (NIP-04 / NIP-17) | No |
+| `cli` | `true` | enable the interactive CLI channel |
+| `message_timeout_secs` | `300` | base per-message processing budget |
+| `ack_reactions` | `true` | add receipt/completion reactions when supported |
+| `show_tool_calls` | `false` | forward tool-call notices to channel users |
+| `session_persistence` | `true` | persist channel conversation sessions |
+| `session_backend` | `sqlite` | session store; `jsonl` remains a legacy option |
+| `session_ttl_hours` | `0` | archive sessions older than N hours; `0` disables expiry |
+| `debounce_ms` | `0` | combine rapid messages from one sender; `0` disables |
 
----
+Channel session SQLite is operational conversation state. It is not a durable-knowledge
+backend; ByoriDB owns cross-session knowledge.
 
-## 3. Allowlist Semantics
+## Slack Socket Mode
 
-For channels with inbound sender allowlists:
-
-- Empty allowlist: deny all inbound messages.
-- `"*"`: allow all inbound senders (use for temporary verification only).
-- Explicit list: allow only listed senders.
-
-Field names differ by channel:
-
-- `allowed_from` (Signal)
-- `allowed_numbers` (WhatsApp)
-- `allowed_pubkeys` (Nostr)
-
----
-
-## 4. Per-Channel Config Examples
-
-### 4.1 Telegram
-
-```toml
-[channels_config.telegram]
-bot_token = "123456:telegram-token"
-allowed_users = ["*"]
-stream_mode = "off"               # optional: off | partial
-draft_update_interval_ms = 1000   # optional: edit throttle for partial streaming
-mention_only = false              # optional: require @mention in groups
-interrupt_on_new_message = false  # optional: cancel in-flight same-sender same-chat request
-```
-
-Telegram notes:
-
-- `interrupt_on_new_message = true` preserves interrupted user turns in conversation history, then restarts generation on the newest message.
-- Interruption scope is strict: same sender in the same chat. Messages from different chats are processed independently.
-
-### 4.2 Discord
-
-```toml
-[channels_config.discord]
-bot_token = "discord-bot-token"
-guild_id = "123456789012345678"   # optional
-allowed_users = ["*"]
-listen_to_bots = false
-mention_only = false
-stream_mode = "multi_message"     # optional: off | partial | multi_message (default: multi_message via wizard)
-draft_update_interval_ms = 1000   # optional: edit throttle for partial streaming
-multi_message_delay_ms = 800      # optional: delay between paragraph sends in multi_message mode
-```
-
-Discord notes:
-
-- `stream_mode = "partial"` sends an editable draft message that updates token-by-token as the LLM streams its response, then finalizes with the complete text.
-- `stream_mode = "multi_message"` delivers the response incrementally as separate messages, splitting at paragraph boundaries (`\n\n`) as tokens arrive from the provider. Each paragraph appears in Discord as soon as it completes.
-- `draft_update_interval_ms` controls edit throttling in partial mode (default: 1000ms).
-- `multi_message_delay_ms` controls minimum delay between paragraph sends in multi_message mode to avoid Discord rate limits (default: 800ms).
-- Code fences are never split across messages in multi_message mode.
-
-### 4.3 Slack
+Create a Slack app, enable Socket Mode, and provide an App-Level Token (`xapp-`) plus a Bot
+Token (`xoxb-`). A public webhook URL is not required.
 
 ```toml
 [channels_config.slack]
+enabled = true
+app_token = "xapp-..."
 bot_token = "xoxb-..."
-app_token = "xapp-..."             # optional
-channel_id = "C1234567890"         # optional: single channel; omit or "*" for all accessible channels
-channel_ids = ["C1234567890"]      # optional: explicit channel list; takes precedence over channel_id
-allowed_users = ["*"]
+# signing_secret = "..."
+# default_channel = "C0123456789"
 ```
 
-Slack listen behavior:
+| Key | Default | Purpose |
+|---|---|---|
+| `enabled` | `false` | activate Slack |
+| `app_token` | required | Socket Mode connection token |
+| `bot_token` | required | Web API send token |
+| `signing_secret` | unset | optional Slack signing secret |
+| `default_channel` | unset | fallback channel when no incoming thread context exists |
 
-- `channel_ids = ["C123...", "D456..."]`: listen only on the listed channels/DMs.
-- `channel_id = "C123..."`: listen only on that channel.
-- `channel_id = "*"` or omitted: auto-discover and listen across all accessible channels.
+Recommended Slack scopes include `chat:write`, `reactions:write`, `channels:history`, and
+`im:history`; the App-Level Token needs `connections:write`.
 
-### 4.4 Mattermost
-
-```toml
-[channels_config.mattermost]
-url = "https://mm.example.com"
-bot_token = "mattermost-token"
-channel_id = "channel-id"          # required for listening
-allowed_users = ["*"]
-```
-
-### 4.5 Matrix
-
-```toml
-[channels_config.matrix]
-homeserver = "https://matrix.example.com"
-access_token = "syt_..."
-user_id = "@naraeclaw:matrix.example.com"   # optional, recommended for E2EE
-device_id = "DEVICEID123"                  # optional, recommended for E2EE
-room_id = "!room:matrix.example.com"       # or room alias (#ops:matrix.example.com)
-allowed_users = ["*"]
-stream_mode = "partial"                    # optional: off | partial | multi_message (default: partial via wizard)
-draft_update_interval_ms = 1500            # optional: edit throttle for partial streaming
-multi_message_delay_ms = 800               # optional: delay between paragraph sends in multi_message mode
-```
-
-Matrix streaming notes:
-
-- `stream_mode = "partial"` sends an editable draft message that updates token-by-token via Matrix `m.replace` edits as the LLM streams its response.
-- `stream_mode = "multi_message"` delivers the response incrementally as separate messages, splitting at paragraph boundaries (`\n\n`) as tokens arrive. Code fences are never split across messages.
-- `draft_update_interval_ms` controls edit throttling in partial mode (default: 1500ms, higher than Telegram to account for E2EE re-encryption overhead and federation latency).
-- `multi_message_delay_ms` controls minimum delay between paragraph sends in multi_message mode (default: 800ms).
-- Both modes work in encrypted and unencrypted rooms — the matrix-sdk handles E2EE transparently.
-- Existing configs without `stream_mode` default to `off` (no behavior change).
-
-See [Matrix E2EE Guide](../../security/matrix-e2ee-guide.md) for encrypted-room troubleshooting.
-
-### 4.6 Signal
-
-```toml
-[channels_config.signal]
-http_url = "http://127.0.0.1:8686"
-account = "+1234567890"
-group_id = "dm"                    # optional: "dm" / group id / omitted
-allowed_from = ["*"]
-ignore_attachments = false
-ignore_stories = true
-```
-
-### 4.7 WhatsApp
-
-NaraeClaw supports two WhatsApp backends:
-
-- **Cloud API mode** (`phone_number_id` + `access_token` + `verify_token`)
-- **WhatsApp Web mode** (`session_path`, requires build flag `--features whatsapp-web`)
-
-Cloud API mode:
-
-```toml
-[channels_config.whatsapp]
-access_token = "EAAB..."
-phone_number_id = "123456789012345"
-verify_token = "your-verify-token"
-app_secret = "your-app-secret"     # optional but recommended
-allowed_numbers = ["*"]
-```
-
-WhatsApp Web mode:
-
-```toml
-[channels_config.whatsapp]
-session_path = "~/.naraeclaw/state/whatsapp-web/session.db"
-pair_phone = "15551234567"         # optional; omit to use QR flow
-pair_code = ""                     # optional custom pair code
-allowed_numbers = ["*"]
-mention_only = false               # optional: require @mention in groups (DMs always processed)
-interrupt_on_new_message = false   # optional: cancel in-flight same-sender same-chat request
-```
-
-Notes:
-
-- Build with `cargo build --features whatsapp-web` (or equivalent run command).
-- Keep `session_path` on persistent storage to avoid relinking after restart.
-- Reply routing uses the originating chat JID, so direct and group replies work correctly.
-- `mention_only = true` makes the bot ignore group messages unless the bot is @-mentioned. Direct messages are always processed. Bot identity is seeded from `pair_phone` and updated from the device store on connect.
-- `interrupt_on_new_message = true` preserves interrupted user turns in conversation history, then restarts generation on the newest message.
-
-### 4.8 Webhook Channel Config (Gateway)
-
-`channels_config.webhook` enables webhook-specific gateway behavior.
-
-```toml
-[channels_config.webhook]
-port = 8080
-secret = "optional-shared-secret"
-```
-
-Run with gateway/daemon and verify `/health`.
-
-### 4.9 Email
-
-```toml
-[channels_config.email]
-imap_host = "imap.example.com"
-imap_port = 993
-imap_folder = "INBOX"
-smtp_host = "smtp.example.com"
-smtp_port = 465
-smtp_tls = true
-username = "bot@example.com"
-password = "email-password"
-from_address = "bot@example.com"
-poll_interval_secs = 60
-allowed_senders = ["*"]
-```
-
-
-### 4.13 Nostr
-
-```toml
-[channels_config.nostr]
-private_key = "nsec1..."                   # hex or nsec bech32 (encrypted at rest)
-# relays default to relay.damus.io, nos.lol, relay.primal.net, relay.snort.social
-# relays = ["wss://relay.damus.io", "wss://nos.lol"]
-allowed_pubkeys = ["hex-or-npub"]          # empty = deny all, "*" = allow all
-```
-
-Nostr supports both NIP-04 (legacy encrypted DMs) and NIP-17 (gift-wrapped private messages).
-Replies automatically use the same protocol the sender used. The private key is encrypted at rest
-via the `SecretStore` when `secrets.encrypt = true` (the default).
-
-Guided onboarding support:
+## CLI Operations
 
 ```bash
-naraeclaw onboard
+naraeclaw channel list
+naraeclaw channel doctor
+naraeclaw channel start
+naraeclaw channel send "message" --channel-id slack --recipient C0123456789
 ```
 
-The wizard now includes dedicated **Lark** and **Feishu** steps with:
+`channel add` and `channel remove` currently direct users back to managed setup or manual
+configuration rather than acting as a complete declarative config editor.
 
-- credential verification against official Open Platform auth endpoint
-- receive mode selection (`websocket` or `webhook`)
-- optional webhook verification token prompt (recommended for stronger callback authenticity checks)
+## Troubleshooting
 
-Runtime token behavior:
+| Symptom | Check |
+|---|---|
+| Slack does not connect | token prefixes, Socket Mode, app installation, `enabled = true` |
+| Messages arrive but no reply | bot scopes, channel membership, daemon logs |
+| Tool activity is invisible | set `show_tool_calls = true` if disclosure is desired |
+| Sessions disappear | `session_persistence`, writable workspace, session TTL |
+| Old channel config has no effect | remove it; only CLI and Slack are in the current schema |
 
-- `tenant_access_token` is cached with a refresh deadline based on `expire`/`expires_in` from the auth response.
-- send requests automatically retry once after token invalidation when Feishu/Lark returns either HTTP `401` or business error code `99991663` (`Invalid access token`).
-- if the retry still returns token-invalid responses, the send call fails with the upstream status/body for easier troubleshooting.
+Use `naraeclaw channel doctor` after every channel config change. The config schema emitted
+by `naraeclaw config schema` and `crates/naraeclaw-config/src/schema/channels.rs` are the
+sources of truth.
 
-### 4.16 Nextcloud Talk
+## Related Docs
 
-```toml
-[channels_config.nextcloud_talk]
-base_url = "https://cloud.example.com"
-app_token = "nextcloud-talk-app-token"
-webhook_secret = "optional-webhook-secret"  # optional but recommended
-allowed_users = ["*"]
-# bot_name = "naraeclaw"  # display name of the bot; filters own messages to prevent feedback loops
-```
-
-Notes:
-
-- Inbound webhook endpoint: `POST /nextcloud-talk`.
-- Signature verification uses `X-Nextcloud-Talk-Random` and `X-Nextcloud-Talk-Signature`.
-- If `webhook_secret` is set, invalid signatures are rejected with `401`.
-- `NARAECLAW_NEXTCLOUD_TALK_WEBHOOK_SECRET` overrides config secret.
-- See [nextcloud-talk-setup.md](../../setup-guides/nextcloud-talk-setup.md) for a full runbook.
-
-
-
-### 7.1 Recommended capture command
-
-```bash
-RUST_LOG=info naraeclaw daemon 2>&1 | tee /tmp/naraeclaw.log
-```
-
-Then filter channel/gateway events:
-
-```bash
-rg -n "Matrix|Telegram|Discord|Slack|Mattermost|Signal|WhatsApp|Email|Nostr|Webhook|Channel" /tmp/naraeclaw.log
-```
-
-### 7.2 Keyword table
-
-| Component | Startup / healthy signal | Authorization / policy signal | Transport / failure signal |
-|---|---|---|---|
-| Telegram | `Telegram channel listening for messages...` | `Telegram: ignoring message from unauthorized user:` | `Telegram poll error:` / `Telegram parse error:` / `Telegram polling conflict (409):` |
-| Discord | `Discord: connected and identified` | `Discord: ignoring message from unauthorized user:` | `Discord: received Reconnect (op 7)` / `Discord: received Invalid Session (op 9)` |
-| Slack | `Slack channel listening on #` / `Slack channel_id not set (or '*'); listening across all accessible channels.` | `Slack: ignoring message from unauthorized user:` | `Slack poll error:` / `Slack parse error:` / `Slack channel discovery failed:` |
-| Mattermost | `Mattermost channel listening on` | `Mattermost: ignoring message from unauthorized user:` | `Mattermost poll error:` / `Mattermost parse error:` |
-| Matrix | `Matrix channel listening on room` / `Matrix room ... is encrypted; E2EE decryption is enabled via matrix-sdk.` | `Matrix whoami failed; falling back to configured session hints for E2EE session restore:` / `Matrix whoami failed while resolving listener user_id; using configured user_id hint:` | `Matrix sync error: ... retrying...` |
-| Signal | `Signal channel listening via SSE on` | (allowlist checks are enforced by `allowed_from`) | `Signal SSE returned ...` / `Signal SSE connect error:` |
-| WhatsApp (channel) | `WhatsApp channel active (webhook mode).` / `WhatsApp Web connected successfully` | `WhatsApp: ignoring message from unauthorized number:` / `WhatsApp Web: message from ... not in allowed list` | `WhatsApp send failed:` / `WhatsApp Web stream error:` |
-| Webhook / WhatsApp (gateway) | `WhatsApp webhook verified successfully` | `Webhook: rejected — not paired / invalid bearer token` / `Webhook: rejected request — invalid or missing X-Webhook-Secret` / `WhatsApp webhook verification failed — token mismatch` | `Webhook JSON parse error:` |
-| Email | `Email polling every ...` / `Email sent to ...` | `Blocked email from ...` | `Email poll failed:` / `Email poll task panicked:` |
-| Nextcloud Talk (gateway) | `POST /nextcloud-talk — Nextcloud Talk bot webhook` | `Nextcloud Talk webhook signature verification failed` / `Nextcloud Talk: ignoring message from unauthorized actor:` | `Nextcloud Talk send failed:` / `LLM error for Nextcloud Talk message:` |
-| Nostr | `Nostr channel listening as npub1...` | `Nostr: ignoring NIP-04 message from unauthorized pubkey:` / `Nostr: ignoring NIP-17 message from unauthorized pubkey:` | `Failed to decrypt NIP-04 message:` / `Failed to unwrap NIP-17 gift wrap:` / `Nostr relay pool shut down` |
-
-### 7.3 Runtime supervisor keywords
-
-If a specific channel task crashes or exits, the channel supervisor in `channels/mod.rs` emits:
-
-- `Channel <name> exited unexpectedly; restarting`
-- `Channel <name> error: ...; restarting`
-- `Channel message worker crashed:`
-
-These messages indicate automatic restart behavior is active, and you should inspect preceding logs for root cause.
+- [Gateway API](../../setup-guides/gateway-api.md)
+- [Network Deployment](../../ops/network-deployment.md)
+- [Config Reference](config-reference.md)

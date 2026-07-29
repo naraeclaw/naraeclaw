@@ -63,7 +63,7 @@ If you get stuck, open a draft PR early and ask questions in the description.
 
 ```bash
 # Clone the repo
-git clone https://github.com/juikkim/naraeclaw.git
+git clone https://github.com/naraeclaw/naraeclaw.git
 cd naraeclaw
 
 # Enable the pre-push hook (runs fmt, clippy, tests before every push)
@@ -122,7 +122,7 @@ For an opt-in docs links pass during pre-push (added-links gate), set:
 NARAECLAW_DOCS_LINKS=1 git push
 ```
 
-For full CI parity in Docker, run:
+For the extended local Docker suite (heavier than active Fast CI), run:
 
 ```bash
 ./dev/ci.sh all
@@ -134,7 +134,9 @@ To skip it during rapid iteration:
 git push --no-verify
 ```
 
-> **Note:** CI runs the same checks, so skipped hooks will be caught on the PR.
+> **Note:** Active Fast CI runs `cargo fmt --all -- --check` and
+> `cargo check --workspace`. Optional hook checks and the extended local suite are not
+> automatically reproduced by CI.
 
 ## Local Secret Management (Required)
 
@@ -230,9 +232,9 @@ To keep review throughput high without lowering quality, every PR should map to 
 
 | Track | Typical scope | Required review depth |
 |---|---|---|
-| **Track A (Low risk)** | docs/tests/chore, isolated refactors, no security/runtime/CI impact | 1 maintainer review + green `CI Required Gate` |
-| **Track B (Medium risk)** | providers/channels/memory/tools behavior changes | 1 subsystem-aware review + explicit validation evidence |
-| **Track C (High risk)** | `src/security/**`, `src/runtime/**`, `src/gateway/**`, `.github/workflows/**`, access-control boundaries | 2-pass review (fast triage + deep risk review), rollback plan required |
+| **Track A (Low risk)** | docs/tests/chore, isolated refactors, no security/runtime/CI impact | Fast CI + lightweight review |
+| **Track B (Medium risk)** | provider/channel or compatibility-memory behavior changes | subsystem-aware review + explicit validation evidence |
+| **Track C (High risk)** | `crates/naraeclaw-runtime/src/security/**`, `crates/naraeclaw-gateway/src/**`, `crates/naraeclaw-tools/src/**`, `.github/workflows/**`, access-control boundaries | 2-pass review (fast triage + deep review), rollback plan required |
 
 When in doubt, choose the higher track.
 
@@ -279,7 +281,7 @@ Before requesting review, ensure all of the following are true:
 
 A PR is merge-ready when:
 
-- `CI Required Gate` is green.
+- Active Fast CI (`fmt` + workspace `check`) is green.
 - Owner-approved when review is requested.
 - Risk level matches changed paths (`risk: low/medium/high`).
 - User-visible behavior, migration, and rollback notes are complete.
@@ -294,7 +296,8 @@ When PR traffic is high (especially with AI-assisted contributions), these rules
 - **Small PRs first**: prefer PR size `XS/S/M`; split large work into stacked PRs.
 - **Template is mandatory**: complete every section in `.github/pull_request_template.md`.
 - **Explicit rollback**: every PR must include a fast rollback path.
-- **Security-first review**: changes in `src/security/`, runtime, gateway, and CI need stricter validation.
+- **Security-first review**: changes in `crates/naraeclaw-runtime/src/security/`, gateway,
+  tool execution, and CI need stricter validation.
 - **Risk-first triage**: use labels (`risk: high`, `risk: medium`, `risk: low`) to route review depth.
 - **Privacy-first hygiene**: redact/anonymize sensitive payloads and keep tests/examples neutral and project-scoped.
 - **Identity normalization**: when identity traits are unavoidable, use NaraeClaw/project-native roles instead of personal or real-world identities.
@@ -322,17 +325,20 @@ Agent implementation playbook lives in [`AGENTS.md`](AGENTS.md).
 
 ## Architecture: Trait-Based Pluggability
 
-NaraeClaw's architecture is built on **traits** — every subsystem is swappable. This means contributing a new integration is as simple as implementing a trait and registering it in the factory function.
+NaraeClaw's runtime boundaries are trait-driven. Providers, channels, and tools are
+extended by implementing their public trait and registering the implementation in the
+owning workspace crate. Durable knowledge is the exception: ByoriDB is the sole supported
+provider, while the `Memory` trait remains only for migration and compatibility.
 
 ```
-src/
-├── providers/       # LLM backends     → Provider trait
-├── channels/        # Messaging         → Channel trait
-├── observability/   # Metrics/logging   → Observer trait
-├── runtime/         # Platform adapters → RuntimeAdapter trait
-├── tools/           # Agent tools       → Tool trait
-├── memory/          # Persistence/brain → Memory trait
-└── security/        # Sandboxing        → SecurityPolicy
+crates/
+├── naraeclaw-api/        # Provider, Channel, Tool, Observer, RuntimeAdapter contracts
+├── naraeclaw-providers/  # LLM backends and provider factory
+├── naraeclaw-channels/   # Messaging transports and orchestration
+├── naraeclaw-tools/      # Agent tool implementations and MCP client
+├── naraeclaw-runtime/    # Agent loop, security, skills, cron, SOP
+├── naraeclaw-config/     # Public config schema and policy
+└── naraeclaw-memory/     # Legacy migration/compatibility and source readers
 ```
 
 ## Code Naming Conventions (Required)
@@ -340,8 +346,8 @@ src/
 Use these defaults unless an existing subsystem pattern clearly overrides them.
 
 - **Rust casing**: modules/files `snake_case`, types/traits/enums `PascalCase`, functions/variables `snake_case`, constants `SCREAMING_SNAKE_CASE`.
-- **Domain-first naming**: prefer explicit role names such as `DiscordChannel`, `SecurityPolicy`, `SqliteMemory` over ambiguous names (`Manager`, `Util`, `Helper`).
-- **Trait implementers**: keep predictable suffixes (`*Provider`, `*Channel`, `*Tool`, `*Memory`, `*Observer`, `*RuntimeAdapter`).
+- **Domain-first naming**: prefer explicit role names such as `DiscordChannel`, `SecurityPolicy`, or `ByoriKnowledgeAdapter` over ambiguous names (`Manager`, `Util`, `Helper`).
+- **Trait implementers**: keep predictable suffixes (`*Provider`, `*Channel`, `*Tool`, `*Observer`, `*RuntimeAdapter`; `*Memory` is reserved for legacy compatibility implementations).
 - **Factory keys**: keep lowercase and stable (`openai`, `discord`, `shell`); avoid adding aliases without migration need.
 - **Tests**: use behavior-oriented names (`subject_expected_behavior`) and neutral project-scoped fixtures.
 - **Identity-like labels**: if unavoidable, use NaraeClaw-native identifiers only (`NaraeClawAgent`, `naraeclaw_user`, `naraeclaw_node`).
@@ -353,9 +359,9 @@ Keep architecture extensible and auditable by following these boundaries.
 - Extend features via trait implementations + factory registration before considering broad refactors.
 - Keep dependency direction contract-first: concrete integrations depend on shared traits/config/util, not on other concrete integrations.
 - Avoid cross-subsystem coupling (provider ↔ channel internals, tools mutating security/gateway internals directly, etc.).
-- Keep responsibilities single-purpose by module (`agent` orchestration, `channels` transport, `providers` model I/O, `security` policy, `tools` execution, `memory` persistence).
+- Keep responsibilities single-purpose by module (`agent` orchestration, `channels` transport, `providers` model I/O, `security` policy, `tools` execution, managed ByoriDB MCP for durable knowledge, `memory` for legacy migration/compatibility).
 - Introduce shared abstractions only after repeated stable use (rule-of-three) and at least one current caller.
-- Treat `src/config/schema.rs` keys as public contract; document compatibility impact, migration steps, and rollback path for changes.
+- Treat keys under `crates/naraeclaw-config/src/schema/` as public contract; document compatibility impact, migration steps, and rollback path for changes.
 
 ## Naming and Architecture Examples (Bad vs Good)
 
@@ -388,71 +394,20 @@ Use these quick examples to align implementation choices before opening a PR.
 
 ## How to Add a New Provider
 
-Create `src/providers/your_provider.rs`:
-
-```rust
-use async_trait::async_trait;
-use anyhow::Result;
-use crate::providers::traits::Provider;
-
-pub struct YourProvider {
-    api_key: String,
-    client: reqwest::Client,
-}
-
-impl YourProvider {
-    pub fn new(api_key: Option<&str>) -> Self {
-        Self {
-            api_key: api_key.unwrap_or_default().to_string(),
-            client: reqwest::Client::new(),
-        }
-    }
-}
-
-#[async_trait]
-impl Provider for YourProvider {
-    async fn chat(&self, message: &str, model: &str, temperature: f64) -> Result<String> {
-        // Your API call here
-        todo!()
-    }
-}
-```
-
-Then register it in `src/providers/mod.rs`:
-
-```rust
-"your_provider" => Ok(Box::new(your_provider::YourProvider::new(api_key))),
-```
+Implement the public `Provider` contract from
+`crates/naraeclaw-api/src/provider.rs`, place the adapter under
+`crates/naraeclaw-providers/src/`, and register it in that crate's factory. Use the
+maintained example and checklist in
+[`extension-examples.md`](docs/contributing/extension-examples.md)
+and [`change-playbooks.md`](docs/contributing/change-playbooks.md#adding-a-provider).
 
 ## How to Add a New Channel
 
-Create `src/channels/your_channel.rs`:
-
-```rust
-use async_trait::async_trait;
-use anyhow::Result;
-use tokio::sync::mpsc;
-use crate::channels::traits::{Channel, ChannelMessage};
-
-pub struct YourChannel { /* config fields */ }
-
-#[async_trait]
-impl Channel for YourChannel {
-    fn name(&self) -> &str { "your_channel" }
-
-    async fn send(&self, message: &str, recipient: &str) -> Result<()> {
-        // Send message via your platform
-        todo!()
-    }
-
-    async fn listen(&self, tx: mpsc::Sender<ChannelMessage>) -> Result<()> {
-        // Listen for incoming messages, forward to tx
-        todo!()
-    }
-
-    async fn health_check(&self) -> bool { true }
-}
-```
+Implement `Channel` from `crates/naraeclaw-api/src/channel.rs`, place transport code under
+`crates/naraeclaw-channels/src/`, and add its public schema under
+`crates/naraeclaw-config/src/schema/`. Channel and gateway boundaries require allowlist,
+authentication, health, and failure-mode tests. See
+[`extension-examples.md`](docs/contributing/extension-examples.md).
 
 ## How to Mark Config Fields as Secrets
 
@@ -481,7 +436,7 @@ pub struct YourChannelConfig {
 }
 ```
 
-2. If your struct is nested inside a parent (e.g., `ChannelsConfig`), add `#[nested]`
+1. If your struct is nested inside a parent (e.g., `ChannelsConfig`), add `#[nested]`
    on the parent's field so the tree traversal finds it:
 
 ```rust
@@ -503,8 +458,8 @@ Field names are derived automatically: `bot_token` on a struct with
 ### Adding enum fields
 
 If your config struct has an enum field (e.g. `stream_mode: StreamMode`), the enum
-type must implement `HasPropKind`. Add it to the `impl_enum_prop_kind!` block in
-`src/config/schema.rs`:
+type must implement `HasPropKind`. Add it to the relevant `impl_enum_prop_kind!` block under
+`crates/naraeclaw-config/src/schema/`:
 
 ```rust
 impl_enum_prop_kind!(
@@ -525,65 +480,16 @@ The compiler will error if this is missing — the error names the trait and the
 
 ## How to Add a New Observer
 
-Create `src/observability/your_observer.rs`:
-
-```rust
-use crate::observability::traits::{Observer, ObserverEvent, ObserverMetric};
-
-pub struct YourObserver { /* client, config, etc. */ }
-
-impl Observer for YourObserver {
-    fn record_event(&self, event: &ObserverEvent) {
-        // Push event to your backend
-    }
-
-    fn record_metric(&self, metric: &ObserverMetric) {
-        // Push metric to your backend
-    }
-
-    fn name(&self) -> &str { "your_observer" }
-}
-```
+Implement `Observer` from `crates/naraeclaw-api/src/observability_traits.rs` and place the
+implementation under `crates/naraeclaw-runtime/src/observability/`. Preserve
+non-sensitive logging and bounded failure behavior.
 
 ## How to Add a New Tool
 
-Create `src/tools/your_tool.rs`:
-
-```rust
-use async_trait::async_trait;
-use anyhow::Result;
-use serde_json::{json, Value};
-use crate::tools::traits::{Tool, ToolResult};
-
-pub struct YourTool { /* security policy, config, etc. */ }
-
-#[async_trait]
-impl Tool for YourTool {
-    fn name(&self) -> &str { "your_tool" }
-
-    fn description(&self) -> &str { "Does something useful" }
-
-    fn parameters_schema(&self) -> Value {
-        json!({
-            "type": "object",
-            "properties": {
-                "input": { "type": "string", "description": "The input" }
-            },
-            "required": ["input"]
-        })
-    }
-
-    async fn execute(&self, args: Value) -> Result<ToolResult> {
-        let input = args["input"].as_str()
-            .ok_or_else(|| anyhow::anyhow!("Missing 'input'"))?;
-        Ok(ToolResult {
-            success: true,
-            output: format!("Processed: {input}"),
-            error: None,
-        })
-    }
-}
-```
+Implement `Tool` from `crates/naraeclaw-api/src/tool.rs`, place reusable execution code
+under `crates/naraeclaw-tools/src/`, and register runtime wiring in
+`crates/naraeclaw-runtime/src/tools/mod.rs`. Use the maintained example in
+[`extension-examples.md`](docs/contributing/extension-examples.md).
 
 ## Pull Request Checklist
 
@@ -636,12 +542,12 @@ Recommended scope keys in commit titles:
 
 ## Maintainer Merge Policy
 
-- Require passing `CI Required Gate` before merge.
+- Require the active Fast CI workflow before merge.
 - Require docs quality checks when docs are touched.
 - Require review approval for non-trivial changes.
 - Ask for focused review on protected paths when risk is high.
-- Use risk labels to determine review depth, scope labels (`core`, `provider`, `channel`, `security`, etc.) to route ownership, and module labels (`<module>:<component>`, e.g. `channel:telegram`, `provider:kimi`, `tool:shell`) to route subsystem expertise.
-- Contributor tier labels are auto-applied on PRs and issues by merged PR count: `experienced contributor` (>=10), `principal contributor` (>=20), `distinguished contributor` (>=50). Treat them as read-only automation labels; manual edits are auto-corrected.
+- Use risk and scope labels when maintainers apply them; label automation is currently
+  disabled in Fast Development Mode.
 - Prefer squash merge with conventional commit title.
 - Revert fast on regressions; re-land with tests.
 

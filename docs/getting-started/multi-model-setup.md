@@ -2,7 +2,7 @@
 
 This guide introduces multi-model concepts in NaraeClaw, including fallback provider chains, model-level fallbacks, and API key rotation for resilience.
 
-**Last verified: March 28, 2026**
+Last verified: March 28, 2026
 
 ## When to Use Multi-Model Setup
 
@@ -259,4 +259,4 @@ export GROQ_API_KEY="gsk-..."
 
 - [Config Reference: Reliability Section](/docs/reference/api/config-reference.md#reliability)
 - [Providers Reference: Fallback Provider Chains](/docs/reference/api/providers-reference.md#fallback-provider-chains)
-- [Observability and Debugging](/docs/ops/observability.md)
+- [Observability and Debugging](/docs/reference/api/config-reference.md#observability)

@@ -2,7 +2,7 @@
 
 This page defines the fastest supported path to install and initialize NaraeClaw.
 
-Last verified: **February 20, 2026**.
+Last verified: **July 29, 2026**.
 
 ## Option 0: Homebrew (macOS/Linuxbrew)
 
@@ -22,6 +22,17 @@ What it does by default:
 
 1. `cargo build --release --locked`
 2. `cargo install --path . --force --locked`
+
+The NaraeClaw installer does not install ByoriDB. Complete the default durable-knowledge
+setup separately:
+
+```bash
+curl -fsSL https://github.com/byoridb/byori/releases/latest/download/install.sh | bash
+naraeclaw knowledge status
+```
+
+See [ByoriDB Durable Knowledge](byoridb-knowledge.md) before migrating an existing
+workspace.
 
 ### Resource preflight and pre-built flow
 
@@ -79,6 +90,12 @@ If you run Option B outside a repository checkout, the install script automatica
 ## Optional onboarding modes
 
 ### Containerized onboarding (Docker)
+
+> **Current limitation:** the stock container image does not bundle Python or the Byori
+> MCP wrapper. Containerized onboarding can configure NaraeClaw, but durable knowledge is
+> unavailable until a Byori-capable image or supported sidecar contract exists. There is no
+> automatic fallback to legacy memory. See
+> [Container Limitation](byoridb-knowledge.md#container-limitation).
 
 ```bash
 ./install.sh --docker
@@ -224,6 +241,7 @@ See all options:
 ## Related docs
 
 - [README.md](../README.md)
+- [byoridb-knowledge.md](byoridb-knowledge.md)
 - [commands-reference.md](../reference/cli/commands-reference.md)
 - [providers-reference.md](../reference/api/providers-reference.md)
 - [channels-reference.md](../reference/api/channels-reference.md)

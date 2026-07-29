@@ -1,6 +1,6 @@
 # NaraeClaw 문서
 
-최종 갱신: **2026-04-13**
+최종 갱신: **2026-07-29**
 
 ## 바로 찾기
 
@@ -8,6 +8,8 @@
 |---|---|
 | 빠르게 설치·실행 | [README.md](../README.md) |
 | 온보딩 마법사 실행 | `naraeclaw onboard` |
+| ByoriDB 지식 저장소 설치·이전 | [byoridb-knowledge.md](setup-guides/byoridb-knowledge.md) |
+| 외부 클라이언트를 게이트웨이에 연결 | [gateway-api.md](setup-guides/gateway-api.md) |
 | CLI 명령어 전체 조회 | [commands-reference.md](reference/cli/commands-reference.md) |
 | 설정 키·기본값 확인 | [config-reference.md](reference/api/config-reference.md) |
 | 운영 런북 (day-2) | [operations-runbook.md](ops/operations-runbook.md) |
@@ -29,6 +31,8 @@
 ### 사용자 / 운영자
 
 - [commands-reference.md](reference/cli/commands-reference.md) — 워크플로우별 명령어
+- [byoridb-knowledge.md](setup-guides/byoridb-knowledge.md) — 영속 지식 설치, 격리, 이전, 롤백
+- [gateway-api.md](setup-guides/gateway-api.md) — HTTP/WebSocket 실행과 핵심 경로
 - [providers-reference.md](reference/api/providers-reference.md) — Provider ID, 별칭, 환경변수
 - [channels-reference.md](reference/api/channels-reference.md) — 채널 기능 및 설정 경로
 - [config-reference.md](reference/api/config-reference.md) — 주요 설정 키 및 보안 기본값

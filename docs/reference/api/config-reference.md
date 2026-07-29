@@ -2,7 +2,7 @@
 
 This is a high-signal reference for common config sections and defaults.
 
-Last verified: **February 21, 2026**.
+Last verified: **July 29, 2026**.
 
 Config path resolution at startup:
 
@@ -221,7 +221,7 @@ For detailed configuration guidance, see [Multi-Model Setup and Fallback Chains]
 | `method` | `totp` | OTP method (`totp`, `pairing`, `cli-prompt`) |
 | `token_ttl_secs` | `30` | TOTP time-step window in seconds |
 | `cache_valid_secs` | `300` | Cache window for recently validated OTP codes |
-| `gated_actions` | `["shell","file_write","browser_open","browser","memory_forget"]` | Tool actions protected by OTP |
+| `gated_actions` | `["shell","file_write","browser_open","browser","byoridb__memory_delete"]` | Tool actions protected by OTP |
 | `gated_domains` | `[]` | Explicit domain patterns requiring OTP (`*.example.com`, `login.example.com`) |
 | `gated_domain_categories` | `[]` | Domain preset categories (`banking`, `medical`, `government`, `identity_providers`) |
 
@@ -498,13 +498,44 @@ Notes:
 | `host` | `127.0.0.1` | bind address |
 | `port` | `42617` | gateway listen port |
 | `require_pairing` | `true` | require pairing before bearer auth |
-| `allow_public_bind` | `false` | block accidental public exposure |
+| `allow_public_bind` | `false` | operator intent flag for non-loopback binding; currently advisory |
+| `paired_tokens` | `[]` | managed bearer tokens; do not edit manually |
+| `pair_rate_limit_per_minute` | `10` | maximum `/pair` requests per client key per minute |
+| `webhook_rate_limit_per_minute` | `60` | maximum `/webhook` requests per client key per minute |
+| `trust_forwarded_headers` | `false` | trust `X-Forwarded-For` / `X-Real-IP` behind a trusted proxy |
 | `path_prefix` | _(none)_ | URL path prefix for reverse-proxy deployments (e.g. `"/naraeclaw"`) |
+| `rate_limit_max_keys` | `10000` | maximum client keys retained by rate-limit maps |
+| `idempotency_ttl_secs` | `300` | webhook idempotency-key TTL |
+| `idempotency_max_keys` | `10000` | maximum idempotency keys retained in memory |
+| `session_persistence` | `true` | persist gateway WebSocket chat sessions to SQLite |
+| `session_ttl_hours` | `0` | archive sessions older than N hours; `0` disables expiry |
+| `web_dist_dir` | _(none)_ | compatibility path for static dashboard files; API-only by default |
 
 When deploying behind a reverse proxy that maps NaraeClaw to a sub-path,
 set `path_prefix` to that sub-path (e.g. `"/naraeclaw"`). All gateway
 routes will be served under this prefix. The value must start with `/`
 and must not end with `/`.
+
+`allow_public_bind` does not currently enforce a bind denial: the gateway logs a warning
+and still binds to the requested non-loopback address. Treat `host`, firewall rules, and a
+trusted reverse proxy or tunnel as the actual exposure controls. Keep `host = "127.0.0.1"`
+unless remote access is intentional.
+
+### `[gateway.pairing_dashboard]`
+
+| Key | Default | Purpose |
+|---|---|---|
+| `code_length` | `8` | pairing-code length |
+| `code_ttl_secs` | `3600` | pending-code lifetime |
+| `max_pending_codes` | `3` | maximum concurrent pending codes |
+| `max_failed_attempts` | `5` | failures before lockout |
+| `lockout_secs` | `300` | lockout duration |
+
+### `[gateway.tls]` and `[gateway.tls.client_auth]`
+
+`[gateway.tls]` supports `enabled` (default `false`), `cert_path`, and `key_path`.
+Optional `[gateway.tls.client_auth]` supports `enabled` (default `false`),
+`ca_cert_path`, `require_client_cert` (default `true`), and `pinned_certs`.
 
 ## `[autonomy]`
 
@@ -519,7 +550,7 @@ and must not end with `/`.
 | `max_cost_per_day_cents` | `500` | per-policy spend guardrail |
 | `require_approval_for_medium_risk` | `true` | approval gate for medium-risk commands |
 | `block_high_risk_commands` | `true` | hard block for high-risk commands |
-| `auto_approve` | `[]` | tool operations always auto-approved |
+| `auto_approve` | built-in safe-tool list | tool operations always auto-approved |
 | `always_ask` | `[]` | tool operations that always require approval |
 
 Notes:
@@ -528,6 +559,10 @@ Notes:
 - Access outside the workspace requires `allowed_roots`, even when `workspace_only = false`.
 - `allowed_roots` supports absolute paths, `~/...`, and workspace-relative paths.
 - `allowed_commands` entries can be command names (for example, `"git"`), explicit executable paths (for example, `"/usr/bin/antigravity"`), or `"*"` to allow any command name/path (risk gates still apply).
+- The default `auto_approve` list includes `tool_search`, ByoriDB reads, standalone-note
+  and typed-wiki upserts, and export. Relationship changes and
+  `byoridb__memory_delete` are excluded; they require explicit approval in supervised
+  interactive use and are denied on non-interactive supervised surfaces.
 - Shell separator/operator parsing is quote-aware. Characters like `;` inside quoted arguments are treated as literals, not command separators.
 - Unquoted shell chaining/operators are still enforced by policy checks (`;`, `|`, `&&`, `||`, background chaining, and redirects).
 
@@ -538,23 +573,71 @@ forbidden_paths = ["/etc", "/root", "/proc", "/sys", "~/.ssh", "~/.gnupg", "~/.a
 allowed_roots = ["~/Desktop/projects", "/opt/shared-repo"]
 ```
 
-## `[memory]`
+## `[knowledge]`
+
+ByoriDB is the default and sole durable knowledge surface.
 
 | Key | Default | Purpose |
 |---|---|---|
-| `backend` | `sqlite` | `sqlite`, `lucid`, `markdown`, `none` |
-| `auto_save` | `true` | persist user-stated inputs only (assistant outputs are excluded) |
-| `embedding_provider` | `none` | `none`, `openai`, or custom endpoint |
-| `embedding_model` | `text-embedding-3-small` | embedding model ID, or `hint:<name>` route |
-| `embedding_dimensions` | `1536` | expected vector size for selected embedding model |
-| `vector_weight` | `0.7` | hybrid ranking vector weight |
-| `keyword_weight` | `0.3` | hybrid ranking keyword weight |
+| `enabled` | `true` | enable durable knowledge through ByoriDB |
+| `provider` | `byoridb` | knowledge provider; no other value is currently accepted |
+| `byoridb_home` | `~/.byoridb` | installation root containing `bin/run-mcp.sh` |
+| `space` | unset | optional explicit ByoriDB space identifier |
+| `required` | `false` | fail config validation when the MCP wrapper is missing |
+
+When `space` is unset, NaraeClaw hashes the canonical `workspace_dir` and derives a
+workspace-isolated name such as `naraeclaw_0123456789abcdef01234567`. Explicit values
+must match `[A-Za-z_][A-Za-z0-9_]{0,63}`. Moving a workspace changes the derived space;
+set an explicit value when the graph must retain its identity across moves.
+
+The managed MCP process always receives the effective space as
+`BYORIDB_MEMORY_SPACE` and `BYORIDB_MCP_PROFILE=safe`. The safe profile omits the
+unrestricted `memory_query` tool and retains `memory_query_read` for guarded reads.
+NaraeClaw adds this managed server without requiring a manual `[[mcp.servers]]` entry. If
+a user-configured MCP server is also named `byoridb` (case-insensitive), NaraeClaw replaces
+that entry at runtime with the managed local stdio wrapper, safe profile, and effective
+workspace space. Give unrelated/custom Byori servers a different name.
+
+```toml
+[knowledge]
+enabled = true
+provider = "byoridb"
+byoridb_home = "~/.byoridb"
+# space = "project_alpha"
+required = false
+```
+
+Installation, migration, and rollback procedures are in
+[ByoriDB Durable Knowledge](../../setup-guides/byoridb-knowledge.md).
+
+For an existing config file, NaraeClaw requires at least one Byori-specific key before it
+interprets `[knowledge]` as the new provider schema. A missing table, an empty table, or an
+`enabled`-only legacy table stays in compatibility mode so old SQLite memory is not
+silently disabled before migration. Freshly generated configs serialize the complete
+ByoriDB table shown above.
+
+## Legacy `[memory]` (compatibility only)
+
+| Key | Default | Purpose |
+|---|---|---|
+| `backend` | `none` | legacy backend: `sqlite`, `lucid`, `markdown`, `qdrant`, or `none` |
+| `auto_save` | `false` | legacy user-input auto-save |
+| `embedding_provider` | `none` | legacy embedding provider |
+| `embedding_model` | `text-embedding-3-small` | legacy embedding model ID or `hint:<name>` route |
+| `embedding_dimensions` | `1536` | expected legacy embedding vector size |
+| `vector_weight` | `0.7` | legacy hybrid-ranking vector weight |
+| `keyword_weight` | `0.3` | legacy hybrid-ranking keyword weight |
 
 Notes:
 
-- Memory context injection ignores legacy `assistant_resp*` auto-save keys to prevent old model-authored summaries from being treated as facts.
+- When `[knowledge].enabled = true`, the runtime uses a no-op legacy memory handle and
+  does not expose legacy memory tools. This prevents two competing durable sources.
+- Use `[memory]` only for temporary compatibility or as a source for
+  `naraeclaw knowledge migrate`; do not enable it alongside active ByoriDB knowledge.
+- Legacy context injection ignores `assistant_resp*` auto-save keys to prevent old
+  model-authored summaries from being treated as facts.
 
-## `[[model_routes]]` and `[[embedding_routes]]`
+## `[[model_routes]]` and legacy `[[embedding_routes]]`
 
 Use route hints so integrations can keep stable names while model IDs evolve.
 
@@ -569,6 +652,9 @@ Use route hints so integrations can keep stable names while model IDs evolve.
 
 ### `[[embedding_routes]]`
 
+Embedding routes apply only to the disabled-by-default legacy `[memory]` compatibility
+path. ByoriDB knowledge does not use NaraeClaw's embedding routes.
+
 | Key | Default | Purpose |
 |---|---|---|
 | `hint` | _required_ | Route hint name (e.g. `"semantic"`, `"archive"`, `"faq"`) |
@@ -578,6 +664,9 @@ Use route hints so integrations can keep stable names while model IDs evolve.
 | `api_key` | unset | Optional API key override for this route's provider |
 
 ```toml
+[knowledge]
+enabled = false
+
 [memory]
 embedding_model = "hint:semantic"
 
@@ -595,9 +684,11 @@ dimensions = 1536
 
 Upgrade strategy:
 
-1. Keep hints stable (`hint:reasoning`, `hint:semantic`).
-2. Update only `model = "...new-version..."` in the route entries.
-3. Validate with `naraeclaw doctor` before restart/rollout.
+1. Keep model hints stable (for example, `hint:reasoning`).
+2. When legacy memory compatibility is active, also keep its embedding hint stable
+   (for example, `hint:semantic`).
+3. Update only `model = "...new-version..."` in the relevant route entries.
+4. Validate with `naraeclaw doctor` before restart/rollout.
 
 Natural-language config path:
 
@@ -649,20 +740,18 @@ priority = 5
 
 ## `[channels_config]`
 
-Top-level channel options are configured under `channels_config`.
+The current public channel schema supports the local CLI and optional Slack Socket Mode.
 
 | Key | Default | Purpose |
 |---|---|---|
+| `cli` | `true` | enable the interactive CLI channel |
 | `message_timeout_secs` | `300` | Base timeout in seconds for channel message processing; runtime scales this with tool-loop depth (up to 4x, overridable via `[pacing].message_timeout_scale_max`) |
-
-Examples:
-
-- `[channels_config.telegram]`
-- `[channels_config.discord]`
-- `[channels_config.whatsapp]`
-- `[channels_config.nextcloud_talk]`
-- `[channels_config.email]`
-- `[channels_config.nostr]`
+| `ack_reactions` | `true` | send receipt/completion reactions when supported |
+| `show_tool_calls` | `false` | forward tool-call notices to channel users |
+| `session_persistence` | `true` | persist channel conversation state |
+| `session_backend` | `sqlite` | conversation-session store; `jsonl` is legacy |
+| `session_ttl_hours` | `0` | archive sessions after N hours; `0` disables expiry |
+| `debounce_ms` | `0` | combine rapid messages from one sender; `0` disables |
 
 Notes:
 
@@ -672,78 +761,26 @@ Notes:
 - If using cloud APIs (OpenAI, Anthropic, etc.), you can reduce this to `60` or lower.
 - Values below `30` are clamped to `30` to avoid immediate timeout churn.
 - When a timeout occurs, users receive: `⚠️ Request timed out while waiting for the model. Please try again.`
-- Telegram-only interruption behavior is controlled with `channels_config.telegram.interrupt_on_new_message` (default `false`).
-  When enabled, a newer message from the same sender in the same chat cancels the in-flight request and preserves interrupted user context.
 - While `naraeclaw channel start` is running, updates to `default_provider`, `default_model`, `default_temperature`, `api_key`, `api_url`, and `reliability.*` are hot-applied from `config.toml` on the next inbound message.
 
-### `[channels_config.nostr]`
+### `[channels_config.slack]`
 
 | Key | Default | Purpose |
 |---|---|---|
-| `private_key` | _required_ | Nostr private key (hex or `nsec1…` bech32); encrypted at rest when `secrets.encrypt = true` |
-| `relays` | see note | List of relay WebSocket URLs; defaults to `relay.damus.io`, `nos.lol`, `relay.primal.net`, `relay.snort.social` |
-| `allowed_pubkeys` | `[]` (deny all) | Sender allowlist (hex or `npub1…`); use `"*"` to allow all senders |
+| `enabled` | `false` | activate Slack Socket Mode |
+| `app_token` | required | App-Level Token (`xapp-`) |
+| `bot_token` | required | Bot Token (`xoxb-`) |
+| `signing_secret` | unset | optional Slack signing secret |
+| `default_channel` | unset | fallback channel ID |
 
-Notes:
-
-- Supports both NIP-04 (legacy encrypted DMs) and NIP-17 (gift-wrapped private messages). Replies mirror the sender's protocol automatically.
-- The `private_key` is a high-value secret; keep `secrets.encrypt = true` (the default) in production.
-
-See detailed channel matrix and allowlist behavior in [channels-reference.md](channels-reference.md).
-
-### `[channels_config.whatsapp]`
-
-WhatsApp supports two backends under one config table.
-
-Cloud API mode (Meta webhook):
-
-| Key | Required | Purpose |
-|---|---|---|
-| `access_token` | Yes | Meta Cloud API bearer token |
-| `phone_number_id` | Yes | Meta phone number ID |
-| `verify_token` | Yes | Webhook verification token |
-| `app_secret` | Optional | Enables webhook signature verification (`X-Hub-Signature-256`) |
-| `allowed_numbers` | Recommended | Allowed inbound numbers (`[]` = deny all, `"*"` = allow all) |
-
-WhatsApp Web mode (native client):
-
-| Key | Required | Purpose |
-|---|---|---|
-| `session_path` | Yes | Persistent SQLite session path |
-| `pair_phone` | Optional | Pair-code flow phone number (digits only) |
-| `pair_code` | Optional | Custom pair code (otherwise auto-generated) |
-| `allowed_numbers` | Recommended | Allowed inbound numbers (`[]` = deny all, `"*"` = allow all) |
-| `mention_only` | Optional | When `true`, only respond to group messages that @-mention the bot (DMs always processed) |
-
-Notes:
-
-- WhatsApp Web requires build flag `whatsapp-web`.
-- If both Cloud and Web fields are present, Cloud mode wins for backward compatibility.
-
-
-### `[channels_config.nextcloud_talk]`
-
-Native Nextcloud Talk bot integration (webhook receive + OCS send API).
-
-| Key | Required | Purpose |
-|---|---|---|
-| `base_url` | Yes | Nextcloud base URL (e.g. `https://cloud.example.com`) |
-| `app_token` | Yes | Bot app token used for OCS bearer auth |
-| `webhook_secret` | Optional | Enables webhook signature verification |
-| `allowed_users` | Recommended | Allowed Nextcloud actor IDs (`[]` = deny all, `"*"` = allow all) |
-| `bot_name` | Optional | Display name of the bot in Nextcloud Talk (e.g. `"naraeclaw"`). Used to filter out the bot's own messages and prevent feedback loops. |
-
-Notes:
-
-- Webhook endpoint is `POST /nextcloud-talk`.
-- `NARAECLAW_NEXTCLOUD_TALK_WEBHOOK_SECRET` overrides `webhook_secret` when set.
-- See [nextcloud-talk-setup.md](../../setup-guides/nextcloud-talk-setup.md) for setup and troubleshooting.
+Conversation-session SQLite is operational state, not durable knowledge. ByoriDB owns
+cross-session facts and relationships. See [Channels Reference](channels-reference.md).
 
 ## Security-Relevant Defaults
 
-- deny-by-default channel allowlists (`[]` means deny all)
 - pairing required on gateway by default
-- public bind disabled by default
+- loopback gateway host by default; `allow_public_bind` is currently advisory rather than
+  an enforcement boundary
 
 ## Validation Commands
 

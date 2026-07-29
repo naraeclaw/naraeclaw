@@ -4,11 +4,16 @@ Treat documentation as a first-class product surface, not a post-merge artifact.
 
 ## Canonical Entry Points
 
-- root READMEs: `README.md`\n- docs hubs: `docs/README.md`\n- unified TOC: `docs/SUMMARY.md`
+- root README: `README.md`
+- docs hub: `docs/README.md`
+- unified TOC: `docs/SUMMARY.md`
 
 ## Supported Locales
 
-`en`, `ko`
+- Korean (`ko`) is the canonical user-facing language.
+- English (`en`) is supported for technical reference and contributor documentation.
+- There are currently no mirrored locale directory trees. Update localized equivalents
+  only where they exist.
 
 ## Collection Indexes
 
@@ -26,6 +31,5 @@ Treat documentation as a first-class product surface, not a post-merge artifact.
 - If a change touches docs IA, runtime-contract references, or user-facing wording in shared docs, perform i18n follow-through for supported locales in the same PR:
   - Update locale navigation links (`README*`, `docs/README*`, `docs/SUMMARY.md`).
   - Update localized runtime-contract docs where equivalents exist.
-  - For Vietnamese, treat `docs/vi/**` as canonical.
 - Keep proposal/roadmap docs explicitly labeled; avoid mixing proposal text into runtime-contract docs.
 - Keep project snapshots date-stamped and immutable once superseded by a newer date.

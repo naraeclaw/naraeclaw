@@ -1,143 +1,53 @@
-# SOP Connectivity & Event Fan-In
+# SOP Connectivity
 
-This document describes how external events trigger SOP runs.
+This page describes the currently wired SOP entry points.
 
-## Quick Paths
+Last verified: **July 29, 2026**.
 
-- [MQTT Integration](#2-mqtt-integration)
-- [Webhook Integration](#3-webhook-integration)
-- [Cron Integration](#4-cron-integration)
-- [Security Defaults](#5-security-defaults)
-- [Troubleshooting](#6-troubleshooting)
+## Current Runtime Contract
 
-## 1. Overview
+SOP definitions may contain manual, MQTT, webhook, and cron trigger schemas, and the SOP
+engine has matchers for those event types. The current daemon/gateway does not wire MQTT,
+webhook, or cron events into `dispatch_sop_event`.
 
-NaraeClaw routes MQTT/webhook/cron events through a unified SOP dispatcher (`dispatch_sop_event`).
+In particular:
 
-Key behaviors:
+- there is no `POST /sop/{*rest}` gateway route;
+- `POST /webhook` performs the normal webhook chat flow and does not dispatch SOPs first;
+- defining an MQTT, webhook, or cron trigger does not by itself create a live external
+  subscription or gateway route.
 
-- **Consistent trigger matching:** one matcher path for all event sources.
-- **Run-start audit:** started runs are persisted via `SopAuditLogger`.
-- **Headless safety:** in non-agent-loop contexts, `ExecuteStep` actions are logged as pending (not silently executed).
+Treat those trigger types as internal engine capability, not an available operator surface.
 
-## 2. MQTT Integration
+## Supported Entry Point
 
-### 2.1 Configuration
+Start and progress SOP runs from an active agent session with the registered tools:
 
-Configure broker access in `config.toml`:
+- `sop_execute` — start a named SOP manually;
+- `sop_status` — inspect a run;
+- `sop_approve` — approve a waiting step;
+- `sop_advance` — record step completion and advance the run.
 
-```toml
-[channels_config.mqtt]
-broker_url = "mqtts://broker.example.com:8883"  # use mqtt:// for plaintext
-client_id = "naraeclaw-agent-1"
-topics = ["sensors/alert", "ops/deploy/#"]
-qos = 1
-username = "mqtt-user"      # optional
-password = "mqtt-password"  # optional
-use_tls = true              # must match scheme (mqtts:// => true)
-```
-
-### 2.2 Trigger Definition
-
-In `SOP.toml`:
-
-```toml
-[[triggers]]
-type = "mqtt"
-topic = "sensors/alert"
-condition = "$.severity >= 2"
-```
-
-MQTT payload is forwarded into SOP event payload (`event.payload`), then shown in step context.
-
-## 3. Webhook Integration
-
-### 3.1 Endpoints
-
-- **`POST /sop/{*rest}`**: SOP-only endpoint. Returns `404` if no SOP matches. No LLM fallback.
-- **`POST /webhook`**: chat endpoint. It attempts SOP dispatch first; if no match, falls back to normal LLM flow.
-
-Path matching is exact against configured webhook trigger path.
-
-Example:
-
-- Trigger path in SOP: `path = "/sop/deploy"`
-- Matching request: `POST /sop/deploy`
-
-### 3.2 Authorization
-
-When pairing is enabled (default), provide:
-
-1. `Authorization: Bearer <token>` (from `POST /pair`)
-2. Optional second layer: `X-Webhook-Secret: <secret>` when webhook secret is configured
-
-### 3.3 Idempotency
-
-Use:
-
-`X-Idempotency-Key: <unique-key>`
-
-Defaults:
-
-- TTL: 300s
-- Duplicate response: `200 OK` with `"status": "duplicate"`
-
-Idempotency keys are namespaced per endpoint (`/webhook` vs `/sop/*`).
-
-### 3.4 Example Request
+The CLI commands manage definitions only:
 
 ```bash
-curl -X POST http://127.0.0.1:3000/sop/deploy \
-  -H "Authorization: Bearer <token>" \
-  -H "X-Idempotency-Key: $(uuidgen)" \
-  -H "Content-Type: application/json" \
-  -d '{"message":"deploy-service-a"}'
+naraeclaw sop list
+naraeclaw sop validate
+naraeclaw sop show <name>
 ```
 
-Typical response:
+## Audit Limitation
 
-```json
-{
-  "status": "accepted",
-  "matched_sops": ["deploy-pipeline"],
-  "source": "sop_webhook",
-  "path": "/sop/deploy"
-}
-```
+`SopAuditLogger` still writes through the legacy `Memory` compatibility interface. In the
+default ByoriDB mode that handle is a no-op, so SOP audit entries are not durable. Runtime
+state and metrics remain available. Do not put operational audit events into ByoriDB as
+user knowledge without a separate design decision.
 
-## 4. Cron Integration
+## Reintroducing Event Fan-In
 
-The scheduler evaluates cached cron triggers using a window-based check.
+A future MQTT/webhook/cron integration must include the actual daemon/router wiring,
+authentication and idempotency boundaries, focused end-to-end tests, and updates to this
+document. Gateway work is high risk and needs an explicit rollback plan.
 
-- **Window-based:** events within `(last_check, now]` are not missed.
-- **At-most-once per expression per tick:** if multiple fire points are in one poll window, dispatch happens once.
-
-Trigger example:
-
-```toml
-[[triggers]]
-type = "cron"
-expression = "0 0 8 * * *"
-```
-
-Cron expressions support 5, 6, or 7 fields.
-
-## 5. Security Defaults
-
-| Feature | Mechanism |
-|---|---|
-| **MQTT transport** | `mqtts://` + `use_tls = true` for TLS transport |
-| **Webhook auth** | Pairing bearer token (default required), optional shared secret header |
-| **Rate limiting** | Per-client limits on webhook routes (`webhook_rate_limit_per_minute`, default `60`) |
-| **Idempotency** | Header-based dedup (`X-Idempotency-Key`, default TTL `300s`) |
-| **Cron validation** | Invalid cron expressions fail closed during parsing/cache build |
-
-## 6. Troubleshooting
-
-| Symptom | Likely Cause | Fix |
-|---|---|---|
-| **MQTT** connection errors | broker URL/TLS mismatch | Verify scheme + TLS flag pairing (`mqtt://`/`false`, `mqtts://`/`true`) |
-| **Webhook** `401 Unauthorized` | missing bearer or invalid secret | re-pair token (`POST /pair`) and verify `X-Webhook-Secret` if configured |
-| **`/sop/*` returns 404** | trigger path mismatch | ensure `SOP.toml` uses exact path (for example `/sop/deploy`) |
-| **SOP started but step not executed** | headless trigger without active agent loop | run an agent loop for `ExecuteStep`, or design run to pause on approvals |
-| **Cron not firing** | daemon not running or invalid expression | run `naraeclaw daemon`; check logs for cron parse warnings |
+See [SOP Syntax](syntax.md), [Observability](observability.md), and
+[Gateway API](../../setup-guides/gateway-api.md).

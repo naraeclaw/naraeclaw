@@ -1,27 +1,28 @@
 # Extension Examples
 
 NaraeClaw's architecture is trait-driven and modular.
-To add a new provider, channel, tool, or memory backend, implement the corresponding trait and register it in the factory module.
+To add a new provider, channel, or tool, implement the corresponding trait and register it in the factory module.
 
 This page contains minimal, working examples for each core extension point.
 For step-by-step integration checklists, see [change-playbooks.md](./change-playbooks.md).
 
-> **Source of truth**: the trait definitions live in `src/*/traits.rs`.
+> **Source of truth**: public trait definitions live in `crates/naraeclaw-api/src/`.
 > If an example here conflicts with the trait file, the trait file wins.
 
 ---
 
-## Tool (`src/tools/traits.rs`)
+## Tool (`crates/naraeclaw-api/src/tool.rs`)
 
 Tools are the agent's hands — they let it interact with the world.
 
 **Required methods**: `name()`, `description()`, `parameters_schema()`, `execute()`.
 The `spec()` method has a default implementation that composes the others.
 
-Register your tool in `src/tools/mod.rs` via `default_tools()`.
+Place the implementation in `crates/naraeclaw-tools/src/` and register runtime wiring in
+`crates/naraeclaw-runtime/src/tools/mod.rs` via `default_tools()`.
 
 ```rust
-// In your crate: use naraeclaw::tools::traits::{Tool, ToolResult};
+// In your crate: use naraeclaw_api::tool::{Tool, ToolResult};
 
 use anyhow::Result;
 use async_trait::async_trait;
@@ -77,7 +78,7 @@ impl Tool for HttpGetTool {
 
 ---
 
-## Channel (`src/channels/traits.rs`)
+## Channel (`crates/naraeclaw-api/src/channel.rs`)
 
 Channels let NaraeClaw communicate through any messaging platform.
 
@@ -86,10 +87,11 @@ Default implementations exist for `health_check()`, `start_typing()`, `stop_typi
 draft methods (`send_draft`, `update_draft`, `finalize_draft`, `cancel_draft`),
 and reaction methods (`add_reaction`, `remove_reaction`).
 
-Register your channel in `src/channels/mod.rs` and add config to `ChannelsConfig` in `src/config/schema.rs`.
+Place the implementation and factory wiring in `crates/naraeclaw-channels/`, and add public
+config to `ChannelsConfig` under `crates/naraeclaw-config/src/schema/`.
 
 ```rust
-// In your crate: use naraeclaw::channels::traits::{Channel, ChannelMessage, SendMessage};
+// In your crate: use naraeclaw_api::channel::{Channel, ChannelMessage, SendMessage};
 
 use anyhow::Result;
 use async_trait::async_trait;
@@ -172,6 +174,9 @@ impl Channel for TelegramChannel {
                             channel: "telegram".into(),
                             timestamp: msg["date"].as_u64().unwrap_or(0),
                             thread_ts: None,
+                            interruption_scope_id: None,
+                            attachments: vec![],
+                            is_mention: true,
                         };
 
                         if tx.send(channel_msg).await.is_err() {
@@ -197,7 +202,7 @@ impl Channel for TelegramChannel {
 
 ---
 
-## Provider (`src/providers/traits.rs`)
+## Provider (`crates/naraeclaw-api/src/provider.rs`)
 
 Providers are LLM backend adapters. Each provider connects NaraeClaw to a different model API.
 
@@ -207,10 +212,10 @@ Everything else has default implementations:
 `capabilities()` returns no native tool calling by default;
 streaming methods return empty/error streams by default.
 
-Register your provider in `src/providers/mod.rs`.
+Place the implementation and factory wiring in `crates/naraeclaw-providers/src/`.
 
 ```rust
-// In your crate: use naraeclaw::providers::traits::Provider;
+// In your crate: use naraeclaw_api::provider::Provider;
 
 use anyhow::Result;
 use async_trait::async_trait;
@@ -271,127 +276,17 @@ impl Provider for OllamaProvider {
 
 ---
 
-## Memory (`src/memory/traits.rs`)
+## Legacy Memory Compatibility
 
-Memory backends provide pluggable persistence for the agent's knowledge.
+The `Memory` trait in `crates/naraeclaw-api/src/memory_traits.rs` and implementations in
+`crates/naraeclaw-memory/` are retained for migration and compatibility-only runtime paths.
+They are active only when `[knowledge].enabled = false`; default ByoriDB mode replaces the
+runtime handle with a no-op so a second durable source cannot form.
 
-**Required methods**: `name()`, `store()`, `recall()`, `get()`, `list()`, `forget()`, `count()`, `health_check()`.
-Both `store()` and `recall()` accept an optional `session_id` for scoping.
-
-Register your backend in `src/memory/mod.rs`.
-
-```rust
-// In your crate: use naraeclaw::memory::traits::{Memory, MemoryEntry, MemoryCategory};
-
-use async_trait::async_trait;
-use std::collections::HashMap;
-use std::sync::Mutex;
-
-/// In-memory HashMap backend (useful for testing or ephemeral sessions).
-pub struct InMemoryBackend {
-    store: Mutex<HashMap<String, MemoryEntry>>,
-}
-
-impl InMemoryBackend {
-    pub fn new() -> Self {
-        Self {
-            store: Mutex::new(HashMap::new()),
-        }
-    }
-}
-
-#[async_trait]
-impl Memory for InMemoryBackend {
-    fn name(&self) -> &str {
-        "in-memory"
-    }
-
-    async fn store(
-        &self,
-        key: &str,
-        content: &str,
-        category: MemoryCategory,
-        session_id: Option<&str>,
-    ) -> anyhow::Result<()> {
-        let entry = MemoryEntry {
-            id: uuid::Uuid::new_v4().to_string(),
-            key: key.to_string(),
-            content: content.to_string(),
-            category,
-            timestamp: chrono::Local::now().to_rfc3339(),
-            session_id: session_id.map(|s| s.to_string()),
-            score: None,
-        };
-        self.store
-            .lock()
-            .map_err(|e| anyhow::anyhow!("{e}"))?
-            .insert(key.to_string(), entry);
-        Ok(())
-    }
-
-    async fn recall(
-        &self,
-        query: &str,
-        limit: usize,
-        session_id: Option<&str>,
-    ) -> anyhow::Result<Vec<MemoryEntry>> {
-        let store = self.store.lock().map_err(|e| anyhow::anyhow!("{e}"))?;
-        let query_lower = query.to_lowercase();
-
-        let mut results: Vec<MemoryEntry> = store
-            .values()
-            .filter(|e| e.content.to_lowercase().contains(&query_lower))
-            .filter(|e| match session_id {
-                Some(sid) => e.session_id.as_deref() == Some(sid),
-                None => true,
-            })
-            .cloned()
-            .collect();
-
-        results.truncate(limit);
-        Ok(results)
-    }
-
-    async fn get(&self, key: &str) -> anyhow::Result<Option<MemoryEntry>> {
-        let store = self.store.lock().map_err(|e| anyhow::anyhow!("{e}"))?;
-        Ok(store.get(key).cloned())
-    }
-
-    async fn list(
-        &self,
-        category: Option<&MemoryCategory>,
-        session_id: Option<&str>,
-    ) -> anyhow::Result<Vec<MemoryEntry>> {
-        let store = self.store.lock().map_err(|e| anyhow::anyhow!("{e}"))?;
-        Ok(store
-            .values()
-            .filter(|e| match category {
-                Some(cat) => &e.category == cat,
-                None => true,
-            })
-            .filter(|e| match session_id {
-                Some(sid) => e.session_id.as_deref() == Some(sid),
-                None => true,
-            })
-            .cloned()
-            .collect())
-    }
-
-    async fn forget(&self, key: &str) -> anyhow::Result<bool> {
-        let mut store = self.store.lock().map_err(|e| anyhow::anyhow!("{e}"))?;
-        Ok(store.remove(key).is_some())
-    }
-
-    async fn count(&self) -> anyhow::Result<usize> {
-        let store = self.store.lock().map_err(|e| anyhow::anyhow!("{e}"))?;
-        Ok(store.len())
-    }
-
-    async fn health_check(&self) -> bool {
-        true
-    }
-}
-```
+Do not add a new durable knowledge provider through this legacy factory. Extend the managed
+ByoriDB MCP adapter and its `byoridb-memory` skill when a durable knowledge capability is
+needed. A legacy backend change still requires an explicit compatibility use case, factory
+wiring in `crates/naraeclaw-memory/`, focused tests, and migration documentation.
 
 ---
 
@@ -399,9 +294,9 @@ impl Memory for InMemoryBackend {
 
 All extension traits follow the same wiring pattern:
 
-1. Create your implementation file in the relevant `src/*/` directory.
+1. Create your implementation file in the relevant workspace crate.
 2. Register it in the module's factory function (e.g., `default_tools()`, provider match arm).
-3. Add any needed config keys to `src/config/schema.rs`.
+3. Add any needed config keys to `crates/naraeclaw-config/src/schema/`.
 4. Write focused tests for factory wiring and error paths.
 
 See [change-playbooks.md](./change-playbooks.md) for full checklists per extension type.

@@ -56,7 +56,9 @@ Search-preview models do not accept temperature parameter:
 
 ## Implementation
 
-The `adjust_temperature_for_model()` function in `src/providers/openai.rs` automatically adjusts temperature to 1.0 for reasoning models while preserving user-specified values for standard models.
+The `adjust_temperature_for_model()` function in
+`crates/naraeclaw-providers/src/openai.rs` automatically adjusts temperature to 1.0 for
+reasoning models while preserving user-specified values for standard models.
 
 ## Testing Methodology
 
@@ -69,5 +71,5 @@ Results were validated against actual OpenAI API responses.
 
 ## References
 
-- OpenAI API Documentation: https://platform.openai.com/docs/api-reference/chat
+- [OpenAI API Documentation](https://platform.openai.com/docs/api-reference/chat)
 - Related Issue: Temperature errors with o1/o3/gpt-5 models

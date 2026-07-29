@@ -4,7 +4,8 @@
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 0.1.x   | :white_check_mark: |
+| 0.6.x   | :white_check_mark: |
+| < 0.6   | :x:                |
 
 ## Reporting a Vulnerability
 
@@ -13,7 +14,7 @@
 Instead, please report them responsibly:
 
 1. **Email**: Send details to the maintainers via GitHub private vulnerability reporting
-2. **GitHub**: Use [GitHub Security Advisories](https://github.com/juikkim/naraeclaw/security/advisories/new)
+2. **GitHub**: Use [GitHub Security Advisories](https://github.com/naraeclaw/naraeclaw/security/advisories/new)
 
 ### What to Include
 
@@ -33,18 +34,21 @@ Instead, please report them responsibly:
 NaraeClaw implements defense-in-depth security:
 
 ### Autonomy Levels
+
 - **ReadOnly** — Agent can only read, no shell or write access
 - **Supervised** — Agent can act within allowlists (default)
 - **Full** — Agent has full access within workspace sandbox
 
 ### Sandboxing Layers
+
 1. **Workspace isolation** — All file operations confined to workspace directory
-2. **Path traversal blocking** — `..` sequences and absolute paths rejected
+2. **Path boundary enforcement** — traversal and paths outside configured roots are rejected
 3. **Command allowlisting** — Only explicitly approved commands can execute
 4. **Forbidden path list** — Critical system paths (`/etc`, `/root`, `~/.ssh`) always blocked
 5. **Rate limiting** — Max actions per hour and cost per day caps
 
 ### What We Protect Against
+
 - Path traversal attacks (`../../../etc/passwd`)
 - Command injection (`rm -rf /`, `curl | sh`)
 - Workspace escape via symlinks or absolute paths
@@ -53,13 +57,14 @@ NaraeClaw implements defense-in-depth security:
 
 ## Security Testing
 
-All security mechanisms are covered by automated tests (129 tests):
+Security-sensitive paths have focused automated tests. Run the relevant filters for the
+surface being changed:
 
 ```bash
-cargo test -- security
-cargo test -- tools::shell
-cargo test -- tools::file_read
-cargo test -- tools::file_write
+cargo test -p naraeclaw-runtime security::
+cargo test -p naraeclaw-runtime tools::shell::
+cargo test -p naraeclaw-runtime tools::file_read::
+cargo test -p naraeclaw-tools file_write::
 ```
 
 ## Container Security
@@ -69,9 +74,9 @@ NaraeClaw Docker images follow CIS Docker Benchmark best practices:
 | Control | Implementation |
 |---------|----------------|
 | **4.1 Non-root user** | Container runs as UID 65534 (distroless nonroot) |
-| **4.2 Minimal base image** | `gcr.io/distroless/cc-debian12:nonroot` — no shell, no package manager |
-| **4.6 HEALTHCHECK** | Not applicable (stateless CLI/gateway) |
-| **5.25 Read-only filesystem** | Supported via `docker run --read-only` with `/workspace` volume |
+| **4.2 Minimal base image** | `gcr.io/distroless/cc-debian13:nonroot` — no shell, no package manager |
+| **4.6 HEALTHCHECK** | `naraeclaw status --format=exit-code` |
+| **5.25 Read-only filesystem** | Supported with `--read-only` plus a writable `/naraeclaw-data` volume |
 
 ### Verifying Container Security
 
@@ -82,7 +87,7 @@ docker inspect --format='{{.Config.User}}' naraeclaw
 # Expected: 65534:65534
 
 # Run with read-only filesystem (production hardening)
-docker run --read-only -v /path/to/workspace:/workspace naraeclaw gateway
+docker run --read-only -v naraeclaw-data:/naraeclaw-data naraeclaw gateway
 ```
 
 ### CI Enforcement

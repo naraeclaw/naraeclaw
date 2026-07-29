@@ -2,7 +2,7 @@
 
 This runbook is for operators who maintain availability, security posture, and incident response.
 
-Last verified: **February 18, 2026**.
+Last verified: **July 29, 2026**.
 
 ## Scope
 
@@ -25,6 +25,11 @@ For first-time installation, start from [one-click-bootstrap.md](../setup-guides
 | Docker / Podman | `docker compose up -d` | containerized deployment |
 
 ## Docker / Podman Runtime
+
+The stock container currently lacks the Byori MCP wrapper and Python runtime. Gateway and
+agent operations can run, but durable knowledge is unavailable; mounting Byori data alone
+does not fix the missing runtime. Use native deployment when ByoriDB knowledge is required,
+and see [Container Limitation](../setup-guides/byoridb-knowledge.md#container-limitation).
 
 If you installed via `./install.sh --docker`, the container exits after onboarding. To run
 NaraeClaw as a long-lived container, use the repository `docker-compose.yml` or start a
@@ -89,20 +94,21 @@ For full setup instructions, see [one-click-bootstrap.md](../setup-guides/one-cl
 naraeclaw status
 ```
 
-2. Verify diagnostics:
+1. Verify diagnostics:
 
 ```bash
 naraeclaw doctor
+naraeclaw knowledge status
 naraeclaw channel doctor
 ```
 
-3. Start runtime:
+1. Start runtime:
 
 ```bash
 naraeclaw daemon
 ```
 
-4. For persistent user session service:
+1. For persistent user session service:
 
 ```bash
 naraeclaw service install
@@ -117,6 +123,7 @@ naraeclaw service status
 | Config validity | `naraeclaw doctor` | no critical errors |
 | Channel connectivity | `naraeclaw channel doctor` | configured channels healthy |
 | Runtime summary | `naraeclaw status` | expected provider/model/channels |
+| Durable knowledge | `naraeclaw knowledge status` | managed wrapper connected, safe profile, expected space |
 | Daemon heartbeat/state | `~/.naraeclaw/daemon_state.json` | file updates periodically |
 
 ## Logs and Diagnostics
@@ -139,33 +146,34 @@ journalctl --user -u naraeclaw.service -f
 ```bash
 naraeclaw status
 naraeclaw doctor
+naraeclaw knowledge status
 naraeclaw channel doctor
 ```
 
-2. Check service state:
+1. Check service state:
 
 ```bash
 naraeclaw service status
 ```
 
-3. If service is unhealthy, restart cleanly:
+1. If service is unhealthy, restart cleanly:
 
 ```bash
 naraeclaw service stop
 naraeclaw service start
 ```
 
-4. If channels still fail, verify allowlists and credentials in `~/.naraeclaw/config.toml`.
+1. If channels still fail, verify allowlists and credentials in `~/.naraeclaw/config.toml`.
 
-5. If gateway is involved, verify bind/auth settings (`[gateway]`) and local reachability.
+1. If gateway is involved, verify bind/auth settings (`[gateway]`) and local reachability.
 
 ## Safe Change Procedure
 
 Before applying config changes:
 
-1. backup `~/.naraeclaw/config.toml`
+1. back up `~/.naraeclaw/config.toml` and important ByoriDB data
 2. apply one logical change at a time
-3. run `naraeclaw doctor`
+3. run `naraeclaw doctor` and `naraeclaw knowledge status`
 4. restart daemon/service
 5. verify with `status` + `channel doctor`
 
@@ -181,6 +189,7 @@ If a rollout regresses behavior:
 ## Related Docs
 
 - [one-click-bootstrap.md](../setup-guides/one-click-bootstrap.md)
+- [byoridb-knowledge.md](../setup-guides/byoridb-knowledge.md)
 - [troubleshooting.md](./troubleshooting.md)
 - [config-reference.md](../reference/api/config-reference.md)
 - [commands-reference.md](../reference/cli/commands-reference.md)

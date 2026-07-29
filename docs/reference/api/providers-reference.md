@@ -2,7 +2,7 @@
 
 This document maps provider IDs, aliases, and credential environment variables.
 
-Last verified: **March 12, 2026**.
+Last verified: **July 29, 2026**.
 
 ## How to List Providers
 
@@ -339,12 +339,17 @@ Then call with a hint model name (for example from tool or integration paths):
 hint:reasoning
 ```
 
-## Embedding Routing (`hint:<name>`)
+## Legacy Embedding Routing (`hint:<name>`)
 
-You can route embedding calls with the same hint pattern using `[[embedding_routes]]`.
-Set `[memory].embedding_model` to a `hint:<name>` value to activate routing.
+ByoriDB is the default durable knowledge provider and does not use NaraeClaw embedding
+routes. `[[embedding_routes]]` remains only for deployments that explicitly disable
+`[knowledge]` and temporarily run a legacy `[memory]` backend. In that compatibility
+mode, set `[memory].embedding_model` to a `hint:<name>` value to activate routing.
 
 ```toml
+[knowledge]
+enabled = false
+
 [memory]
 embedding_model = "hint:semantic"
 
@@ -383,11 +388,13 @@ Use stable hints and update only route targets when providers deprecate model ID
 
 Recommended workflow:
 
-1. Keep call sites stable (`hint:reasoning`, `hint:semantic`).
-2. Change only the target model under `[[model_routes]]` or `[[embedding_routes]]`.
-3. Run:
+1. Keep model call sites stable (`hint:reasoning`).
+2. Change only the target model under `[[model_routes]]`.
+3. If legacy memory compatibility is active, keep its embedding hint stable and update
+   only the matching `[[embedding_routes]]` target.
+4. Run:
    - `naraeclaw doctor`
    - `naraeclaw status`
-4. Smoke test one representative flow (chat + memory retrieval) before rollout.
+5. Smoke test one representative flow (chat + `byoridb__memory_read`) before rollout.
 
 This minimizes breakage because integrations and prompts do not need to change when model IDs are upgraded.

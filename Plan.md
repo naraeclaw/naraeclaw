@@ -5,7 +5,7 @@
 > 현재 단계: 큰 실험형 포크를 실제 유지 가능한 제품형 코드베이스로 줄이는 중.
 > 새 기능보다 **핵심 경로 안정화, 제품 정체성, 단순한 검증 루프**를 우선한다.
 >
-> 업데이트: 2026-04-22
+> 업데이트: 2026-07-29
 
 ---
 
@@ -65,6 +65,7 @@ cargo test -p naraeclaw-tui --lib
 |---|---|---|---|
 | P0 | 제품 정체성 정리 | README, AGENTS, 온보딩, 사용자 노출 문구가 같은 제품을 설명하게 만든다 | 완료 |
 | P0 | 핵심 경로 안정화 | `onboard -> configure -> agent/gateway -> tool use` 흐름을 깨지 않게 만든다 | 완료 |
+| P0 | 영속 지식 단일화 | ByoriDB managed MCP + skill + migration으로 지식 source of truth를 하나로 만든다 | 완료 (2026-07-29) |
 | P0 | 검증 루프 단순화 | 빠른 개발을 막는 과도한 CI/CD와 낡은 체크를 제거한다 | 완료 |
 | P1 | stale scope 제거 | 로봇/디바이스/marketplace/CN/legacy channel/plugin 잔재를 제거한다 | 완료 |
 | P1 | Desktop/Web 제거 | `apps/tauri/`와 `web/` 삭제 — CLI + 게이트웨이 API로 단일화 | 완료 (2026-05-05) |
@@ -80,7 +81,7 @@ cargo test -p naraeclaw-tui --lib
 
 작업:
 
-- [x] README를 서버 관리 + 개인 지식 관리 + CLI/Desktop/Web 중심으로 다시 정리
+- [x] README를 서버 관리 + 개인 지식 관리 + CLI/게이트웨이 중심으로 다시 정리
 - [x] “ZeroClaw 포크”라는 출처는 명확히 남기되, 현재 제품명은 NaraeClaw로 일관화
 - [x] AGENTS.md에서 삭제된 plugin/hardware/device-era guidance 제거
 - [x] README, docs, onboarding의 사용자 노출 문구에서 남은 Zeroclaw/ZeroClaw 흔적 점검
@@ -104,7 +105,7 @@ cargo test -p naraeclaw-tui --lib
 2. provider/model/API key 설정
 3. workspace/config 저장
 4. `naraeclaw agent` 실행
-5. shell/file/http/browser/memory 도구 사용
+5. shell/file/http/browser/ByoriDB 지식 도구 사용
 6. gateway API 접근 (포트 42617)
 
 작업:
@@ -128,7 +129,7 @@ cargo test -p naraeclaw-tui --lib
 기본 CI:
 
 - format
-- workspace check excluding desktop
+- workspace check
 - targeted clippy or tests for changed surfaces
 
 제외하거나 별도 수동 작업으로 내릴 대상:
@@ -143,7 +144,7 @@ cargo test -p naraeclaw-tui --lib
 - [x] `.github/workflows/`가 현재 제품 범위와 맞는지 재점검
 - [x] `dev/ci.sh`, `Justfile`, docs의 검증 명령을 같은 기준으로 통일
 - [x] `--locked`가 Cargo.lock 갱신과 충돌하는 흐름 정리 (Justfile에서 제거, ci.sh Docker는 유지)
-- [x] desktop 검증은 별도 job 또는 수동 검증으로 분리
+- [x] 제거된 Desktop/Web 검증과 배포 잔재 정리
 
 완료 기준:
 
@@ -172,8 +173,8 @@ cargo test -p naraeclaw-tui --lib
 
 삭제 원칙:
 
-- macOS/Windows/Linux desktop/server에서 쓸 일이 없으면 삭제 후보
-- Desktop/Web 개인 편의성은 유지
+- macOS/Windows/Linux CLI/server에서 쓸 일이 없으면 삭제 후보
+- 독립 Desktop/Web UI는 다시 확장하지 않고 게이트웨이 API를 통합 경계로 사용
 - 서버 관리와 개인 지식 관리에 직접 연결되지 않으면 낮은 우선순위
 - 단순 compatibility fallback은 유지할 수 있지만 사용자 노출은 줄인다
 
@@ -189,6 +190,9 @@ cargo test -p naraeclaw-tui --lib
 유지되는 표면:
 - `naraeclaw agent` — 대화형 CLI
 - `naraeclaw gateway` — HTTP/WebSocket API (포트 42617)
+
+알려진 잔재: 현재 CLI help에는 `naraeclaw desktop [--install]` 호환 launcher가
+아직 노출된다. 제품 표면으로 지원하지 않으며 별도 코드 정리 대상으로 둔다.
 
 ---
 
@@ -220,7 +224,7 @@ cargo test -p naraeclaw-tui --lib
 - [x] install script가 현재 지원 OS만 설명하게 정리 (macOS/Linux 4 target 명시)
 - [x] Docker 사용 여부를 서버 운영 목적에 맞게 재검토 → 유지 (서버 배포 핵심 경로)
 - [x] package metadata에서 ZeroClaw/NaraeClaw 혼재 제거 (잔재 없음 확인)
-- [x] release workflow를 CLI/Desktop/Web 산출물 기준으로 단순화 (workflows README에 계획 명시, 구현은 릴리즈 케이던스 확정 후)
+- [x] release workflow 계획을 CLI 단일 바이너리와 서버용 Docker 산출물 기준으로 단순화 (구현은 릴리즈 케이던스 확정 후)
 
 완료 기준:
 
@@ -234,13 +238,19 @@ cargo test -p naraeclaw-tui --lib
 P0–P1 핵심 작업은 모두 완료되었다. 남은 작업:
 
 1. naraeclaw-channels 프롬프트 어셈블리 테스트 12개 drift 수정 (P2, 채널 제거 잔재 정리 follow-up)
-2. Release workflow 실제 구현 — CLI 단일 바이너리 기준으로 단순화, 릴리즈 케이던스 확정 후 (P2)
+1. Release workflow 실제 구현 — CLI 단일 바이너리 기준으로 단순화, 릴리즈 케이던스 확정 후 (P2)
 
 ### ADR-005 자동 스킬 진화 루프 (`docs/architecture/adr-005-auto-skill-evolution.md`)
 
 M1·M2·M2.5·M3a·M3b(실시간 연결 포함)·M4·Level 2 도구 교체 완료. channels clippy 부채 정리. 남은 작업:
 
-3. **M5 포맷 호환 레이어** — Hermes import/export (보류, 외부 마켓 연동 후속)
+1. **M5 포맷 호환 레이어** — Hermes import/export (보류, 외부 마켓 연동 후속)
+1. **ByoriDB 컨테이너 계약** — Python/MCP wrapper를 포함한 이미지 또는 지원되는
+   sidecar transport 정의
+1. **레거시 Memory 의존 제거** — SOP audit와 ADR-005 skill index/stat/candidate의
+   영속 경로를 ByoriDB 또는 별도 운영 저장소로 재설계
+1. **제거 표면 코드 정리** — visible `desktop` launcher와 gateway static-dashboard
+   호환 경로가 현재 제품 범위에 필요한지 결정하고 제거 또는 명시적 legacy 처리
 
 ---
 

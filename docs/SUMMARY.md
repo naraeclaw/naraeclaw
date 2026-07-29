@@ -5,6 +5,8 @@
 ## 시작하기
 
 - [설정 가이드](setup-guides/README.md)
+- [ByoriDB 지식 저장소](setup-guides/byoridb-knowledge.md)
+- [Gateway API 연결](setup-guides/gateway-api.md)
 - [MCP 설정](setup-guides/mcp-setup.md)
 - [macOS 업데이트 및 제거](setup-guides/macos-update-uninstall.md)
 
@@ -29,6 +31,12 @@
 - [샌드박싱](security/sandboxing.md)
 - [감사 로깅](security/audit-logging.md)
 - [보안 로드맵](security/security-roadmap.md)
+
+## 아키텍처
+
+- [ADR-004: Tool Shared State Ownership](architecture/adr-004-tool-shared-state-ownership.md)
+- [ADR-005: Auto Skill Evolution](architecture/adr-005-auto-skill-evolution.md)
+- [ADR-006: ByoriDB Durable Knowledge](architecture/adr-006-byoridb-durable-knowledge.md)
 
 ## 기여
 

@@ -15,8 +15,8 @@ NaraeClaw keeps tests in three automated levels plus shared fixtures/support.
 | Directory | Level | Description | Run command |
 |-----------|-------|-------------|-------------|
 | `src/**/*.rs` | Unit | Co-located `#[cfg(test)]` blocks or separate `tests.rs` files alongside source | `cargo test --lib` |
-| `tests/component/` | Component | One subsystem, real implementation, mocked boundaries | `cargo test --test component` |
-| `tests/integration/` | Integration | Multiple internal components wired together | `cargo test --test integration` |
+| `tests/component/` | Component | One subsystem, real implementation, mocked boundaries | `cargo test --test test_component` |
+| `tests/integration/` | Integration | Multiple internal components wired together | `cargo test --test test_integration` |
 | `tests/support/` | Shared support | Mock providers, channels, tools, helpers, and trace assertions | imported by test binaries |
 | `tests/fixtures/` | Fixtures | Static test data such as media files and JSON traces | loaded by tests |
 
@@ -24,24 +24,21 @@ NaraeClaw keeps tests in three automated levels plus shared fixtures/support.
 
 ```bash
 # Run all automated tests
-cargo test
+cargo test --workspace
 
 # Run only unit tests
 cargo test --lib
 
 # Run component tests
-cargo test --test component
+cargo test --test test_component
 
 # Run integration tests
-cargo test --test integration
-
-# Run system tests
-cargo test --test system
+cargo test --test test_integration
 
 # Filter within a level
-cargo test --test integration agent
+cargo test --test test_integration agent
 
-# Full local validation
+# Extended local validation (heavier than active Fast CI)
 ./dev/ci.sh all
 ```
 
@@ -49,7 +46,7 @@ cargo test --test integration agent
 
 1. Testing one subsystem in isolation? Use `tests/component/`.
 2. Testing multiple components together? Use `tests/integration/`.
-4. Avoid tests that require real external services or personal credentials. Prefer mocks, local fixtures, and `wiremock`.
+3. Avoid tests that require real external services or personal credentials. Prefer mocks and local fixtures.
 
 After creating a test file, add it to the appropriate `mod.rs` and use shared infrastructure from `tests/support/`.
 

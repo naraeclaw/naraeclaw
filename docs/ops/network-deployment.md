@@ -1,188 +1,110 @@
-# Network Deployment — NaraeClaw on a Server or Local Network
+# Network Deployment
 
-This document covers deploying NaraeClaw on a macOS, Windows, or Linux server or local network host, with Telegram and optional webhook channels.
+This document covers the current NaraeClaw network surfaces: the gateway API and Slack
+Socket Mode. The independent Web UI and Desktop application are not supported product
+surfaces.
 
----
+Last verified: **July 29, 2026**.
 
-## 1. Overview
+## Current Inbound Surfaces
 
-| Mode | Inbound port needed? | Use case |
-|------|----------------------|----------|
-| **Telegram polling** | No | NaraeClaw polls Telegram API; works from anywhere |
-| **Matrix sync (including E2EE)** | No | NaraeClaw syncs via Matrix client API; no inbound webhook required |
-| **Discord/Slack** | No | Same — outbound only |
-| **Nostr** | No | Connects to relays via WebSocket; outbound only |
-| **Gateway webhook** | Yes | POST /webhook, /whatsapp, /nextcloud-talk need a public URL |
-| **Gateway pairing** | Yes | If you pair clients via the gateway |
+| Surface | Inbound port | Notes |
+|---|---|---|
+| CLI agent | none | local stdin/stdout |
+| Slack Socket Mode | none | outbound WebSocket connection to Slack |
+| Gateway API | `42617` by default | HTTP, webhooks, and WebSocket chat |
 
-**Key:** Telegram, Discord, Slack, and Nostr use **outbound connections** — NaraeClaw connects to external servers/relays. No port forwarding or public IP required.
+The public channel config currently supports CLI and Slack. Gateway routes for WhatsApp,
+WATI, Nextcloud Talk, and Gmail exist only as `404 Not Found` compatibility stubs and must
+not be configured as working integrations.
 
----
+## Loopback Deployment
 
-## 2. NaraeClaw on a Server
-
-### 2.1 Prerequisites
-
-- macOS, Windows, or Linux server or local machine
-- Network access to your chosen messaging provider or webhook tunnel
-
-### 2.2 Install
-
-```bash
-cargo build --release
-# Or install via your preferred method
-```
-
-### 2.3 Config
-
-Edit `~/.naraeclaw/config.toml`:
+Keep the gateway on loopback unless another machine must connect:
 
 ```toml
-[channels_config.telegram]
-bot_token = "YOUR_BOT_TOKEN"
-allowed_users = []
-
 [gateway]
 host = "127.0.0.1"
 port = 42617
+require_pairing = true
 allow_public_bind = false
 ```
-
-### 2.4 Run Daemon (Local Only)
 
 ```bash
 naraeclaw daemon --host 127.0.0.1 --port 42617
 ```
 
-- Gateway binds to `127.0.0.1` — not reachable from other machines
-- Telegram channel works: NaraeClaw polls Telegram API (outbound)
-- No firewall or port forwarding needed
+Validate the local surface:
 
----
+```bash
+curl -fsS http://127.0.0.1:42617/health
+naraeclaw self-test
+naraeclaw knowledge status
+```
 
-## 3. Binding to 0.0.0.0 (Local Network)
+## LAN or Public Deployment
 
-To allow other devices on your LAN to hit the gateway (e.g. for pairing or webhooks):
+The current implementation logs a warning for a non-loopback bind when
+`allow_public_bind = false`, but it does not reject the bind. The requested `host` is the
+actual exposure control. Do not rely on `allow_public_bind` as a security boundary.
 
-### 3.1 Option A: Explicit Opt-In
+For intentional LAN exposure:
 
 ```toml
 [gateway]
 host = "0.0.0.0"
 port = 42617
 allow_public_bind = true
+require_pairing = true
 ```
 
 ```bash
-naraeclaw daemon --host 0.0.0.0 --port 42617
+naraeclaw gateway start --host 0.0.0.0 --port 42617
 ```
 
-**Security:** `allow_public_bind = true` exposes the gateway to your local network. Only use on trusted LANs.
+Use all of the following:
 
-### 3.2 Option B: Tunnel (Recommended for Webhooks)
+- host firewall rules that restrict source networks;
+- pairing/bearer authentication;
+- TLS or a trusted TLS-terminating reverse proxy;
+- `trust_forwarded_headers = true` only behind a proxy that overwrites client-IP headers;
+- a path prefix when the reverse proxy publishes NaraeClaw under a subpath.
 
-If you need a **public URL** (e.g. WhatsApp webhook, external clients):
+For Internet-facing access, prefer a tunnel or reverse proxy that forwards to
+`127.0.0.1:42617`. NaraeClaw supports Tailscale, ngrok, and Cloudflare tunnel providers in
+its tunnel configuration; verify the active config schema before deployment.
 
-1. Run gateway on localhost:
-   ```bash
-   naraeclaw daemon --host 127.0.0.1 --port 42617
-   ```
+## Slack Socket Mode
 
-2. Start a tunnel:
-   ```toml
-   [tunnel]
-   provider = "tailscale"   # or "ngrok", "cloudflare"
-   ```
-   Or use `naraeclaw tunnel` (see tunnel docs).
-
-3. NaraeClaw will refuse `0.0.0.0` unless `allow_public_bind = true` or a tunnel is active.
-
----
-
-## 4. Telegram Polling (No Inbound Port)
-
-Telegram uses **long-polling** by default:
-
-- NaraeClaw calls `https://api.telegram.org/bot{token}/getUpdates`
-- No inbound port or public IP needed
-- Works behind NAT or behind a firewall without public exposure
-
-**Config:**
+Slack does not require a public inbound gateway URL. Configure an App-Level Token and Bot
+Token, then run the daemon:
 
 ```toml
-[channels_config.telegram]
-bot_token = "YOUR_BOT_TOKEN"
-allowed_users = []            # deny-by-default, bind identities explicitly
+[channels_config.slack]
+enabled = true
+app_token = "xapp-..."
+bot_token = "xoxb-..."
 ```
-
-Run `naraeclaw daemon` — Telegram channel starts automatically.
-
-To approve one Telegram account at runtime:
 
 ```bash
-naraeclaw channel bind-telegram <IDENTITY>
+naraeclaw daemon
+naraeclaw channel doctor
 ```
 
-`<IDENTITY>` can be a numeric Telegram user ID or a username (without `@`).
+## Deployment Checklist
 
-### 4.1 Single Poller Rule (Important)
+- [ ] Keep `host = "127.0.0.1"` unless remote access is intentional.
+- [ ] Verify `/health` locally before publishing a route.
+- [ ] Keep pairing enabled or provide an equivalent authenticated proxy boundary.
+- [ ] Use TLS for traffic that leaves the host.
+- [ ] Restrict firewall and proxy source ranges.
+- [ ] Run `naraeclaw knowledge status`; gateway health does not prove ByoriDB readiness.
+- [ ] Confirm the current route in `crates/naraeclaw-gateway/src/lib.rs` before relying on
+      an integration-specific webhook.
 
-Telegram Bot API `getUpdates` supports only one active poller per bot token.
+## References
 
-- Keep one runtime instance for the same token (recommended: `naraeclaw daemon` service).
-- Do not run `cargo run -- channel start` or another bot process at the same time.
-
-If you hit this error:
-
-`Conflict: terminated by other getUpdates request`
-
-you have a polling conflict. Stop extra instances and restart only one daemon.
-
----
-
-## 5. Webhook Channels (WhatsApp, Nextcloud Talk, Custom)
-
-Webhook-based channels need a **public URL** so Meta (WhatsApp) or your client can POST events.
-
-### 5.1 Tailscale Funnel
-
-```toml
-[tunnel]
-provider = "tailscale"
-```
-
-Tailscale Funnel exposes your gateway via a `*.ts.net` URL. No port forwarding.
-
-### 5.2 ngrok
-
-```toml
-[tunnel]
-provider = "ngrok"
-```
-
-Or run ngrok manually:
-```bash
-ngrok http 42617
-# Use the HTTPS URL for your webhook
-```
-
-### 5.3 Cloudflare Tunnel
-
-Configure Cloudflare Tunnel to forward to `127.0.0.1:42617`, then set your webhook URL to the tunnel's public hostname.
-
----
-
-## 6. Checklist: Server Deployment
-
-- [ ] Build or install the `naraeclaw` binary
-- [ ] Configure `[channels_config.telegram]` or your selected channel
-- [ ] Run `naraeclaw daemon --host 127.0.0.1 --port 42617` (Telegram works without 0.0.0.0)
-- [ ] For LAN access: `--host 0.0.0.0` + `allow_public_bind = true` in config
-- [ ] For webhooks: use Tailscale, ngrok, or Cloudflare tunnel
-
----
-
-## 7. References
-
-- [channels-reference.md](../reference/api/channels-reference.md) — Channel configuration overview
-- [matrix-e2ee-guide.md](../security/matrix-e2ee-guide.md) — Matrix setup and encrypted-room troubleshooting
+- [Gateway API](../setup-guides/gateway-api.md)
+- [Channels Reference](../reference/api/channels-reference.md)
+- [Config Reference](../reference/api/config-reference.md#gateway)
+- [ByoriDB Durable Knowledge](../setup-guides/byoridb-knowledge.md)

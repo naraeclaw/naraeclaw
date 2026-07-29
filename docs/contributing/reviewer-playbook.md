@@ -1,5 +1,9 @@
 # Reviewer Playbook
 
+> **Fast Development Mode override (2026-07-29):** Active CI is format plus workspace
+> check. Label, responder, and high-volume queue automation referenced below is disabled.
+> Use `CONTRIBUTING.md` and `.github/workflows/README.md` for the current merge contract.
+
 This playbook is the operational companion to [`pr-workflow.md`](./pr-workflow.md).
 For broader documentation navigation, use [`docs/README.md`](../README.md).
 
@@ -60,8 +64,8 @@ Go to:
 | Risk label | Typical touched paths | Minimum review depth | Required evidence |
 |---|---|---|---|
 | `risk: low` | docs/tests/chore, isolated non-runtime changes | 1 reviewer + CI gate | coherent local validation + no behavior ambiguity |
-| `risk: medium` | `src/providers/**`, `src/channels/**`, `src/memory/**`, `src/config/**` | 1 subsystem-aware reviewer + behavior verification | focused scenario proof + explicit side effects |
-| `risk: high` | `src/security/**`, `src/runtime/**`, `src/gateway/**`, `src/tools/**`, `.github/workflows/**` | fast triage + deep review + rollback readiness | security/failure-mode checks + rollback clarity |
+| `risk: medium` | `crates/naraeclaw-providers/**`, `crates/naraeclaw-channels/**`, `crates/naraeclaw-memory/**` (legacy compatibility), `crates/naraeclaw-config/**` | 1 subsystem-aware reviewer + behavior verification | focused scenario proof + explicit side effects |
+| `risk: high` | `crates/naraeclaw-runtime/src/security/**`, `crates/naraeclaw-gateway/src/**`, `crates/naraeclaw-tools/src/**`, `.github/workflows/**` | fast triage + deep review + rollback readiness | security/failure-mode checks + rollback clarity |
 
 When uncertain, treat as `risk: high`.
 
@@ -81,7 +85,7 @@ For every new PR:
    - scope labels (for example `provider`, `channel`, `security`)
    - module-scoped labels (`channel:*`, `provider:*`, `tool:*`)
    - contributor tier labels when applicable
-3. Confirm CI signal status (`CI Required Gate`).
+3. Confirm active Fast CI status (format + workspace check).
 4. Confirm scope is one concern (reject mixed mega-PRs unless justified).
 5. Confirm privacy/data-hygiene and neutral test wording requirements are satisfied.
 

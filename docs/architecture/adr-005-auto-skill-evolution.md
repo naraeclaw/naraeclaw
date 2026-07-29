@@ -1,12 +1,20 @@
 # ADR-005: Auto Skill Evolution Loop
 
-**Status:** Accepted
+**Status:** Accepted; legacy-memory portions partially superseded by
+[ADR-006](adr-006-byoridb-durable-knowledge.md) on 2026-07-29
 
 **Date:** 2026-05-13 (proposed), 2026-05-13 (accepted, decisions finalized)
 
 **Related modules:** `naraeclaw-runtime/src/{skills,skillforge}`, `naraeclaw-memory`, `naraeclaw-runtime/src/agent`
 
 **Inspiration:** [Hermes Agent](https://hermes-agent.org/) (Nous Research, 2026-02)
+
+> **Current contract:** This ADR records the design and implementation history of the
+> auto-skill loop. Sections that persist `skill_index`, `skill_stat`, or
+> `skill_candidate` through the `Memory` trait are active only in legacy compatibility
+> mode (`[knowledge].enabled = false`). Default ByoriDB mode supplies a no-op legacy
+> `Memory` handle, so those records are not durable until the skill-evolution bridge is
+> ported to ByoriDB. The skill files and non-memory parts of this ADR remain current.
 
 ## Context
 
@@ -342,19 +350,22 @@ enabled = false                  # M4 기본 off
 각 마일스톤은 별도 브랜치에서 진행, 작업 파일이 겹치지 않게 분할.
 
 ### M1 — 추적 인프라 (저위험)
+
 - `ExecutionTrace` 캡처 + `agent/loop_.rs` 훅
 - `SkillStats` 메모리 적재 (`Custom("skill_stat")` 카테고리)
 - **검증**: 단위 테스트 + live 한 세션 돌려 trace JSON 덤프 확인
 - **범위**: trace 캡처만, 자동 생성 OFF. `agent.execution_trace.enabled` flag로 보호
 
 ### M2 — 자동 트리거 (중위험)
+
 - `ValueSignal` + `score()` + **D1 임계값 0.6** 기본
 - `SkillCreator` 자동 호출 (`skills.auto_evolution.enabled` flag로 보호)
 - **검증**: MockProvider로 멀티스텝 시나리오 통과, 무한 루프 가드(스킬 생성 동안 다시 트리거 차단)
 
 ### M3 — 핫 리로드 + Memory 브리지 (중위험)
 
-**M3a — 핫 리로드 ✅ 2026-06-05**
+#### M3a — 핫 리로드 ✅ 2026-06-05
+
 - `SkillRegistry` 전면 도입(모든 호출자 마이그레이션) 대신 **최소 침습** 방식 채택:
   `skills::replace_skills_section` 헬퍼 + `loop_::run` 인터랙티브 루프의 턴 경계
   재스캔. 채널은 이미 새 세션마다 reload하므로 자연 커버, gateway(Agent 경로)는
@@ -364,7 +375,8 @@ enabled = false                  # M4 기본 off
   `system_prompt`/`base_system_prompt`/`history[0]` 스킬 섹션 갱신
 - **검증**: `replace_skills_section` 단위 테스트 4개 (교체/삽입/제거/no-op)
 
-**M3b — Memory 브리지 ✅ 2026-06-05 / 실시간 연결 ✅ 2026-06-09**
+#### M3b — Memory 브리지 ✅ 2026-06-05 / 실시간 연결 ✅ 2026-06-09
+
 - ✅ **D3** 스킬 인덱스 적재 — `skills::stats::store_skill_index` (`Custom("skill_index")`, importance 0.8). `try_trigger` spawn에서 생성 성공 시 적재, `SkillEvolutionService`에 memory 주입
 - ✅ **D2** `mark_skill_candidate` 도구 신설 + auto_approve 등록. `loop_::run_tool_call_loop`이 같은 턴 trace의 도구 호출을 감지해 `UserSignal::Tool` 도출
 - ✅ **D6** `consolidation` 프롬프트에 `skill_candidate` 추출 추가 — `ConsolidationResult`에 `#[serde(default)]` 필드, 후보 감지 시 `Custom("skill_candidate")` 마킹. 회귀 테스트로 pre-M3b 응답 파싱 불변 보장
@@ -373,6 +385,7 @@ enabled = false                  # M4 기본 off
 - **검증**: skill_index 2 + mark_skill_candidate 3 + consolidation 회귀 8 + resolve/consume 2건
 
 ### M4 — SkillForge 스케줄러 (저위험, 보너스) ✅ 2026-05-13
+
 - `[skillforge.scheduler]` 서브섹션 신설 (`enabled`, `interval_secs` 테스트 오버라이드)
 - daemon supervisor에 `skillforge-scheduler` 컴포넌트 등록 — `cron::scheduler::run`과 동일 패턴
 - `crates/naraeclaw-runtime/src/skillforge/scheduler.rs`: `tokio::time::interval` 기반 백그라운드 루프, 최소 주기 60초 클램프
@@ -380,6 +393,7 @@ enabled = false                  # M4 기본 off
 - **검증**: 단위 테스트 6개 추가 — interval 계산(4) + disabled 경로 + enabled 경로의 health 상태 전환
 
 ### M5 — 포맷 호환 레이어 (저위험, D5 신규)
+
 - `skills/format/{native, hermes, convert, mod}.rs` 신설
 - `load_skills` → `format::auto_detect()` 위임 (SKILL.toml vs SKILL.md 프론트매터 자동 분기)
 - Hermes → NaraeClaw 변환: 프론트매터 → SKILL.toml, body → SKILL.md
@@ -403,13 +417,17 @@ enabled = false                  # M4 기본 off
 
 ## 9. 참고 자료
 
-- Hermes Agent 공식: https://hermes-agent.org/
-- NousResearch 해설: https://discuss.pytorch.kr/t/hermes-agent-nousresearch-ai/9184
+- [Hermes Agent 공식](https://hermes-agent.org/)
+- [NousResearch 해설](https://discuss.pytorch.kr/t/hermes-agent-nousresearch-ai/9184)
 - 기존 ADR: `docs/architecture/adr-004-tool-shared-state-ownership.md`
 
 ---
 
 ## 변경 이력
+
+- **2026-07-29 (부분 대체)** — ADR-006 채택. 영속 지식의 기본 경로를 ByoriDB로
+  단일화하고, `Memory` 기반 skill index/stat/candidate 적재를 legacy 호환 경로로
+  재분류
 
 - **2026-05-13 (제안)** — 초기 작성, Status: Proposed, 오픈 질문 6개 (Q1~Q6)
 - **2026-05-13 (확정)** — Status: Accepted. D1~D6 결정 확정 (`Decision` 섹션 참조). M5 신설(포맷 호환 레이어). Section 8 오픈 질문 제거 → `Decision` 표로 흡수

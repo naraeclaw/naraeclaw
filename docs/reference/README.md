@@ -8,12 +8,13 @@ Structured reference index for commands, providers, channels, config, and integr
 - Provider IDs / aliases / env vars: [api/providers-reference.md](api/providers-reference.md)
 - Channel setup + allowlists: [api/channels-reference.md](api/channels-reference.md)
 - Config defaults and keys: [api/config-reference.md](api/config-reference.md)
+- Durable knowledge setup and migration: [../setup-guides/byoridb-knowledge.md](../setup-guides/byoridb-knowledge.md)
 
 ## Provider & Integration Extensions
 
 - Custom provider endpoints: [../contributing/custom-providers.md](../contributing/custom-providers.md)
-- Nextcloud Talk bot integration: [../setup-guides/nextcloud-talk-setup.md](../setup-guides/nextcloud-talk-setup.md)
-- LangGraph-based integration patterns: [../contributing/langgraph-integration.md](../contributing/langgraph-integration.md)
+- Unsupported Nextcloud Talk compatibility route:
+  [../setup-guides/nextcloud-talk-setup.md](../setup-guides/nextcloud-talk-setup.md)
 
 ## Usage
 

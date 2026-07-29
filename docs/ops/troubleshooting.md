@@ -2,7 +2,7 @@
 
 This guide focuses on common setup/runtime failures and fast resolution paths.
 
-Last verified: **February 20, 2026**.
+Last verified: **July 29, 2026**.
 
 ## Installation / Bootstrap
 
@@ -77,7 +77,6 @@ Symptoms:
 
 Why this happens in NaraeClaw:
 
-- Matrix E2EE stack (`matrix-sdk`, `ruma`, `vodozemac`) is large and expensive to type-check.
 - TLS + crypto native build scripts (`aws-lc-sys`, `ring`) add noticeable compile time.
 - `rusqlite` with bundled SQLite compiles C code locally.
 - Running multiple cargo jobs/worktrees in parallel causes lock contention.
@@ -91,19 +90,14 @@ cargo tree -d
 
 The timing report is written to `target/cargo-timings/cargo-timing.html`.
 
-Faster local iteration (when Matrix channel is not needed):
+Faster local iteration:
 
 ```bash
 cargo check
 ```
 
-This uses the lean default feature set and can significantly reduce compile time.
-
-To build with Matrix support explicitly enabled:
-
-```bash
-cargo check --features channel-matrix
-```
+The removed `channel-matrix` feature is not a valid build target. The current public channel
+schema supports CLI and Slack.
 
 Lock-contention mitigation:
 

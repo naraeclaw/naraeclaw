@@ -6,7 +6,7 @@ A fully containerized development sandbox for NaraeClaw agents. This environment
 
 - **`agent/`**: (Merged into root Dockerfile)
     - The development image is built from the root `Dockerfile` using the `dev` stage (`target: dev`).
-    - Based on `debian:bookworm-slim` (unlike production `distroless`).
+    - Based on `debian:trixie-slim` (unlike production `distroless`).
     - Includes `bash`, `curl`, and debug tools.
 - **`sandbox/`**: Dockerfile for the simulated user environment.
     - Based on `ubuntu:22.04`.
@@ -70,7 +70,15 @@ The `playground/` directory (in repo root) is mounted as the shared workspace:
 - **Agent**: `/naraeclaw-data/workspace`
 - **Sandbox**: `/home/developer/workspace`
 
-Files created by the agent are visible to the sandbox user, and vice versa. The directory is git-ignored and auto-populated on first run — the agent creates `brain.db`, `sessions.db`, personality files (`IDENTITY.md`, `SOUL.md`), and hygiene state automatically.
+Files created by the agent are visible to the sandbox user, and vice versa. The directory
+is git-ignored and may contain session state and personality files (`IDENTITY.md`,
+`SOUL.md`). Durable knowledge is not stored in a workspace `brain.db`; the default provider
+is ByoriDB.
+
+The stock development image does not bundle Python or the Byori MCP wrapper, so durable
+knowledge is unavailable inside it. Use native development for Byori integration tests or
+build an explicitly Byori-capable image; see
+[`byoridb-knowledge.md`](../docs/setup-guides/byoridb-knowledge.md#container-limitation).
 
 The agent configuration lives in `target/.naraeclaw` (mounted to `/naraeclaw-data/.naraeclaw`), so settings persist across container rebuilds.
 
@@ -127,7 +135,6 @@ To run the incremental strict gate (changed Rust lines only):
 ./dev/ci.sh lint-delta
 ./dev/ci.sh test
 ./dev/ci.sh build
-./dev/ci.sh deny
 ./dev/ci.sh audit
 ./dev/ci.sh security
 ./dev/ci.sh docker-smoke
@@ -137,7 +144,8 @@ To run the incremental strict gate (changed Rust lines only):
 ./scripts/ci/docs_links_gate.sh
 ```
 
-Note: local `deny` focuses on license/source policy; advisory scanning is handled by `audit`.
+The active GitHub Fast CI runs only format and workspace check. `./dev/ci.sh all` is an
+extended local suite and is intentionally heavier.
 
 ### 4. Enter CI container shell
 

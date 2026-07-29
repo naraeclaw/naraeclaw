@@ -4,7 +4,7 @@
 
 **Date:** 2026-03-22
 
-**Issue:** [#4057](https://github.com/zeroclaw/zeroclaw/issues/4057)
+**Issue:** [#4057](https://github.com/zeroclaw-labs/zeroclaw/issues/4057)
 
 ## Context
 
@@ -12,13 +12,13 @@ NaraeClaw tools execute in a multi-client environment where a single daemon
 process serves requests from multiple connected clients simultaneously. Several
 tools already maintain long-lived shared state:
 
-- **`DelegateParentToolsHandle`** (`src/tools/mod.rs`):
+- **`DelegateParentToolsHandle`** (`crates/naraeclaw-runtime/src/tools/mod.rs`):
   `Arc<RwLock<Vec<Arc<dyn Tool>>>>` — holds parent tools for delegate agents
   with no per-client isolation.
-- **`ChannelMapHandle`** (`src/tools/reaction.rs`):
+- **`ChannelMapHandle`** (`crates/naraeclaw-tools/src/reaction.rs`):
   `Arc<RwLock<HashMap<String, Arc<dyn Channel>>>>` — global channel map shared
   across all clients.
-- **`CanvasStore`** (`src/tools/canvas.rs`):
+- **`CanvasStore`** (`crates/naraeclaw-tools/src/canvas.rs`):
   `Arc<RwLock<HashMap<String, CanvasEntry>>>` — canvas IDs are plain strings
   with no client namespace.
 
@@ -33,7 +33,7 @@ Additional context:
 - The tool registry is immutable after startup, built once in
   `all_tools_with_runtime()`.
 - Client identity is currently derived from IP address only
-  (`src/gateway/mod.rs`), which is insufficient for reliable namespacing.
+  (`crates/naraeclaw-gateway/src/lib.rs`), which is insufficient for reliable namespacing.
 - `SecurityPolicy` is scoped per agent, not per client.
 - `WorkspaceManager` provides some isolation but workspace switching is global.
 
@@ -49,9 +49,9 @@ This pattern is already proven by three independent implementations:
 
 | Handle | Location | Inner type |
 |--------|----------|-----------|
-| `DelegateParentToolsHandle` | `src/tools/mod.rs` | `Vec<Arc<dyn Tool>>` |
-| `ChannelMapHandle` | `src/tools/reaction.rs` | `HashMap<String, Arc<dyn Channel>>` |
-| `CanvasStore` | `src/tools/canvas.rs` | `HashMap<String, CanvasEntry>` |
+| `DelegateParentToolsHandle` | `crates/naraeclaw-runtime/src/tools/mod.rs` | `Vec<Arc<dyn Tool>>` |
+| `ChannelMapHandle` | `crates/naraeclaw-tools/src/reaction.rs` | `HashMap<String, Arc<dyn Channel>>` |
+| `CanvasStore` | `crates/naraeclaw-tools/src/canvas.rs` | `HashMap<String, CanvasEntry>` |
 
 Tools that need shared state MUST:
 
@@ -69,7 +69,7 @@ client identity keys.
 
 A new `ClientId` type should be introduced (opaque, `Clone + Eq + Hash + Send + Sync`)
 that the daemon assigns at connection time. This replaces the current approach
-of using raw IP addresses (`src/gateway/mod.rs:259-306`), which breaks when
+of using raw IP addresses (`crates/naraeclaw-gateway/src/lib.rs`), which breaks when
 multiple clients share a NAT address or when proxied connections arrive.
 
 `ClientId` is passed to tools that require per-client state namespacing as part
@@ -194,9 +194,9 @@ state's validity.
 
 ## References
 
-- `src/tools/mod.rs` — `DelegateParentToolsHandle`, `all_tools_with_runtime()`
-- `src/tools/reaction.rs` — `ChannelMapHandle`, `ReactionTool`
-- `src/tools/canvas.rs` — `CanvasStore`, `CanvasEntry`
-- `src/tools/traits.rs` — `Tool` trait
-- `src/gateway/mod.rs` — client IP extraction (`forwarded_client_ip`, `resolve_client_ip`)
-- `src/security/` — `SecurityPolicy`
+- `crates/naraeclaw-runtime/src/tools/mod.rs` — `DelegateParentToolsHandle`, runtime wiring
+- `crates/naraeclaw-tools/src/reaction.rs` — `ChannelMapHandle`, `ReactionTool`
+- `crates/naraeclaw-tools/src/canvas.rs` — `CanvasStore`, `CanvasEntry`
+- `crates/naraeclaw-api/src/tool.rs` — `Tool` trait
+- `crates/naraeclaw-gateway/src/lib.rs` — client IP extraction
+- `crates/naraeclaw-runtime/src/security/` — `SecurityPolicy`

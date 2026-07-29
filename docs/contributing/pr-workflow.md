@@ -1,5 +1,12 @@
 # NaraeClaw PR Workflow (High-Volume Collaboration)
 
+> **Fast Development Mode override (2026-07-29):** The active required workflow is
+> `.github/workflows/ci-run.yml`, which runs format and workspace check on `master` pushes
+> and pull requests. Release, label, auto-responder, CodeQL, and heavy matrix automation
+> described later in this document is currently disabled. Treat those sections as the
+> intended steady-state model, not active repository behavior. `CONTRIBUTING.md` and
+> `.github/workflows/README.md` are the current authorities.
+
 This document defines how NaraeClaw handles high PR volume while maintaining:
 
 - High performance
