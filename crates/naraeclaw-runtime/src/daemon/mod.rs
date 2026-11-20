@@ -970,6 +970,7 @@ mod tests {
             bot_token: "xoxb-test".into(),
             signing_secret: None,
             default_channel: None,
+            mention_only: false,
         });
         assert!(has_supervised_channels(&config));
     }
