@@ -12,10 +12,18 @@ use async_trait::async_trait;
 use futures_util::{SinkExt, StreamExt};
 use naraeclaw_api::channel::{Channel, ChannelMessage, SendMessage};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::sync::Mutex;
+use std::time::{Duration, Instant};
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 use tracing::{debug, info, warn};
 
 const SLACK_API_BASE: &str = "https://slack.com/api";
+
+/// How long a thread stays "joined" after the bot was last addressed in it.
+const ACTIVE_THREAD_TTL: Duration = Duration::from_secs(7 * 24 * 60 * 60);
+/// Upper bound on remembered threads so the map cannot grow without limit.
+const ACTIVE_THREAD_MAX: usize = 4096;
 
 pub struct SlackChannel {
     app_token: String,
@@ -25,6 +33,11 @@ pub struct SlackChannel {
     /// Used so the reply-intent classifier can tell self-mentions apart from
     /// mentions of other users.
     bot_user_id: tokio::sync::OnceCell<Option<String>>,
+    /// When true, plain channel messages are dropped unless they are follow-ups
+    /// in a thread the bot has already joined (mentioned in or replied to).
+    mention_only: bool,
+    /// Threads the bot has joined, keyed by `(channel, thread root ts)`.
+    active_threads: Mutex<HashMap<(String, String), Instant>>,
 }
 
 impl SlackChannel {
@@ -34,7 +47,109 @@ impl SlackChannel {
             bot_token,
             default_channel,
             bot_user_id: tokio::sync::OnceCell::new(),
+            mention_only: false,
+            active_threads: Mutex::new(HashMap::new()),
         }
+    }
+
+    /// Only handle @mentions, DMs, and follow-ups in threads the bot joined.
+    #[must_use]
+    pub fn with_mention_only(mut self, mention_only: bool) -> Self {
+        self.mention_only = mention_only;
+        self
+    }
+
+    fn remember_thread(&self, channel: &str, root_ts: &str) {
+        let mut threads = self
+            .active_threads
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let now = Instant::now();
+        threads.insert((channel.to_string(), root_ts.to_string()), now);
+        if threads.len() > ACTIVE_THREAD_MAX {
+            threads.retain(|_, seen| now.duration_since(*seen) < ACTIVE_THREAD_TTL);
+        }
+        while threads.len() > ACTIVE_THREAD_MAX {
+            let Some(oldest) = threads
+                .iter()
+                .min_by_key(|(_, seen)| **seen)
+                .map(|(key, _)| key.clone())
+            else {
+                break;
+            };
+            threads.remove(&oldest);
+        }
+    }
+
+    fn is_remembered_thread(&self, channel: &str, root_ts: &str) -> bool {
+        let threads = self
+            .active_threads
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        threads
+            .get(&(channel.to_string(), root_ts.to_string()))
+            .is_some_and(|seen| seen.elapsed() < ACTIVE_THREAD_TTL)
+    }
+
+    /// Ask Slack whether the bot posted in, or was mentioned in, a thread.
+    /// Covers threads joined before a restart. Fails closed (returns false).
+    async fn bot_joined_thread(&self, channel: &str, root_ts: &str) -> bool {
+        let Some(bot_id) = self.bot_self_id().await else {
+            return false;
+        };
+        let resp = match self
+            .http_client()
+            .get(format!("{SLACK_API_BASE}/conversations.replies"))
+            .header("Authorization", format!("Bearer {}", self.bot_token))
+            .query(&[("channel", channel), ("ts", root_ts), ("limit", "200")])
+            .send()
+            .await
+        {
+            Ok(resp) => resp,
+            Err(e) => {
+                debug!("Slack conversations.replies request failed: {e}");
+                return false;
+            }
+        };
+        let Ok(body) = resp.json::<serde_json::Value>().await else {
+            return false;
+        };
+        if !body["ok"].as_bool().unwrap_or(false) {
+            debug!(
+                "Slack conversations.replies failed: {}",
+                body["error"].as_str().unwrap_or("unknown")
+            );
+            return false;
+        }
+        body["messages"]
+            .as_array()
+            .is_some_and(|messages| thread_involves_bot(messages, &bot_id))
+    }
+
+    /// Decide whether an incoming message should reach the orchestrator.
+    async fn admit(&self, msg: &ChannelMessage) -> bool {
+        if !self.mention_only {
+            return true;
+        }
+        let root = thread_root(msg);
+        if msg.is_mention {
+            if let Some(root) = root {
+                self.remember_thread(&msg.reply_target, root);
+            }
+            return true;
+        }
+        // Plain channel message: only thread follow-ups can pass.
+        let Some(root) = msg.interruption_scope_id.as_deref() else {
+            return false;
+        };
+        if self.is_remembered_thread(&msg.reply_target, root) {
+            return true;
+        }
+        if self.bot_joined_thread(&msg.reply_target, root).await {
+            self.remember_thread(&msg.reply_target, root);
+            return true;
+        }
+        false
     }
 
     /// Resolve the bot's own user ID via `auth.test` and cache it for the
@@ -241,7 +356,13 @@ impl Channel for SlackChannel {
         };
 
         self.post_message(channel, &message.content, message.thread_ts.as_deref())
-            .await
+            .await?;
+        if self.mention_only
+            && let Some(ts) = message.thread_ts.as_deref()
+        {
+            self.remember_thread(channel, ts);
+        }
+        Ok(())
     }
 
     async fn listen(&self, tx: tokio::sync::mpsc::Sender<ChannelMessage>) -> Result<()> {
@@ -314,9 +435,17 @@ impl Channel for SlackChannel {
                                     "events_api" => {
                                         if let Some(payload) = envelope.payload
                                             && let Some(channel_msg) = parse_events_api(&payload)
-                                            && tx.send(channel_msg).await.is_err()
                                         {
-                                            return Ok(());
+                                            if !self.admit(&channel_msg).await {
+                                                debug!(
+                                                    "Slack: dropping non-mention message {} (mention_only)",
+                                                    channel_msg.id
+                                                );
+                                                continue 'inner;
+                                            }
+                                            if tx.send(channel_msg).await.is_err() {
+                                                return Ok(());
+                                            }
                                         }
                                     }
                                     other => {
@@ -498,6 +627,24 @@ fn build_channel_message(f: SlackEventFields) -> ChannelMessage {
         // false → general channel message; orchestrator LLM decides whether to reply
         is_mention: f.is_direct_mention,
     }
+}
+
+/// Thread root of a message: its parent thread, or the message itself when it
+/// starts a new thread (the bot replies under `thread_ts`).
+fn thread_root(msg: &ChannelMessage) -> Option<&str> {
+    msg.interruption_scope_id
+        .as_deref()
+        .or(msg.thread_ts.as_deref())
+}
+
+/// True when any message in a `conversations.replies` result was posted by the
+/// bot or @mentions it.
+fn thread_involves_bot(messages: &[serde_json::Value], bot_id: &str) -> bool {
+    let mention = format!("<@{bot_id}>");
+    messages.iter().any(|m| {
+        m["user"].as_str() == Some(bot_id)
+            || m["text"].as_str().is_some_and(|t| t.contains(&mention))
+    })
 }
 
 /// Parse a Slack `events_api` payload into a `ChannelMessage`.
@@ -789,5 +936,94 @@ mod tests {
         let payload = dm_event("U123", "hi", "1700000000.123456");
         let msg = parse_events_api(&payload).unwrap();
         assert_eq!(msg.timestamp, 1700000000);
+    }
+
+    // ── mention_only admission ─────────────────────────────────────
+
+    fn channel_message_event(text: &str, ts: &str, thread_ts: Option<&str>) -> serde_json::Value {
+        let mut event = serde_json::json!({ "type": "message", "user": "U1", "channel": "C1", "text": text, "ts": ts });
+        if let Some(t) = thread_ts {
+            event["thread_ts"] = serde_json::json!(t);
+        }
+        serde_json::json!({ "event": event })
+    }
+
+    fn mention_only_channel() -> SlackChannel {
+        SlackChannel::new("xapp-test".into(), "xoxb-test".into(), None).with_mention_only(true)
+    }
+
+    #[tokio::test]
+    async fn admit_allows_everything_when_mention_only_disabled() {
+        let ch = SlackChannel::new("xapp-test".into(), "xoxb-test".into(), None);
+        let msg = parse_events_api(&channel_message_event("chatter", "1.0", None)).unwrap();
+        assert!(ch.admit(&msg).await);
+    }
+
+    #[tokio::test]
+    async fn admit_drops_top_level_chatter_when_mention_only() {
+        let ch = mention_only_channel();
+        let msg = parse_events_api(&channel_message_event("chatter", "1.0", None)).unwrap();
+        assert!(!ch.admit(&msg).await);
+    }
+
+    #[tokio::test]
+    async fn admit_allows_mentions_and_dms_when_mention_only() {
+        let ch = mention_only_channel();
+        let mention = parse_events_api(&mention_event("U1", "C1", "<@UBOT> hi", "1.0")).unwrap();
+        assert!(ch.admit(&mention).await);
+        let dm = parse_events_api(&dm_event("U1", "hi", "2.0")).unwrap();
+        assert!(ch.admit(&dm).await);
+    }
+
+    #[tokio::test]
+    async fn admit_allows_follow_up_in_thread_started_by_mention() {
+        let ch = mention_only_channel();
+        let mention = parse_events_api(&mention_event("U1", "C1", "<@UBOT> hi", "1.0")).unwrap();
+        assert!(ch.admit(&mention).await);
+        let follow_up =
+            parse_events_api(&channel_message_event("and also", "1.5", Some("1.0"))).unwrap();
+        assert!(ch.admit(&follow_up).await);
+    }
+
+    #[tokio::test]
+    async fn admit_allows_follow_up_in_thread_bot_replied_to() {
+        let ch = mention_only_channel();
+        ch.remember_thread("C1", "5.0");
+        let follow_up =
+            parse_events_api(&channel_message_event("thanks", "5.1", Some("5.0"))).unwrap();
+        assert!(ch.admit(&follow_up).await);
+    }
+
+    #[test]
+    fn remembered_threads_are_scoped_by_channel() {
+        let ch = mention_only_channel();
+        ch.remember_thread("C1", "1.0");
+        assert!(ch.is_remembered_thread("C1", "1.0"));
+        assert!(!ch.is_remembered_thread("C2", "1.0"));
+        assert!(!ch.is_remembered_thread("C1", "2.0"));
+    }
+
+    #[test]
+    fn remembered_threads_are_bounded() {
+        let ch = mention_only_channel();
+        for i in 0..(ACTIVE_THREAD_MAX + 10) {
+            ch.remember_thread("C1", &format!("{i}.0"));
+        }
+        let len = ch.active_threads.lock().unwrap().len();
+        assert_eq!(len, ACTIVE_THREAD_MAX);
+        assert!(ch.is_remembered_thread("C1", &format!("{}.0", ACTIVE_THREAD_MAX + 9)));
+    }
+
+    #[test]
+    fn thread_involves_bot_detects_bot_posts_and_mentions() {
+        let posted = vec![
+            serde_json::json!({ "user": "U1", "text": "q" }),
+            serde_json::json!({ "user": "UBOT", "text": "a" }),
+        ];
+        assert!(thread_involves_bot(&posted, "UBOT"));
+        let mentioned = vec![serde_json::json!({ "user": "U1", "text": "<@UBOT> look" })];
+        assert!(thread_involves_bot(&mentioned, "UBOT"));
+        let unrelated = vec![serde_json::json!({ "user": "U1", "text": "<@U2> look" })];
+        assert!(!thread_involves_bot(&unrelated, "UBOT"));
     }
 }

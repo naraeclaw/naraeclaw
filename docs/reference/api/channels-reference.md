@@ -61,6 +61,7 @@ app_token = "xapp-..."
 bot_token = "xoxb-..."
 # signing_secret = "..."
 # default_channel = "C0123456789"
+# mention_only = true
 ```
 
 | Key | Default | Purpose |
@@ -70,9 +71,15 @@ bot_token = "xoxb-..."
 | `bot_token` | required | Web API send token |
 | `signing_secret` | unset | optional Slack signing secret |
 | `default_channel` | unset | fallback channel when no incoming thread context exists |
+| `mention_only` | `false` | handle only @mentions, DMs, and follow-ups in threads the bot already joined; other channel messages never reach the model |
 
 Recommended Slack scopes include `chat:write`, `reactions:write`, `channels:history`, and
 `im:history`; the App-Level Token needs `connections:write`.
+
+With `mention_only = true`, threads the bot joined are tracked in memory. After a restart,
+the first non-mention follow-up in an older thread is checked with `conversations.replies`
+(requires `channels:history`, plus `groups:history` for private channels); if that lookup
+fails, the message is dropped.
 
 ## CLI Operations
 
