@@ -3746,11 +3746,14 @@ fn build_channel_by_id(config: &Config, channel_id: &str) -> Result<Arc<dyn Chan
                 .slack
                 .as_ref()
                 .context("Slack channel is not configured")?;
-            Ok(Arc::new(SlackChannel::new(
-                sl.app_token.clone(),
-                sl.bot_token.clone(),
-                sl.default_channel.clone(),
-            )))
+            Ok(Arc::new(
+                SlackChannel::new(
+                    sl.app_token.clone(),
+                    sl.bot_token.clone(),
+                    sl.default_channel.clone(),
+                )
+                .with_mention_only(sl.mention_only),
+            ))
         }
         other => anyhow::bail!("Unknown channel '{other}'. Supported: slack"),
     }
@@ -3806,11 +3809,14 @@ fn collect_configured_channels(
         if sl.enabled {
             channels.push(ConfiguredChannel {
                 display_name: "Slack",
-                channel: Arc::new(SlackChannel::new(
-                    sl.app_token.clone(),
-                    sl.bot_token.clone(),
-                    sl.default_channel.clone(),
-                )),
+                channel: Arc::new(
+                    SlackChannel::new(
+                        sl.app_token.clone(),
+                        sl.bot_token.clone(),
+                        sl.default_channel.clone(),
+                    )
+                    .with_mention_only(sl.mention_only),
+                ),
             });
         } else {
             tracing::info!("Slack channel configured but disabled (enabled = false)");

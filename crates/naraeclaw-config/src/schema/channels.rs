@@ -160,6 +160,12 @@ pub struct SlackConfig {
     /// Default channel ID to post to when no thread context is available.
     /// If unset, replies are sent to the channel where the message arrived.
     pub default_channel: Option<String>,
+    /// Only handle @mentions, DMs, and follow-ups in threads the bot already
+    /// joined (was mentioned in or replied to). Other channel messages are
+    /// dropped before reaching the model. Default: false (every channel message
+    /// goes through the reply-intent classifier).
+    #[serde(default)]
+    pub mention_only: bool,
 }
 
 impl ChannelConfig for SlackConfig {

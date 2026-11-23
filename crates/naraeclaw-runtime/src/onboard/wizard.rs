@@ -3328,6 +3328,7 @@ fn setup_channels(
                     app_token,
                     bot_token,
                     signing_secret: existing_sl.and_then(|s| s.signing_secret.clone()),
+                    mention_only: existing_sl.is_some_and(|s| s.mention_only),
                     default_channel: if default_channel.is_empty() {
                         existing_sl.and_then(|s| s.default_channel.clone())
                     } else {
