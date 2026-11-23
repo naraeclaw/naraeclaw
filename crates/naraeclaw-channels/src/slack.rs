@@ -97,33 +97,86 @@ impl SlackChannel {
         let Some(bot_id) = self.bot_self_id().await else {
             return false;
         };
+        self.fetch_thread_messages(channel, root_ts, 200)
+            .await
+            .is_some_and(|messages| thread_involves_bot(&messages, &bot_id))
+    }
+
+    /// Fetch up to `limit` messages of a thread (root first) via
+    /// `conversations.replies`. Returns `None` on any failure.
+    async fn fetch_thread_messages(
+        &self,
+        channel: &str,
+        root_ts: &str,
+        limit: u32,
+    ) -> Option<Vec<serde_json::Value>> {
+        let limit = limit.to_string();
         let resp = match self
             .http_client()
             .get(format!("{SLACK_API_BASE}/conversations.replies"))
             .header("Authorization", format!("Bearer {}", self.bot_token))
-            .query(&[("channel", channel), ("ts", root_ts), ("limit", "200")])
+            .query(&[("channel", channel), ("ts", root_ts), ("limit", &limit)])
             .send()
             .await
         {
             Ok(resp) => resp,
             Err(e) => {
-                debug!("Slack conversations.replies request failed: {e}");
-                return false;
+                warn!("Slack conversations.replies request failed: {e}");
+                return None;
             }
         };
-        let Ok(body) = resp.json::<serde_json::Value>().await else {
-            return false;
-        };
+        let body: serde_json::Value = resp.json().await.ok()?;
         if !body["ok"].as_bool().unwrap_or(false) {
-            debug!(
+            warn!(
                 "Slack conversations.replies failed: {}",
                 body["error"].as_str().unwrap_or("unknown")
             );
-            return false;
+            return None;
         }
-        body["messages"]
-            .as_array()
-            .is_some_and(|messages| thread_involves_bot(messages, &bot_id))
+        body["messages"].as_array().cloned()
+    }
+
+    /// When the bot first sees a thread reply, prepend the earlier messages of
+    /// that thread (root included) so the model knows what "this" / "above"
+    /// refers to. Messages that start a thread themselves are left unchanged.
+    async fn attach_thread_context(&self, msg: &mut ChannelMessage) {
+        let Some(root) = msg.interruption_scope_id.clone() else {
+            return;
+        };
+        let Some(messages) = self
+            .fetch_thread_messages(&msg.reply_target, &root, THREAD_FETCH_LIMIT)
+            .await
+        else {
+            return;
+        };
+        let current_ts = message_ts(&msg.reply_target, &msg.id).to_string();
+        if let Some(content) = with_thread_context(&messages, &current_ts, &msg.content) {
+            info!(
+                "Slack: attached {} thread message(s) from {root} to {}",
+                messages.len(),
+                msg.id
+            );
+            msg.content = content;
+        }
+    }
+
+    /// Filter an incoming message and enrich it with thread context.
+    /// Returns `None` when the message should be dropped.
+    async fn prepare_incoming(&self, mut msg: ChannelMessage) -> Option<ChannelMessage> {
+        let root = thread_root(&msg).map(str::to_string);
+        let first_seen = root
+            .as_deref()
+            .is_none_or(|r| !self.is_remembered_thread(&msg.reply_target, r));
+        if !self.admit(&msg).await {
+            return None;
+        }
+        if let Some(root) = root.as_deref() {
+            self.remember_thread(&msg.reply_target, root);
+        }
+        if first_seen {
+            self.attach_thread_context(&mut msg).await;
+        }
+        Some(msg)
     }
 
     /// Decide whether an incoming message should reach the orchestrator.
@@ -357,9 +410,7 @@ impl Channel for SlackChannel {
 
         self.post_message(channel, &message.content, message.thread_ts.as_deref())
             .await?;
-        if self.mention_only
-            && let Some(ts) = message.thread_ts.as_deref()
-        {
+        if let Some(ts) = message.thread_ts.as_deref() {
             self.remember_thread(channel, ts);
         }
         Ok(())
@@ -436,13 +487,15 @@ impl Channel for SlackChannel {
                                         if let Some(payload) = envelope.payload
                                             && let Some(channel_msg) = parse_events_api(&payload)
                                         {
-                                            if !self.admit(&channel_msg).await {
+                                            let id = channel_msg.id.clone();
+                                            let Some(channel_msg) =
+                                                self.prepare_incoming(channel_msg).await
+                                            else {
                                                 debug!(
-                                                    "Slack: dropping non-mention message {} (mention_only)",
-                                                    channel_msg.id
+                                                    "Slack: dropping non-mention message {id} (mention_only)"
                                                 );
                                                 continue 'inner;
-                                            }
+                                            };
                                             if tx.send(channel_msg).await.is_err() {
                                                 return Ok(());
                                             }
@@ -513,13 +566,135 @@ impl Channel for SlackChannel {
     }
 
     async fn add_reaction(&self, channel_id: &str, message_id: &str, emoji: &str) -> Result<()> {
-        self.add_reaction_inner(channel_id, message_id, emoji).await
+        let ts = message_ts(channel_id, message_id);
+        self.add_reaction_inner(channel_id, ts, emoji_name(emoji))
+            .await
     }
 
     async fn remove_reaction(&self, channel_id: &str, message_id: &str, emoji: &str) -> Result<()> {
-        self.remove_reaction_inner(channel_id, message_id, emoji)
+        let ts = message_ts(channel_id, message_id);
+        self.remove_reaction_inner(channel_id, ts, emoji_name(emoji))
             .await
     }
+}
+
+/// Slack's reactions API takes emoji *names* (`eyes`), while the orchestrator
+/// passes Unicode emoji. Map the ones it uses; pass names through (minus colons).
+fn emoji_name(emoji: &str) -> &str {
+    match emoji {
+        "\u{1F440}" => "eyes",
+        "\u{2705}" => "white_check_mark",
+        "\u{26A0}\u{FE0F}" | "\u{26A0}" => "warning",
+        "\u{274C}" => "x",
+        other => other.trim_matches(':'),
+    }
+}
+
+/// The orchestrator passes `ChannelMessage::id` (`slack_<channel>_<ts>`) as the
+/// reaction target; Slack's reactions API needs the bare message `ts`.
+fn message_ts<'a>(channel_id: &str, message_id: &'a str) -> &'a str {
+    message_id
+        .strip_prefix("slack_")
+        .and_then(|rest| rest.strip_prefix(channel_id))
+        .and_then(|rest| rest.strip_prefix('_'))
+        .unwrap_or(message_id)
+}
+
+/// How many thread messages to fetch when building context.
+const THREAD_FETCH_LIMIT: u32 = 200;
+/// Maximum characters of one thread message included as context.
+const THREAD_MESSAGE_MAX_CHARS: usize = 2000;
+/// Maximum total characters of thread context prepended to a message.
+const THREAD_CONTEXT_MAX_CHARS: usize = 12000;
+
+/// Author label for a thread message: `<@U…>` for people, `bot:<name>` for bots.
+fn thread_author(m: &serde_json::Value) -> String {
+    if m.get("bot_id").is_some() || m.get("subtype").and_then(|s| s.as_str()) == Some("bot_message")
+    {
+        let name = m["bot_profile"]["name"]
+            .as_str()
+            .or_else(|| m["username"].as_str())
+            .unwrap_or("bot");
+        return format!("bot:{name}");
+    }
+    m["user"]
+        .as_str()
+        .map_or_else(|| "unknown".to_string(), |u| format!("<@{u}>"))
+}
+
+/// Readable text of a thread message: its text plus legacy attachments
+/// (shared/unfurled messages) and file names.
+fn thread_message_text(m: &serde_json::Value) -> String {
+    let mut parts: Vec<String> = Vec::new();
+    if let Some(t) = m["text"].as_str().map(str::trim)
+        && !t.is_empty()
+    {
+        parts.push(t.to_string());
+    }
+    for a in m["attachments"].as_array().into_iter().flatten() {
+        let body = ["pretext", "title", "text", "fallback"]
+            .iter()
+            .filter_map(|k| a[*k].as_str().map(str::trim))
+            .find(|s| !s.is_empty());
+        if let Some(body) = body {
+            parts.push(format!("[attachment] {body}"));
+        }
+    }
+    for f in m["files"].as_array().into_iter().flatten() {
+        if let Some(name) = f["title"].as_str().or_else(|| f["name"].as_str()) {
+            parts.push(format!("[file] {name}"));
+        }
+    }
+    let joined = parts.join("\n");
+    let mut out: String = joined.chars().take(THREAD_MESSAGE_MAX_CHARS).collect();
+    if out.len() < joined.len() {
+        out.push('…');
+    }
+    out
+}
+
+/// Prefix `current` with the thread messages posted before it (oldest first).
+/// The root is always kept; when the total exceeds the budget, the oldest
+/// replies are dropped. Returns `None` when nothing worth adding remains.
+fn with_thread_context(
+    messages: &[serde_json::Value],
+    current_ts: &str,
+    current: &str,
+) -> Option<String> {
+    let lines: Vec<String> = messages
+        .iter()
+        .take_while(|m| m["ts"].as_str() != Some(current_ts))
+        .filter_map(|m| {
+            let text = thread_message_text(m);
+            (!text.is_empty()).then(|| format!("{}: {text}", thread_author(m)))
+        })
+        .collect();
+    let (root, replies) = lines.split_first()?;
+
+    let mut budget = THREAD_CONTEXT_MAX_CHARS.saturating_sub(root.chars().count());
+    let mut kept: Vec<&String> = Vec::new();
+    for line in replies.iter().rev() {
+        let len = line.chars().count() + 1;
+        if len > budget {
+            break;
+        }
+        budget -= len;
+        kept.push(line);
+    }
+    kept.reverse();
+    let omitted = replies.len() - kept.len();
+
+    let mut ctx = format!("{root}\n");
+    if omitted > 0 {
+        ctx.push_str(&format!("… ({omitted} earlier repl(ies) omitted)\n"));
+    }
+    for line in kept {
+        ctx.push_str(line);
+        ctx.push('\n');
+    }
+    Some(format!(
+        "[Slack thread so far — earlier messages, oldest first]\n{ctx}\n[Reply in thread]\n{current}"
+    ))
 }
 
 // ── parse_events_api helpers (CC ≤ 4 each) ───────────────────────
@@ -620,7 +795,8 @@ fn build_channel_message(f: SlackEventFields) -> ChannelMessage {
         content: f.text,
         channel: "slack".to_string(),
         timestamp,
-        thread_ts: Some(f.ts),
+        // Thread root: replies and conversation history are keyed per thread.
+        thread_ts: Some(f.thread_ts.clone().unwrap_or(f.ts)),
         interruption_scope_id: f.thread_ts,
         attachments: vec![],
         // true  → bot was @mentioned or this is a DM; skip reply-intent classifier
@@ -856,7 +1032,7 @@ mod tests {
         assert_eq!(msg.content, "hello");
         assert_eq!(msg.id, "slack_D9_1700000000.123456");
         assert_eq!(msg.timestamp, 1700000000);
-        assert_eq!(msg.thread_ts.as_deref(), Some("1700000000.123456"));
+        assert_eq!(msg.thread_ts.as_deref(), Some("1700000000.000000"));
         assert_eq!(
             msg.interruption_scope_id.as_deref(),
             Some("1700000000.000000")
@@ -1025,5 +1201,115 @@ mod tests {
         assert!(thread_involves_bot(&mentioned, "UBOT"));
         let unrelated = vec![serde_json::json!({ "user": "U1", "text": "<@U2> look" })];
         assert!(!thread_involves_bot(&unrelated, "UBOT"));
+    }
+
+    // ── thread context ─────────────────────────────────────────────
+
+    #[test]
+    fn thread_replies_share_the_root_as_thread_ts() {
+        let first = parse_events_api(&mention_event("U1", "C1", "<@UBOT> q", "1.0")).unwrap();
+        let reply = parse_events_api(&channel_message_event("more", "1.5", Some("1.0"))).unwrap();
+        assert_eq!(first.thread_ts.as_deref(), Some("1.0"));
+        assert_eq!(reply.thread_ts.as_deref(), Some("1.0"));
+        assert_eq!(reply.interruption_scope_id.as_deref(), Some("1.0"));
+    }
+
+    #[test]
+    fn message_ts_strips_internal_id_prefix() {
+        assert_eq!(
+            message_ts("C1", "slack_C1_1700000000.123456"),
+            "1700000000.123456"
+        );
+        assert_eq!(message_ts("C1", "1700000000.123456"), "1700000000.123456");
+        assert_eq!(message_ts("C2", "slack_C1_1.0"), "slack_C1_1.0");
+    }
+
+    #[test]
+    fn with_thread_context_includes_root_link() {
+        let msgs = vec![
+            serde_json::json!({ "ts": "1.0", "user": "U1", "text": "<https://news.hada.io/topic?id=37555>" }),
+            serde_json::json!({ "ts": "1.5", "user": "U1", "text": "<@UBOT> 이거 읽을 수 있니?" }),
+        ];
+        let out = with_thread_context(&msgs, "1.5", "<@UBOT> 이거 읽을 수 있니?").unwrap();
+        assert!(out.contains("<@U1>: <https://news.hada.io/topic?id=37555>"));
+        assert!(out.ends_with("[Reply in thread]\n<@UBOT> 이거 읽을 수 있니?"));
+        // The current message itself is not duplicated into the context.
+        assert_eq!(out.matches("이거 읽을 수 있니?").count(), 1);
+    }
+
+    #[test]
+    fn with_thread_context_includes_replies_bots_and_attachments() {
+        let msgs = vec![
+            serde_json::json!({ "ts": "1.0", "user": "U1", "text": "…",
+                                "attachments": [{ "fallback": "서버 장애 공유" }] }),
+            serde_json::json!({ "ts": "1.1", "bot_id": "B1", "bot_profile": { "name": "teo_bot" },
+                                "text": "네 내일 복구하시죠" }),
+            serde_json::json!({ "ts": "1.2", "user": "U2", "text": "넵",
+                                "files": [{ "name": "log.txt" }] }),
+            serde_json::json!({ "ts": "1.3", "user": "U1", "text": "<@UBOT> 위 내용 체크 가능?" }),
+        ];
+        let out = with_thread_context(&msgs, "1.3", "<@UBOT> 위 내용 체크 가능?").unwrap();
+        assert!(out.contains("[attachment] 서버 장애 공유"));
+        assert!(out.contains("bot:teo_bot: 네 내일 복구하시죠"));
+        assert!(out.contains("<@U2>: 넵\n[file] log.txt"));
+        let root_at = out.find("서버 장애 공유").unwrap();
+        assert!(root_at < out.find("teo_bot").unwrap());
+    }
+
+    #[test]
+    fn with_thread_context_none_without_prior_messages() {
+        let msgs = vec![serde_json::json!({ "ts": "1.0", "user": "U1", "text": "q" })];
+        assert!(with_thread_context(&msgs, "1.0", "q").is_none());
+        assert!(with_thread_context(&[], "1.0", "q").is_none());
+    }
+
+    #[test]
+    fn with_thread_context_keeps_root_and_drops_oldest_replies_over_budget() {
+        let mut msgs = vec![serde_json::json!({ "ts": "0", "user": "U1", "text": "ROOT" })];
+        for i in 1..=20 {
+            msgs.push(serde_json::json!({ "ts": format!("{i}"), "user": "U2",
+                                          "text": format!("R{i:02} {}", "x".repeat(1500)) }));
+        }
+        let out = with_thread_context(&msgs, "999", "q").unwrap();
+        assert!(out.contains("ROOT"));
+        assert!(out.contains("R20"));
+        assert!(!out.contains("R01"));
+        assert!(out.contains("earlier repl(ies) omitted"));
+        assert!(out.chars().count() < THREAD_CONTEXT_MAX_CHARS + 500);
+    }
+
+    #[test]
+    fn thread_message_text_truncates_long_messages() {
+        let m = serde_json::json!({ "text": "a".repeat(THREAD_MESSAGE_MAX_CHARS + 50) });
+        let t = thread_message_text(&m);
+        assert_eq!(t.chars().count(), THREAD_MESSAGE_MAX_CHARS + 1);
+        assert!(t.ends_with('…'));
+    }
+
+    #[test]
+    fn emoji_name_maps_unicode_to_slack_names() {
+        assert_eq!(emoji_name("\u{1F440}"), "eyes");
+        assert_eq!(emoji_name("\u{2705}"), "white_check_mark");
+        assert_eq!(emoji_name("\u{26A0}\u{FE0F}"), "warning");
+        assert_eq!(emoji_name(":rocket:"), "rocket");
+        assert_eq!(emoji_name("eyes"), "eyes");
+    }
+
+    #[tokio::test]
+    async fn prepare_incoming_leaves_thread_starters_untouched() {
+        let ch = mention_only_channel();
+        let msg = parse_events_api(&mention_event("U1", "C1", "<@UBOT> hi", "1.0")).unwrap();
+        let out = ch.prepare_incoming(msg).await.unwrap();
+        assert_eq!(out.content, "<@UBOT> hi");
+        assert!(ch.is_remembered_thread("C1", "1.0"));
+    }
+
+    #[tokio::test]
+    async fn prepare_incoming_skips_parent_fetch_for_known_threads() {
+        let ch = mention_only_channel();
+        ch.remember_thread("C1", "1.0");
+        let reply = parse_events_api(&channel_message_event("more", "1.5", Some("1.0"))).unwrap();
+        let out = ch.prepare_incoming(reply).await.unwrap();
+        assert_eq!(out.content, "more");
     }
 }
