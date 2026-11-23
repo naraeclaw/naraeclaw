@@ -136,24 +136,26 @@ impl SlackChannel {
         body["messages"].as_array().cloned()
     }
 
-    /// When the bot first sees a thread reply, prepend the thread's root
-    /// message so the model knows what "this" refers to. Messages that start
-    /// a thread themselves are left unchanged.
-    async fn attach_thread_parent(&self, msg: &mut ChannelMessage) {
+    /// When the bot first sees a thread reply, prepend the earlier messages of
+    /// that thread (root included) so the model knows what "this" / "above"
+    /// refers to. Messages that start a thread themselves are left unchanged.
+    async fn attach_thread_context(&self, msg: &mut ChannelMessage) {
         let Some(root) = msg.interruption_scope_id.clone() else {
             return;
         };
         let Some(messages) = self
-            .fetch_thread_messages(&msg.reply_target, &root, 1)
+            .fetch_thread_messages(&msg.reply_target, &root, THREAD_FETCH_LIMIT)
             .await
         else {
             return;
         };
-        let Some(parent) = messages.first() else {
-            return;
-        };
-        if let Some(content) = with_thread_parent(parent, &msg.content) {
-            info!("Slack: attached thread root {root} to message {}", msg.id);
+        let current_ts = message_ts(&msg.reply_target, &msg.id).to_string();
+        if let Some(content) = with_thread_context(&messages, &current_ts, &msg.content) {
+            info!(
+                "Slack: attached {} thread message(s) from {root} to {}",
+                messages.len(),
+                msg.id
+            );
             msg.content = content;
         }
     }
@@ -172,7 +174,7 @@ impl SlackChannel {
             self.remember_thread(&msg.reply_target, root);
         }
         if first_seen {
-            self.attach_thread_parent(&mut msg).await;
+            self.attach_thread_context(&mut msg).await;
         }
         Some(msg)
     }
@@ -565,12 +567,26 @@ impl Channel for SlackChannel {
 
     async fn add_reaction(&self, channel_id: &str, message_id: &str, emoji: &str) -> Result<()> {
         let ts = message_ts(channel_id, message_id);
-        self.add_reaction_inner(channel_id, ts, emoji).await
+        self.add_reaction_inner(channel_id, ts, emoji_name(emoji))
+            .await
     }
 
     async fn remove_reaction(&self, channel_id: &str, message_id: &str, emoji: &str) -> Result<()> {
         let ts = message_ts(channel_id, message_id);
-        self.remove_reaction_inner(channel_id, ts, emoji).await
+        self.remove_reaction_inner(channel_id, ts, emoji_name(emoji))
+            .await
+    }
+}
+
+/// Slack's reactions API takes emoji *names* (`eyes`), while the orchestrator
+/// passes Unicode emoji. Map the ones it uses; pass names through (minus colons).
+fn emoji_name(emoji: &str) -> &str {
+    match emoji {
+        "\u{1F440}" => "eyes",
+        "\u{2705}" => "white_check_mark",
+        "\u{26A0}\u{FE0F}" | "\u{26A0}" => "warning",
+        "\u{274C}" => "x",
+        other => other.trim_matches(':'),
     }
 }
 
@@ -584,23 +600,100 @@ fn message_ts<'a>(channel_id: &str, message_id: &'a str) -> &'a str {
         .unwrap_or(message_id)
 }
 
-/// Maximum characters of a thread root message injected as context.
-const THREAD_PARENT_MAX_CHARS: usize = 4000;
+/// How many thread messages to fetch when building context.
+const THREAD_FETCH_LIMIT: u32 = 200;
+/// Maximum characters of one thread message included as context.
+const THREAD_MESSAGE_MAX_CHARS: usize = 2000;
+/// Maximum total characters of thread context prepended to a message.
+const THREAD_CONTEXT_MAX_CHARS: usize = 12000;
 
-/// Prefix `current` with the thread's root message. Returns `None` when the
-/// root has no text worth adding.
-fn with_thread_parent(parent: &serde_json::Value, current: &str) -> Option<String> {
-    let text = parent["text"].as_str().map(str::trim).unwrap_or("");
-    if text.is_empty() {
-        return None;
+/// Author label for a thread message: `<@U…>` for people, `bot:<name>` for bots.
+fn thread_author(m: &serde_json::Value) -> String {
+    if m.get("bot_id").is_some() || m.get("subtype").and_then(|s| s.as_str()) == Some("bot_message")
+    {
+        let name = m["bot_profile"]["name"]
+            .as_str()
+            .or_else(|| m["username"].as_str())
+            .unwrap_or("bot");
+        return format!("bot:{name}");
     }
-    let text: String = text.chars().take(THREAD_PARENT_MAX_CHARS).collect();
-    let author = parent["user"]
+    m["user"]
         .as_str()
-        .map(|u| format!("<@{u}>"))
-        .unwrap_or_else(|| "unknown".to_string());
+        .map_or_else(|| "unknown".to_string(), |u| format!("<@{u}>"))
+}
+
+/// Readable text of a thread message: its text plus legacy attachments
+/// (shared/unfurled messages) and file names.
+fn thread_message_text(m: &serde_json::Value) -> String {
+    let mut parts: Vec<String> = Vec::new();
+    if let Some(t) = m["text"].as_str().map(str::trim)
+        && !t.is_empty()
+    {
+        parts.push(t.to_string());
+    }
+    for a in m["attachments"].as_array().into_iter().flatten() {
+        let body = ["pretext", "title", "text", "fallback"]
+            .iter()
+            .filter_map(|k| a[*k].as_str().map(str::trim))
+            .find(|s| !s.is_empty());
+        if let Some(body) = body {
+            parts.push(format!("[attachment] {body}"));
+        }
+    }
+    for f in m["files"].as_array().into_iter().flatten() {
+        if let Some(name) = f["title"].as_str().or_else(|| f["name"].as_str()) {
+            parts.push(format!("[file] {name}"));
+        }
+    }
+    let joined = parts.join("\n");
+    let mut out: String = joined.chars().take(THREAD_MESSAGE_MAX_CHARS).collect();
+    if out.len() < joined.len() {
+        out.push('…');
+    }
+    out
+}
+
+/// Prefix `current` with the thread messages posted before it (oldest first).
+/// The root is always kept; when the total exceeds the budget, the oldest
+/// replies are dropped. Returns `None` when nothing worth adding remains.
+fn with_thread_context(
+    messages: &[serde_json::Value],
+    current_ts: &str,
+    current: &str,
+) -> Option<String> {
+    let lines: Vec<String> = messages
+        .iter()
+        .take_while(|m| m["ts"].as_str() != Some(current_ts))
+        .filter_map(|m| {
+            let text = thread_message_text(m);
+            (!text.is_empty()).then(|| format!("{}: {text}", thread_author(m)))
+        })
+        .collect();
+    let (root, replies) = lines.split_first()?;
+
+    let mut budget = THREAD_CONTEXT_MAX_CHARS.saturating_sub(root.chars().count());
+    let mut kept: Vec<&String> = Vec::new();
+    for line in replies.iter().rev() {
+        let len = line.chars().count() + 1;
+        if len > budget {
+            break;
+        }
+        budget -= len;
+        kept.push(line);
+    }
+    kept.reverse();
+    let omitted = replies.len() - kept.len();
+
+    let mut ctx = format!("{root}\n");
+    if omitted > 0 {
+        ctx.push_str(&format!("… ({omitted} earlier repl(ies) omitted)\n"));
+    }
+    for line in kept {
+        ctx.push_str(line);
+        ctx.push('\n');
+    }
     Some(format!(
-        "[Slack thread root message by {author} — context for the reply below]\n{text}\n\n[Reply in thread]\n{current}"
+        "[Slack thread so far — earlier messages, oldest first]\n{ctx}\n[Reply in thread]\n{current}"
     ))
 }
 
@@ -1132,24 +1225,74 @@ mod tests {
     }
 
     #[test]
-    fn with_thread_parent_prefixes_root_text() {
-        let parent =
-            serde_json::json!({ "user": "U1", "text": "<https://news.hada.io/topic?id=37555>" });
-        let out = with_thread_parent(&parent, "<@UBOT> 이거 읽을 수 있니?").unwrap();
-        assert!(out.contains("<@U1>"));
-        assert!(out.contains("https://news.hada.io/topic?id=37555"));
-        assert!(out.ends_with("<@UBOT> 이거 읽을 수 있니?"));
+    fn with_thread_context_includes_root_link() {
+        let msgs = vec![
+            serde_json::json!({ "ts": "1.0", "user": "U1", "text": "<https://news.hada.io/topic?id=37555>" }),
+            serde_json::json!({ "ts": "1.5", "user": "U1", "text": "<@UBOT> 이거 읽을 수 있니?" }),
+        ];
+        let out = with_thread_context(&msgs, "1.5", "<@UBOT> 이거 읽을 수 있니?").unwrap();
+        assert!(out.contains("<@U1>: <https://news.hada.io/topic?id=37555>"));
+        assert!(out.ends_with("[Reply in thread]\n<@UBOT> 이거 읽을 수 있니?"));
+        // The current message itself is not duplicated into the context.
+        assert_eq!(out.matches("이거 읽을 수 있니?").count(), 1);
     }
 
     #[test]
-    fn with_thread_parent_skips_empty_and_truncates() {
-        assert!(
-            with_thread_parent(&serde_json::json!({ "user": "U1", "text": "  " }), "q").is_none()
-        );
-        let long = "a".repeat(THREAD_PARENT_MAX_CHARS + 100);
-        let out = with_thread_parent(&serde_json::json!({ "text": long }), "q").unwrap();
-        assert!(out.contains(&"a".repeat(THREAD_PARENT_MAX_CHARS)));
-        assert!(!out.contains(&"a".repeat(THREAD_PARENT_MAX_CHARS + 1)));
+    fn with_thread_context_includes_replies_bots_and_attachments() {
+        let msgs = vec![
+            serde_json::json!({ "ts": "1.0", "user": "U1", "text": "…",
+                                "attachments": [{ "fallback": "서버 장애 공유" }] }),
+            serde_json::json!({ "ts": "1.1", "bot_id": "B1", "bot_profile": { "name": "teo_bot" },
+                                "text": "네 내일 복구하시죠" }),
+            serde_json::json!({ "ts": "1.2", "user": "U2", "text": "넵",
+                                "files": [{ "name": "log.txt" }] }),
+            serde_json::json!({ "ts": "1.3", "user": "U1", "text": "<@UBOT> 위 내용 체크 가능?" }),
+        ];
+        let out = with_thread_context(&msgs, "1.3", "<@UBOT> 위 내용 체크 가능?").unwrap();
+        assert!(out.contains("[attachment] 서버 장애 공유"));
+        assert!(out.contains("bot:teo_bot: 네 내일 복구하시죠"));
+        assert!(out.contains("<@U2>: 넵\n[file] log.txt"));
+        let root_at = out.find("서버 장애 공유").unwrap();
+        assert!(root_at < out.find("teo_bot").unwrap());
+    }
+
+    #[test]
+    fn with_thread_context_none_without_prior_messages() {
+        let msgs = vec![serde_json::json!({ "ts": "1.0", "user": "U1", "text": "q" })];
+        assert!(with_thread_context(&msgs, "1.0", "q").is_none());
+        assert!(with_thread_context(&[], "1.0", "q").is_none());
+    }
+
+    #[test]
+    fn with_thread_context_keeps_root_and_drops_oldest_replies_over_budget() {
+        let mut msgs = vec![serde_json::json!({ "ts": "0", "user": "U1", "text": "ROOT" })];
+        for i in 1..=20 {
+            msgs.push(serde_json::json!({ "ts": format!("{i}"), "user": "U2",
+                                          "text": format!("R{i:02} {}", "x".repeat(1500)) }));
+        }
+        let out = with_thread_context(&msgs, "999", "q").unwrap();
+        assert!(out.contains("ROOT"));
+        assert!(out.contains("R20"));
+        assert!(!out.contains("R01"));
+        assert!(out.contains("earlier repl(ies) omitted"));
+        assert!(out.chars().count() < THREAD_CONTEXT_MAX_CHARS + 500);
+    }
+
+    #[test]
+    fn thread_message_text_truncates_long_messages() {
+        let m = serde_json::json!({ "text": "a".repeat(THREAD_MESSAGE_MAX_CHARS + 50) });
+        let t = thread_message_text(&m);
+        assert_eq!(t.chars().count(), THREAD_MESSAGE_MAX_CHARS + 1);
+        assert!(t.ends_with('…'));
+    }
+
+    #[test]
+    fn emoji_name_maps_unicode_to_slack_names() {
+        assert_eq!(emoji_name("\u{1F440}"), "eyes");
+        assert_eq!(emoji_name("\u{2705}"), "white_check_mark");
+        assert_eq!(emoji_name("\u{26A0}\u{FE0F}"), "warning");
+        assert_eq!(emoji_name(":rocket:"), "rocket");
+        assert_eq!(emoji_name("eyes"), "eyes");
     }
 
     #[tokio::test]
