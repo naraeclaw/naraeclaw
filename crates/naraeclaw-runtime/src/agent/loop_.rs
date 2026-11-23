@@ -1881,9 +1881,29 @@ pub async fn run_tool_call_loop(
             .to_string(),
     ));
 
+    // History already contains native tool_use/tool_result blocks. Some providers
+    // (e.g. Bedrock Converse) reject such a request unless the tool definitions are
+    // also sent, so pass the same specs and rely on the prompt to get plain text.
+    let mut summary_tool_specs: Vec<crate::tools::ToolSpec> = tools_registry
+        .iter()
+        .filter(|tool| !excluded_tools.iter().any(|ex| ex == tool.name()))
+        .map(|tool| tool.spec())
+        .collect();
+    if let Some(at) = activated_tools {
+        for spec in at.lock().unwrap().tool_specs() {
+            if !excluded_tools.iter().any(|ex| ex == &spec.name) {
+                summary_tool_specs.push(spec);
+            }
+        }
+    }
+    let summary_tools = if provider.supports_native_tools() && !summary_tool_specs.is_empty() {
+        Some(summary_tool_specs.as_slice())
+    } else {
+        None
+    };
     let summary_request = naraeclaw_providers::ChatRequest {
         messages: history,
-        tools: None, // No tools — force a text response
+        tools: summary_tools,
     };
     match provider.chat(summary_request, model, temperature).await {
         Ok(resp) => {
